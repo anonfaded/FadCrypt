@@ -10,6 +10,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidTag
 import psutil
+import tkinter as tk
+from tkinter import simpledialog
 
 class AppLocker:
     def __init__(self, config_file="config.json"):
@@ -17,6 +19,15 @@ class AppLocker:
         self.password_file = "encrypted_password.bin"
         self.load_config()
         self.monitoring = False
+        self.monitoring_thread = None
+
+    def prompt_password_in_gui(self):
+        """ Prompt for a password using a minimal GUI dialog """
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+        password = simpledialog.askstring("Password", "Enter your password:", show='*')
+        root.destroy()  # Close the Tkinter root window
+        return password
 
     def load_config(self):
         """ Load application configuration from a JSON file """
@@ -95,7 +106,6 @@ class AppLocker:
             if not os.path.exists(self.password_file):
                 return False
 
-            password = password.encode()
             with open(self.password_file, "rb") as f:
                 salt = f.read(16)
                 tag = f.read(16)
@@ -108,13 +118,13 @@ class AppLocker:
                 iterations=100000,
                 backend=default_backend()
             )
-            key = kdf.derive(password)
+            key = kdf.derive(password.encode())
             cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag), backend=default_backend())
             decryptor = cipher.decryptor()
             decrypted_hash = decryptor.update(encrypted_hash) + decryptor.finalize()
 
             # Ensure the password matches the decrypted hash
-            return password == decrypted_hash
+            return password.encode() == decrypted_hash
         except InvalidTag:
             print("Incorrect password or data tampering detected.")
         except Exception as e:
@@ -122,22 +132,29 @@ class AppLocker:
         return False
 
     def block_application(self, app_name, app_path):
-        """ Block the specified application and prompt for password """
+        """ Block the specified application and prompt for password using GUI """
         while self.monitoring:
             for proc in psutil.process_iter(['name']):
                 if proc.info['name'].lower() == app_name.lower():
                     proc.terminate()
-                    if self.verify_password(getpass.getpass("Enter your password to unlock: ")):
+                    print(f"Application Path: {app_path}")
+                    password = self.prompt_password_in_gui()
+                   
+                    if self.verify_password(password):
                         if app_path:
                             subprocess.Popen(app_path)  # Relaunch the app after password verification
+                    else:
+                        print(f"{app_name} remains locked due to incorrect password.")
                     break  # Exit the loop after handling the detected instance
             time.sleep(1)  # Check every 1 second
+
 
     def add_application(self):
         """ Add a new application to the config """
         app_name = input("Enter the name of the application (e.g., brave.exe): ")
         app_path = input("Enter the full path to the application (or leave blank if unknown): ")
-        app_path = app_path.replace('\"', '').replace(' ', '')  # Remove quotes and spaces from path
+         # Replace single slashes with double slashes and trim only trailing whitespace
+        app_path = app_path.replace('/', '\\').replace('"', '').rstrip()
         if app_name:
             self.config["applications"].append({"name": app_name, "path": app_path})
             self.save_config()
@@ -165,20 +182,22 @@ class AppLocker:
             print("Monitoring is already running.")
 
     def stop_monitoring(self):
-        """ Stop monitoring, only if the correct password is provided """
-        password = getpass.getpass("Enter your password to stop monitoring: ")
-        if self.verify_password(password):
+        """ Stop monitoring """
+        if self.monitoring:
             self.monitoring = False
             print("Monitoring stopped.")
         else:
-            print("Incorrect password. Monitoring continues.")
+            print("Monitoring is not running.")
 
     def monitoring_loop(self):
         """ Keep the monitoring loop running """
         while self.monitoring:
             command = input()
             if command.lower() == 'quit':
-                self.stop_monitoring()
+                if self.verify_password(getpass.getpass("Enter your password to stop monitoring: ")):
+                    self.stop_monitoring()
+                else:
+                    print("Incorrect password. Monitoring will continue.")
             else:
                 print("Invalid command. To stop monitoring, type 'quit' and press Enter.")
 
