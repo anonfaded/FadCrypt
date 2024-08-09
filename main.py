@@ -71,11 +71,13 @@ class AppLocker:
                             print(f"Terminated {process_name}")
                         except psutil.NoSuchProcess:
                             print(f"Process {process_name} no longer exists")
+                            time.sleep(1)
 
-                time.sleep(1)  # Sleep for a bit to reduce CPU usage
+                time.sleep(2)  # Sleep for a bit to reduce CPU usage
 
             except Exception as e:
                 print(f"Error in continuously_terminate_locked_apps: {e}")
+
 
 
     def prompt_password_in_gui(self, app_name):
