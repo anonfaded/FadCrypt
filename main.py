@@ -14,12 +14,14 @@ import tkinter as tk
 from tkinter import simpledialog
 
 class AppLocker:
-    def __init__(self, config_file="config.json"):
+    def __init__(self, config_file="config.json", state_file="state.json"):
         self.config_file = config_file
         self.password_file = "encrypted_password.bin"
         self.load_config()
         self.monitoring = False
         self.monitoring_thread = None
+        self.state_file = state_file
+        self.load_state()
 
     def prompt_password_in_gui(self):
         """ Prompt for a password using a minimal GUI dialog """
@@ -131,22 +133,130 @@ class AppLocker:
             print(f"Error verifying password: {e}")
         return False
 
+    def load_state(self):
+        """ Load the application state from a JSON file """
+        if os.path.exists(self.state_file):
+            with open(self.state_file, "r") as f:
+                self.state = json.load(f)
+        else:
+            self.state = {"unlocked_apps": []}
+
+    def save_state(self):
+        """ Save the current state to a JSON file """
+        with open(self.state_file, "w") as f:
+            json.dump(self.state, f, indent=4)
+
+
+
     def block_application(self, app_name, app_path):
+        """ Block the specified application and prompt for password using GUI """
+        while self.monitoring:
+            # Check if the application is running
+            app_running = any(proc.info['name'].lower() == app_name.lower() for proc in psutil.process_iter(['name']))
+            
+            if app_running:
+                # If the app is running and is in the unlocked state, do nothing
+                if app_name in self.state["unlocked_apps"]:
+                    # Check if the process is still running
+                    if not any(proc.info['name'].lower() == app_name.lower() for proc in psutil.process_iter(['name'])):
+                        # The app is not running, remove it from unlocked list
+                        self.state["unlocked_apps"].remove(app_name)
+                        self.save_state()
+                    else:
+                        # App is running, continue without terminating it
+                        continue
+                
+                # The app is either not running or not in the unlocked state
+                for proc in psutil.process_iter(['name']):
+                    if proc.info['name'].lower() == app_name.lower():
+                        proc.terminate()
+                        break  # Stop looking for this process
+
+                # Prompt for password
+                password = self.prompt_password_in_gui()
+                if password is None:
+                    # Cancel button pressed or dialog closed
+                    print(f"{app_name} remains locked due to cancellation.")
+                    continue
+
+                if self.verify_password(password):
+                    # Update the state to reflect the application is unlocked
+                    if app_name not in self.state["unlocked_apps"]:
+                        self.state["unlocked_apps"].append(app_name)
+                        self.save_state()
+
+                    if app_path:
+                        try:
+                            subprocess.Popen(app_path)  # Relaunch the app after password verification
+                            print(f"{app_name} started successfully.")
+                        except Exception as e:
+                            print(f"Failed to start {app_name}: {e}")
+                else:
+                    print(f"{app_name} remains locked due to incorrect password.")
+                    # Remove the application from unlocked list if password is incorrect
+                    if app_name in self.state["unlocked_apps"]:
+                        self.state["unlocked_apps"].remove(app_name)
+                        self.save_state()
+            
+            time.sleep(1)  # Check every 1 second
+
+
+
+
+
+
         """ Block the specified application and prompt for password using GUI """
         while self.monitoring:
             for proc in psutil.process_iter(['name']):
                 if proc.info['name'].lower() == app_name.lower():
+                    print(f"Detected {app_name}. Terminating process.")
                     proc.terminate()
-                    print(f"Application Path: {app_path}")
+                    
+                    # Debugging: Print current state and application name
+                    print(f"Current state: {self.state}")
+
+                    # Check if application is in the unlocked state
+                    if app_name in self.state["unlocked_apps"]:
+                        print(f"{app_name} is already unlocked. Skipping password prompt.")
+                        continue
+                    
+                    # Prompt for password
                     password = self.prompt_password_in_gui()
-                   
+                    if password is None:
+                        print("Password prompt was canceled. Terminating application.")
+                        proc.terminate()
+                        break
+
                     if self.verify_password(password):
+                        print(f"Password for {app_name} verified successfully.")
+                        # Update the state to reflect the application is unlocked
+                        if app_name not in self.state["unlocked_apps"]:
+                            self.state["unlocked_apps"].append(app_name)
+                            self.save_state()
+                            print(f"State updated: {self.state}")
+
+                        # Relaunch the app if needed
                         if app_path:
-                            subprocess.Popen(app_path)  # Relaunch the app after password verification
+                            try:
+                                print(f"Attempting to launch {app_path}")
+                                subprocess.Popen(app_path)  # Relaunch the app after password verification
+                                print(f"Successfully launched {app_path}.")
+                            except FileNotFoundError as e:
+                                print(f"Error launching {app_path}: {e}")
+                            except Exception as e:
+                                print(f"Unexpected error launching {app_path}: {e}")
                     else:
                         print(f"{app_name} remains locked due to incorrect password.")
+                        # Remove the application from unlocked list if password is incorrect
+                        if app_name in self.state["unlocked_apps"]:
+                            self.state["unlocked_apps"].remove(app_name)
+                            self.save_state()
+                            print(f"State updated: {self.state}")
+                    
                     break  # Exit the loop after handling the detected instance
             time.sleep(1)  # Check every 1 second
+
+
 
 
     def add_application(self):
