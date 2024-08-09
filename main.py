@@ -42,27 +42,41 @@ class AppLocker:
 
 
 
+    def get_unlocked_apps(self):
+        """ Retrieve the list of unlocked applications from state.json. """
+        try:
+            with open('state.json', 'r') as f:
+                data = json.load(f)
+            return data.get('unlocked_apps', [])
+        except Exception as e:
+            print(f"Error retrieving unlocked apps: {e}")
+            return []
+    
+
+
+
+
     def continuously_terminate_locked_apps(self):
-        """ Continuously terminate locked apps if they are found running """
+        """ Continuously check for and terminate locked applications. """
         while True:
             try:
                 locked_apps = self.get_locked_apps()
-                for proc in psutil.process_iter(['name']):
-                    if proc.info['name'] in locked_apps:
-                        # Terminate the process if it is in the list of locked apps
+                unlocked_apps = self.get_unlocked_apps()
+
+                for proc in psutil.process_iter(['pid', 'name']):
+                    process_name = proc.info['name']
+                    if process_name in locked_apps and process_name not in unlocked_apps:
                         proc.terminate()
-                        print(f"Terminated {proc.info['name']}")
-                time.sleep(1)  # Check every second
+                        print(f"Terminated {process_name}")
+
+                time.sleep(1)  # Sleep for a bit to reduce CPU usage
+
             except Exception as e:
                 print(f"Error in continuously_terminate_locked_apps: {e}")
-                time.sleep(1)  # Delay before retrying on error
 
 
     def prompt_password_in_gui(self, app_name):
         """ Prompt for a password using a minimal GUI dialog and run continuous monitoring """
-        # Start the continuous monitoring in a separate thread
-        monitor_thread = threading.Thread(target=self.continuously_terminate_locked_apps, daemon=True)
-        monitor_thread.start()
 
         root = tk.Tk()
         root.withdraw()  # Hide the root window
@@ -262,7 +276,11 @@ class AppLocker:
             print(f"Application {app_name} removed from the configuration.")
 
     def start_monitoring(self):
+        """ Start monitoring and terminating locked apps """
+        # Start continuous termination in a separate thread
+        threading.Thread(target=self.continuously_terminate_locked_apps, daemon=True).start()
         """ Start the monitoring thread """
+
         if not self.monitoring:
             self.monitoring = True
             for app in self.config["applications"]:
