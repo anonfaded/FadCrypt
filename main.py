@@ -23,13 +23,57 @@ class AppLocker:
         self.state_file = state_file
         self.load_state()
 
-    def prompt_password_in_gui(self):
-        """ Prompt for a password using a minimal GUI dialog """
+
+
+
+
+
+    def get_locked_apps(self):
+        """ Get the list of locked apps from config.json """
+        try:
+            with open('config.json', 'r') as file:
+                data = json.load(file)
+            # Extract application names from the config
+            return [app['name'] for app in data['applications']]
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Error loading config: {e}")
+            return []
+
+
+
+
+    def continuously_terminate_locked_apps(self):
+        """ Continuously terminate locked apps if they are found running """
+        while True:
+            try:
+                locked_apps = self.get_locked_apps()
+                for proc in psutil.process_iter(['name']):
+                    if proc.info['name'] in locked_apps:
+                        # Terminate the process if it is in the list of locked apps
+                        proc.terminate()
+                        print(f"Terminated {proc.info['name']}")
+                time.sleep(1)  # Check every second
+            except Exception as e:
+                print(f"Error in continuously_terminate_locked_apps: {e}")
+                time.sleep(1)  # Delay before retrying on error
+
+
+    def prompt_password_in_gui(self, app_name):
+        """ Prompt for a password using a minimal GUI dialog and run continuous monitoring """
+        # Start the continuous monitoring in a separate thread
+        monitor_thread = threading.Thread(target=self.continuously_terminate_locked_apps, daemon=True)
+        monitor_thread.start()
+
         root = tk.Tk()
         root.withdraw()  # Hide the root window
-        password = simpledialog.askstring("Password", "Enter your password:", show='*')
+        password = simpledialog.askstring("Password", f"Enter your password to unlock {app_name}:", show='*')
         root.destroy()  # Close the Tkinter root window
         return password
+
+
+
+
+
 
     def load_config(self):
         """ Load application configuration from a JSON file """
@@ -162,7 +206,7 @@ class AppLocker:
                     print(f"Detected {app_name} trying to start. Process terminated.")
                     
                     # Prompt for password
-                    password = self.prompt_password_in_gui()
+                    password = self.prompt_password_in_gui(app_name)
                     if password is None:
                         # Cancel button pressed or dialog closed
                         print(f"{app_name} remains locked due to cancellation.")
