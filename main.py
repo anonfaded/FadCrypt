@@ -247,6 +247,7 @@ class AppLocker:
                         print(f"{app_name} remains locked due to incorrect password.")
                 else:
                     print(f"{app_name} is already unlocked. Skipping termination.")
+                    time.sleep(7)
             
             # Check if the unlocked app has been closed and remove from unlocked state
             if app_name in self.state["unlocked_apps"] and not app_processes:
