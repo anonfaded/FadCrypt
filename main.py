@@ -66,8 +66,11 @@ class AppLocker:
                 for proc in psutil.process_iter(['pid', 'name']):
                     process_name = proc.info['name']
                     if process_name in locked_apps and process_name not in unlocked_apps:
-                        proc.terminate()
-                        print(f"Terminated {process_name}")
+                        try:
+                            proc.terminate()
+                            print(f"Terminated {process_name}")
+                        except psutil.NoSuchProcess:
+                            print(f"Process {process_name} no longer exists")
 
                 time.sleep(1)  # Sleep for a bit to reduce CPU usage
 
