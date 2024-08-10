@@ -17,6 +17,20 @@ import signal
 from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
 import sys
+import base64
+from cryptography.fernet import Fernet
+
+# Embedded configuration and state data
+embedded_config = {
+    "applications": []
+}
+
+embedded_state = {
+    "unlocked_apps": [
+        "FreeTube.exe"
+    ]
+}
+
 
 class AppLockerGUI:
     def __init__(self, master):
@@ -52,12 +66,12 @@ class AppLockerGUI:
         ttk.Button(self.apps_frame, text="Remove Application", command=self.remove_application).pack(pady=5)
 
         # Config Tab
-        # self.config_frame = ttk.Frame(self.notebook)
-        # self.notebook.add(self.config_frame, text="Config")
+        self.config_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.config_frame, text="Config")
 
-        # self.config_text = tk.Text(self.config_frame, width=60, height=10)
-        # self.config_text.pack(pady=5)
-        # self.update_config_display()
+        self.config_text = tk.Text(self.config_frame, width=60, height=10)
+        self.config_text.pack(pady=5)
+        self.update_config_display()
 
         # State Tab
         # self.state_frame = ttk.Frame(self.notebook)
@@ -153,7 +167,7 @@ class AppLockerGUI:
             if app_path:
                 self.app_locker.add_application(app_name, app_path)
                 self.update_apps_listbox()
-                self.update_config_textbox()  # Update config tab
+                self.update_config_display()  # Update config tab
                 messagebox.showinfo("Success", f"Application {app_name} added successfully.")
 
 
@@ -163,7 +177,7 @@ class AppLockerGUI:
             app_name = self.apps_listbox.get(selection[0]).split(" - ")[0]
             self.app_locker.remove_application(app_name)
             self.update_apps_listbox()
-            self.update_config_textbox()  # Update config tab
+            self.update_config_display()  # Update config tab
             messagebox.showinfo("Success", f"Application {app_name} removed successfully.")
         else:
             messagebox.showerror("Error", "Please select an application to remove.")
@@ -189,40 +203,124 @@ class AppLocker:
     # def __init__(self, gui, config_file="config.json", state_file="state.json"):
     def __init__(self, gui):
         self.gui = gui
+        self.config_file = self.get_config_file_path()
+        self.key = self.generate_key()
+        self.fernet = Fernet(self.key)
+
         # self.config_file = {"applications": []}  # In-memory config
         self.password_file = "encrypted_password.bin"
+        self.config = {"applications": []}  # In-memory configuration
+        self.state = {"unlocked_apps": []}  # In-memory state
+
         self.load_config()
+        self.load_state()
         self.monitoring = False
         self.monitoring_thread = None
         # self.state_file = {"unlocked_apps": []}  # In-memory state
         self.load_state()
         self.icon = None
-        self.config = {"applications": []}  # In-memory configuration
-        self.state = {"unlocked_apps": []}  # In-memory state
+        
+
+        
 
     def load_config(self):
-        # No file operation, use in-memory config
-        pass
+        print(f"Loading config from {self.config_file}")  # Debug print
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'rb') as f:
+                encrypted_data = f.read()
+                self.config = self.decrypt_data(encrypted_data)
+                print(f"Config loaded: {self.config}")  # Debug print
+        else:
+            self.config = {"applications": []}
+            print("Config file does not exist. Initialized with default config.")  # Debug print
 
     def save_config(self):
-        # No file operation, use in-memory config
-        pass
+        encrypted_data = self.encrypt_data(self.config)
+        print(f"Saving config to {self.config_file}")  # Debug print
+        with open(self.config_file, 'wb') as f:
+            f.write(encrypted_data)
+        print("Config saved.")  # Debug print
 
+    def get_key(self):
+        # Generate a key for encryption/decryption
+        # You can generate a key using: Fernet.generate_key()
+        # Save this key securely; for demo, we're using a hardcoded key.
+        return base64.urlsafe_b64encode(b"your-secret-key-32-bytes-long")
+
+    def get_config_file_path(self):
+        path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
+        os.makedirs(path, exist_ok=True)  # Ensure the directory exists
+        config_file_path = os.path.join(path, 'config.json')
+        print(f"Config file path: {config_file_path}")  # Debug print
+        return config_file_path
+        
+    def generate_key(self):
+        key_path = os.path.join(os.getenv('APPDATA'), 'FadCrypt', 'config.key')
+        print(f"Key file path: {key_path}")  # Debug print
+        if os.path.exists(key_path):
+            with open(key_path, 'rb') as key_file:
+                return key_file.read()
+        else:
+            key = Fernet.generate_key()
+            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            with open(key_path, 'wb') as key_file:
+                key_file.write(key)
+            return key
+    
+    def encrypt_data(self, data):
+        json_data = json.dumps(data).encode()
+        encrypted_data = self.fernet.encrypt(json_data)
+        print(f"Encrypted data: {encrypted_data}")  # Debug print
+        return encrypted_data
+
+    def decrypt_data(self, encrypted_data):
+        decrypted_data = self.fernet.decrypt(encrypted_data)
+        print(f"Decrypted data: {decrypted_data}")  # Debug print
+        return json.loads(decrypted_data)
+    
     def load_state(self):
         # No file operation, use in-memory state
         pass
 
     def save_state(self):
-        # No file operation, use in-memory state
-        pass
+        self._update_script("embedded_state", self.state)
     
     def export_config(self):
-        with open("config.json", "w") as f:
+        export_path = "FadCrypt_config.json"
+        print(f"Exporting config to {export_path}")  # Debug print
+        with open(export_path, "w") as f:
             json.dump(self.config, f, indent=4)
+        print("Config exported.")  # Debug print
 
     def export_state(self):
-        with open("state.json", "w") as f:
+        export_path = "state.json"
+        print(f"Exporting state to {export_path}")  # Debug print
+        with open(export_path, "w") as f:
             json.dump(self.state, f, indent=4)
+        print("State exported.")  # Debug print
+
+
+    def _update_script(self, variable_name, data):
+        # Update the script with new data
+        script_path = sys.argv[0]  # Get the path of the running script
+
+        print(f"Updating script: {script_path}")  # Debug print
+        with open(script_path, 'r') as file:
+            script = file.read()
+
+        # Convert the current embedded data to a JSON string
+        old_data_str = f"{variable_name} = " + json.dumps(eval(variable_name), indent=4)
+
+        # Convert the new data to a JSON string
+        new_data_str = f"{variable_name} = " + json.dumps(data, indent=4)
+
+        # Replace the old data with the new data in the script
+        script = script.replace(old_data_str, new_data_str)
+
+        # Save the modified script
+        with open(script_path, 'w') as file:
+            file.write(script)
+        print("Script updated.")  # Debug print
 
 
 
