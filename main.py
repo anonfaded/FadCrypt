@@ -19,6 +19,10 @@ from pystray import Icon, Menu, MenuItem
 import sys
 import base64
 from cryptography.fernet import Fernet
+import shutil
+import time
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # Embedded configuration and state data
 embedded_config = {
@@ -540,6 +544,108 @@ class AppLocker:
         else:
             messagebox.showerror("Error", "Incorrect password. Application will continue.")
 
+
+
+
+class FileMonitor:
+    def __init__(self):
+        self.observer = Observer()
+        self.backup_folder = None
+        self.files_to_monitor = []
+
+    def get_fadcrypt_folder(self):
+        path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    def set_files_to_monitor(self):
+        # Set the files to monitor in the correct directory
+        fadcrypt_folder = self.get_fadcrypt_folder()
+        self.files_to_monitor = [
+            os.path.join(fadcrypt_folder, 'config.json'),
+            os.path.join(fadcrypt_folder, 'encrypted_password.bin')
+        ]
+        self.backup_folder = os.path.join(fadcrypt_folder, 'backup')
+        os.makedirs(self.backup_folder, exist_ok=True)
+        print(f"Files to monitor set: {self.files_to_monitor}")
+        print(f"Backup folder created at: {self.backup_folder}")
+
+    def start_monitoring(self):
+        self.set_files_to_monitor()
+        event_handler = self.FileChangeHandler(self.files_to_monitor, self.backup_folder)
+        self.observer.schedule(event_handler, os.path.dirname(self.files_to_monitor[0]), recursive=False)
+        self.observer.start()
+        print("Started monitoring files...")
+
+    class FileChangeHandler(FileSystemEventHandler):
+        def __init__(self, files_to_monitor, backup_folder):
+            super().__init__()
+            self.files_to_monitor = files_to_monitor
+            self.backup_folder = backup_folder
+            self.initial_restore()  # Restore any missing files from the backup folder
+            print("Initial file recovery completed.")
+
+        def on_modified(self, event):
+            if event.src_path in self.files_to_monitor:
+                print(f"File modified: {event.src_path}")
+                self.backup_files()
+
+        def on_deleted(self, event):
+            if event.src_path in self.files_to_monitor:
+                print(f"File deleted: {event.src_path}")
+                self.restore_files()
+
+        def backup_files(self):
+            for file_path in self.files_to_monitor:
+                if os.path.exists(file_path):
+                    backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
+                    try:
+                        shutil.copy(file_path, backup_path)
+                        print(f"Backed up {file_path} to {backup_path}")
+                    except Exception as e:
+                        print(f"Error backing up {file_path}: {e}")
+                else:
+                    print(f"File {file_path} does not exist, cannot back up.")
+
+        def restore_files(self):
+            for file_path in self.files_to_monitor:
+                backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
+                if not os.path.exists(file_path) and os.path.exists(backup_path):
+                    try:
+                        shutil.copy(backup_path, file_path)
+                        print(f"Restored {file_path} from {backup_path}")
+                    except Exception as e:
+                        print(f"Error restoring {file_path}: {e}")
+                else:
+                    print(f"Could not restore {file_path}; either it already exists or no backup found.")
+
+        def initial_restore(self):
+            for file_path in self.files_to_monitor:
+                if not os.path.exists(file_path):
+                    backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
+                    if os.path.exists(backup_path):
+                        try:
+                            shutil.copy(backup_path, file_path)
+                            print(f"Initial restore: {file_path} restored from {backup_path}")
+                        except Exception as e:
+                            print(f"Error during initial restore of {file_path}: {e}")
+                    else:
+                        print(f"Backup for {file_path} not found for initial restore.")
+
+
+
+def start_monitoring_thread(monitor):
+    monitor.start_monitoring()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        monitor.observer.stop()
+    monitor.observer.join()
+
+
+
+
 def main():
     root = tk.Tk()
     app = AppLockerGUI(root)
@@ -547,4 +653,8 @@ def main():
     root.mainloop()
 
 if __name__ == "__main__":
+    monitor = FileMonitor()
+    monitoring_thread = threading.Thread(target=start_monitoring_thread, args=(monitor,))
+    monitoring_thread.daemon = True
+    monitoring_thread.start()
     main()
