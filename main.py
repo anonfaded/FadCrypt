@@ -244,6 +244,8 @@ class AppLocker:
 
     def load_config(self):
         print(f"Loading config from {self.config_file}")  # Debug print
+        
+        # Check if the config file exists
         if os.path.exists(self.config_file):
             if os.path.exists(self.password_file):
                 password = self.load_password()
@@ -252,9 +254,15 @@ class AppLocker:
             else:
                 print("Password file does not exist.")
                 self.config = {"applications": []}
+                # Optionally, save default config if password file is missing
+                self.save_config()
         else:
-            self.config = {"applications": []}
             print("Config file does not exist. Initialized with default config.")  # Debug print
+            self.config = {"applications": []}
+            # Create the config file with default content
+            with open(self.config_file, 'w') as f:
+                json.dump(self.config, f, indent=4)
+            print(f"Config file created at {self.config_file} with default settings.")  # Debug print
 
     def save_config(self):
         if os.path.exists(self.password_file):
