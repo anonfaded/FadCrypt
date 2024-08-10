@@ -311,7 +311,7 @@ class AppLocker:
 def main():
     root = tk.Tk()
     app = AppLockerGUI(root)
-    root.protocol("WM_DELETE_WINDOW", root.iconify)  # Minimize instead of close
+    # root.protocol("WM_DELETE_WINDOW", root.iconify)  # Minimize instead of close
     root.mainloop()
 
 if __name__ == "__main__":
