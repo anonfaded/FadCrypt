@@ -558,6 +558,13 @@ class FileMonitor:
         os.makedirs(path, exist_ok=True)
         return path
 
+    def get_backup_folder(self):
+        # Using ProgramData for more secure backup location
+        print("Using ProgramData for more secure backup location")
+        path = os.path.join('C:\\ProgramData', 'FadCrypt', 'Backup')
+        os.makedirs(path, exist_ok=True)
+        return path
+    
     def set_files_to_monitor(self):
         # Set the files to monitor in the correct directory
         fadcrypt_folder = self.get_fadcrypt_folder()
@@ -565,10 +572,7 @@ class FileMonitor:
             os.path.join(fadcrypt_folder, 'config.json'),
             os.path.join(fadcrypt_folder, 'encrypted_password.bin')
         ]
-        self.backup_folder = os.path.join(fadcrypt_folder, 'backup')
-        os.makedirs(self.backup_folder, exist_ok=True)
-        print(f"Files to monitor set: {self.files_to_monitor}")
-        print(f"Backup folder created at: {self.backup_folder}")
+        self.backup_folder = self.get_backup_folder()
 
     def start_monitoring(self):
         self.set_files_to_monitor()
@@ -596,6 +600,11 @@ class FileMonitor:
                 self.restore_files()
 
         def backup_files(self):
+            # Ensure backup directory exists
+            if not os.path.exists(self.backup_folder):
+                os.makedirs(self.backup_folder)
+                print(f"Backup folder created: {self.backup_folder}")
+
             for file_path in self.files_to_monitor:
                 if os.path.exists(file_path):
                     backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
@@ -607,10 +616,13 @@ class FileMonitor:
                 else:
                     print(f"File {file_path} does not exist, cannot back up.")
 
+
         def restore_files(self):
             for file_path in self.files_to_monitor:
                 backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
                 if not os.path.exists(file_path) and os.path.exists(backup_path):
+                    # Ensure the target directory exists
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
                     try:
                         shutil.copy(backup_path, file_path)
                         print(f"Restored {file_path} from {backup_path}")
@@ -619,11 +631,14 @@ class FileMonitor:
                 else:
                     print(f"Could not restore {file_path}; either it already exists or no backup found.")
 
+
         def initial_restore(self):
             for file_path in self.files_to_monitor:
                 if not os.path.exists(file_path):
                     backup_path = os.path.join(self.backup_folder, os.path.basename(file_path))
                     if os.path.exists(backup_path):
+                        # Ensure the target directory exists
+                        os.makedirs(os.path.dirname(file_path), exist_ok=True)
                         try:
                             shutil.copy(backup_path, file_path)
                             print(f"Initial restore: {file_path} restored from {backup_path}")
@@ -631,6 +646,7 @@ class FileMonitor:
                             print(f"Error during initial restore of {file_path}: {e}")
                     else:
                         print(f"Backup for {file_path} not found for initial restore.")
+
 
 
 
