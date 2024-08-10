@@ -22,7 +22,7 @@ class AppLockerGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("App Locker")
-        self.master.geometry("400x300")
+        self.master.geometry("500x400") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
         
         self.create_widgets()
@@ -31,6 +31,7 @@ class AppLockerGUI:
         self.notebook = ttk.Notebook(self.master)
         self.notebook.pack(expand=True, fill="both")
 
+        # Main Tab
         self.main_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.main_frame, text="Main")
 
@@ -39,6 +40,7 @@ class AppLockerGUI:
         ttk.Button(self.main_frame, text="Start Monitoring", command=self.start_monitoring).pack(pady=5)
         ttk.Button(self.main_frame, text="Stop Monitoring", command=self.stop_monitoring).pack(pady=5)
 
+        # Applications Tab
         self.apps_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.apps_frame, text="Applications")
 
@@ -48,6 +50,77 @@ class AppLockerGUI:
 
         ttk.Button(self.apps_frame, text="Add Application", command=self.add_application).pack(pady=5)
         ttk.Button(self.apps_frame, text="Remove Application", command=self.remove_application).pack(pady=5)
+
+        # Config Tab
+        # self.config_frame = ttk.Frame(self.notebook)
+        # self.notebook.add(self.config_frame, text="Config")
+
+        # self.config_text = tk.Text(self.config_frame, width=60, height=10)
+        # self.config_text.pack(pady=5)
+        # self.update_config_display()
+
+        # State Tab
+        # self.state_frame = ttk.Frame(self.notebook)
+        # self.notebook.add(self.state_frame, text="State")
+
+        # self.state_text = tk.Text(self.state_frame, width=60, height=10)
+        # self.state_text.pack(pady=5)
+        # self.update_state_display()
+
+        # Settings Tab
+        self.settings_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.settings_frame, text="Settings")
+
+        ttk.Button(self.settings_frame, text="Export Config", command=self.export_config).pack(pady=5)
+        # ttk.Button(self.settings_frame, text="Export State", command=self.export_state).pack(pady=5)
+
+    def update_config_textbox(self):
+        # Update the content of the config text box with the latest config data
+        config_json = json.dumps(self.app_locker.config, indent=4)
+        self.config_textbox.config(state=tk.NORMAL)
+        self.config_textbox.delete(1.0, tk.END)
+        self.config_textbox.insert(tk.END, config_json)
+        self.config_textbox.config(state=tk.DISABLED)
+
+
+
+    def update_apps_listbox(self):
+        self.apps_listbox.delete(0, tk.END)
+        for app in self.app_locker.config["applications"]:
+            self.apps_listbox.insert(tk.END, app["name"])
+        self.update_config_display()
+
+    def update_config_display(self):
+        self.config_text.config(state=tk.NORMAL)
+        self.config_text.delete(1.0, tk.END)
+        self.config_text.insert(tk.END, json.dumps(self.app_locker.config, indent=4))
+        self.config_text.config(state=tk.DISABLED)
+
+
+
+
+
+
+    def update_state_display(self):
+        self.state_text.delete(1.0, tk.END)
+        self.state_text.insert(tk.END, json.dumps(self.app_locker.state, indent=4))
+
+    def export_config(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".json", initialfile="FadCrypt_config.json", filetypes=[("JSON files", "*.json")])
+        if file_path:
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(self.app_locker.config, f, indent=4)
+                messagebox.showinfo("Success", f"Config exported successfully to {file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export config: {e}")
+
+    def export_state(self):
+        self.app_locker.export_state()
+        messagebox.showinfo("Info", "State exported to state.json")
+
+
+        
 
     def update_apps_listbox(self):
         self.apps_listbox.delete(0, tk.END)
@@ -80,7 +153,9 @@ class AppLockerGUI:
             if app_path:
                 self.app_locker.add_application(app_name, app_path)
                 self.update_apps_listbox()
+                self.update_config_textbox()  # Update config tab
                 messagebox.showinfo("Success", f"Application {app_name} added successfully.")
+
 
     def remove_application(self):
         selection = self.apps_listbox.curselection()
@@ -88,6 +163,7 @@ class AppLockerGUI:
             app_name = self.apps_listbox.get(selection[0]).split(" - ")[0]
             self.app_locker.remove_application(app_name)
             self.update_apps_listbox()
+            self.update_config_textbox()  # Update config tab
             messagebox.showinfo("Success", f"Application {app_name} removed successfully.")
         else:
             messagebox.showerror("Error", "Please select an application to remove.")
@@ -110,38 +186,45 @@ class AppLockerGUI:
             messagebox.showinfo("Info", "Monitoring is not running.")
 
 class AppLocker:
-    def __init__(self, gui, config_file="config.json", state_file="state.json"):
+    # def __init__(self, gui, config_file="config.json", state_file="state.json"):
+    def __init__(self, gui):
         self.gui = gui
-        self.config_file = config_file
+        # self.config_file = {"applications": []}  # In-memory config
         self.password_file = "encrypted_password.bin"
         self.load_config()
         self.monitoring = False
         self.monitoring_thread = None
-        self.state_file = state_file
+        # self.state_file = {"unlocked_apps": []}  # In-memory state
         self.load_state()
         self.icon = None
+        self.config = {"applications": []}  # In-memory configuration
+        self.state = {"unlocked_apps": []}  # In-memory state
 
     def load_config(self):
-        if os.path.exists(self.config_file):
-            with open(self.config_file, "r") as f:
-                self.config = json.load(f)
-        else:
-            self.config = {"applications": []}
+        # No file operation, use in-memory config
+        pass
 
     def save_config(self):
-        with open(self.config_file, "w") as f:
-            json.dump(self.config, f, indent=4)
+        # No file operation, use in-memory config
+        pass
 
     def load_state(self):
-        if os.path.exists(self.state_file):
-            with open(self.state_file, "r") as f:
-                self.state = json.load(f)
-        else:
-            self.state = {"unlocked_apps": []}
+        # No file operation, use in-memory state
+        pass
 
     def save_state(self):
-        with open(self.state_file, "w") as f:
+        # No file operation, use in-memory state
+        pass
+    
+    def export_config(self):
+        with open("config.json", "w") as f:
+            json.dump(self.config, f, indent=4)
+
+    def export_state(self):
+        with open("state.json", "w") as f:
             json.dump(self.state, f, indent=4)
+
+
 
     def create_password(self, password):
         try:
