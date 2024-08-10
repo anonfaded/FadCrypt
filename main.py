@@ -199,16 +199,25 @@ class AppLockerGUI:
         else:
             messagebox.showinfo("Info", "Monitoring is not running.")
 
+
+
+
+
+
+
+
+
+
 class AppLocker:
     # def __init__(self, gui, config_file="config.json", state_file="state.json"):
     def __init__(self, gui):
         self.gui = gui
         self.config_file = self.get_config_file_path()
-        self.key = self.generate_key()
-        self.fernet = Fernet(self.key)
+        # self.key = self.generate_key()
+        # self.fernet = Fernet(self.key)
 
         # self.config_file = {"applications": []}  # In-memory config
-        self.password_file = "encrypted_password.bin"
+        self.password_file = os.path.join(self.get_fadcrypt_folder(), 'encrypted_password.bin')
         self.config = {"applications": []}  # In-memory configuration
         self.state = {"unlocked_apps": []}  # In-memory state
 
@@ -221,26 +230,40 @@ class AppLocker:
         self.icon = None
         
 
+
+    def get_fadcrypt_folder(self):
+        path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
+        os.makedirs(path, exist_ok=True)
+        return path
+    
         
 
     def load_config(self):
         print(f"Loading config from {self.config_file}")  # Debug print
         if os.path.exists(self.config_file):
-            with open(self.config_file, 'rb') as f:
-                encrypted_data = f.read()
-                self.config = self.decrypt_data(encrypted_data)
+            if os.path.exists(self.password_file):
+                password = self.load_password()
+                self.config = self.decrypt_data(password, self.config_file)
                 print(f"Config loaded: {self.config}")  # Debug print
+            else:
+                print("Password file does not exist.")
+                self.config = {"applications": []}
         else:
             self.config = {"applications": []}
             print("Config file does not exist. Initialized with default config.")  # Debug print
 
     def save_config(self):
-        encrypted_data = self.encrypt_data(self.config)
-        print(f"Saving config to {self.config_file}")  # Debug print
-        with open(self.config_file, 'wb') as f:
-            f.write(encrypted_data)
-        print("Config saved.")  # Debug print
+        if os.path.exists(self.password_file):
+            password = self.load_password()
+            self.encrypt_data(password, self.config, self.config_file)
+            print(f"Config saved to {self.config_file}")  # Debug print
+        else:
+            print("Password file does not exist. Cannot save config.")
 
+    def load_password(self):
+        with open(self.password_file, 'rb') as f:
+            return f.read()
+        
     def get_key(self):
         # Generate a key for encryption/decryption
         # You can generate a key using: Fernet.generate_key()
@@ -248,11 +271,8 @@ class AppLocker:
         return base64.urlsafe_b64encode(b"your-secret-key-32-bytes-long")
 
     def get_config_file_path(self):
-        path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
-        os.makedirs(path, exist_ok=True)  # Ensure the directory exists
-        config_file_path = os.path.join(path, 'config.json')
-        print(f"Config file path: {config_file_path}")  # Debug print
-        return config_file_path
+        return os.path.join(self.get_fadcrypt_folder(), 'config.json')
+    
         
     def generate_key(self):
         key_path = os.path.join(os.getenv('APPDATA'), 'FadCrypt', 'config.key')
@@ -267,15 +287,42 @@ class AppLocker:
                 key_file.write(key)
             return key
     
-    def encrypt_data(self, data):
+    def encrypt_data(self, password, data, file_path):
+        salt = os.urandom(16)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        key = kdf.derive(password)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(salt), backend=default_backend())
+        encryptor = cipher.encryptor()
         json_data = json.dumps(data).encode()
-        encrypted_data = self.fernet.encrypt(json_data)
-        print(f"Encrypted data: {encrypted_data}")  # Debug print
-        return encrypted_data
+        encrypted_data = encryptor.update(json_data) + encryptor.finalize()
+        with open(file_path, 'wb') as f:
+            f.write(salt + encryptor.tag + encrypted_data)
 
-    def decrypt_data(self, encrypted_data):
-        decrypted_data = self.fernet.decrypt(encrypted_data)
-        print(f"Decrypted data: {decrypted_data}")  # Debug print
+    def decrypt_data(self, password, file_path):
+        with open(file_path, 'rb') as f:
+            salt = f.read(16)
+            tag = f.read(16)
+            encrypted_data = f.read()
+        print(f"Salt: {salt.hex()}")
+        print(f"Tag: {tag.hex()}")
+        print(f"Encrypted Data: {encrypted_data.hex()}")
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        key = kdf.derive(password)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_data) + decryptor.finalize()
         return json.loads(decrypted_data)
     
     def load_state(self):
@@ -347,6 +394,10 @@ class AppLocker:
     def change_password(self, old_password, new_password):
         if self.verify_password(old_password):
             self.create_password(new_password)
+
+            # Re-encrypt the configuration file with the new password
+            self.save_config()  # This will use the new password
+            print("change_password: Re-encrypt the configuration file with the new password")
         else:
             messagebox.showerror("Error", "Incorrect old password.")
 
