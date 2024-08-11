@@ -419,12 +419,22 @@ class AppLockerGUI:
                 winreg.SetValueEx(taskmgr_key, 'DisableTaskMgr', 0, winreg.REG_DWORD, 1)
             print("Task Manager disabled.")
             
-            # Disable PowerShell: cant disable, do it manually!
-            # with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun') as disallow_run_key:
-            #     winreg.SetValueEx(disallow_run_key, '1', 0, winreg.REG_SZ, 'powershell.exe')
-            #     winreg.SetValueEx(disallow_run_key, '2', 0, winreg.REG_SZ, 'powershell_ise.exe')
-            # print("PowerShell disabled, maybe. Please Disable PowerShell manually!")
+            # Disable Control Panel
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer') as explorer_key:
+                winreg.SetValueEx(explorer_key, 'NoControlPanel', 0, winreg.REG_DWORD, 1)
+            print("Control Panel disabled.")
+            
+            # Disable System Configuration Utility (msconfig)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System') as system_key:
+                winreg.SetValueEx(system_key, 'DisableTaskMgr', 0, winreg.REG_DWORD, 1)
+            print("System Configuration Utility (msconfig) disabled.")
+            
+            # Prevent system shutdown
+            # with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System') as policy_key:
+            #     winreg.SetValueEx(policy_key, 'DisableShutdown', 0, winreg.REG_DWORD, 1)
+            # print("System shutdown disabled.")
 
+            # Block Registry Editor
             AppLockerGUI.block_registry_editor()
 
         except Exception as e:
@@ -445,15 +455,31 @@ class AppLockerGUI:
                 winreg.SetValueEx(taskmgr_key, 'DisableTaskMgr', 0, winreg.REG_DWORD, 0)
             print("Task Manager enabled.")
             
-            # Enable PowerShell: Do it manually!
-            # with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun') as disallow_run_key:
+            # Enable Control Panel
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer') as explorer_key:
+                try:
+                    winreg.DeleteValue(explorer_key, 'NoControlPanel')
+                except FileNotFoundError:
+                    pass
+            print("Control Panel enabled.")
+            
+            # Enable System Configuration Utility (msconfig)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System') as system_key:
+                try:
+                    winreg.DeleteValue(system_key, 'DisableTaskMgr')
+                except FileNotFoundError:
+                    pass
+            print("System Configuration Utility (msconfig) enabled.")
+            
+            # Allow system shutdown
+            # with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System') as policy_key:
             #     try:
-            #         winreg.DeleteValue(disallow_run_key, '1')
-            #         winreg.DeleteValue(disallow_run_key, '2')
+            #         winreg.DeleteValue(policy_key, 'DisableShutdown')
             #     except FileNotFoundError:
-            #         pass  # If the key doesn't exist, nothing to do
-            # print("PowerShell enabled.")
+            #         pass
+            # print("System shutdown enabled.")
 
+            # Unblock Registry Editor
             AppLockerGUI.unblock_registry_editor()
 
         except Exception as e:
