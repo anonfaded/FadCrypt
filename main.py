@@ -24,6 +24,7 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from tkinterdnd2 import TkinterDnD, DND_FILES  # Import the tkinterdnd2 module
+import ctypes
 
 # Embedded configuration and state data
 embedded_config = {
@@ -40,12 +41,18 @@ embedded_state = {
 class AppLockerGUI:
     def __init__(self, master):
         self.master = master
+        
         self.master.title("App Locker")
         self.master.geometry("500x400") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
+
         
-      
+        # Ensure the settings file is correctly initialized
+        self.settings_file = os.path.join(self.app_locker.get_fadcrypt_folder(), 'settings.json')
+        self.lock_tools_var = tk.BooleanVar(value=True)  # Default value is True
+
         self.create_widgets()
+        self.load_settings()  # Load settings at startup
 
     def open_add_application_dialog(self):
         self.add_dialog = tk.Toplevel(self.master)  # Store reference to the dialog
@@ -205,6 +212,28 @@ class AppLockerGUI:
         ttk.Button(self.settings_frame, text="Export Config", command=self.export_config).pack(pady=5)
         # ttk.Button(self.settings_frame, text="Export State", command=self.export_state).pack(pady=5)
 
+
+
+        # Add the checkbox for disabling/enabling cmd, PowerShell, and Task Manager lock
+        self.lock_tools_var = tk.BooleanVar(value=True)
+        lock_tools_checkbox = tk.Checkbutton(self.settings_frame, text="Disable Command Prompt, Registry Editor, and Task Manager when monitoring\n(Default: All those disabled for best security. For even more security, please disable the PowerShell by watching any tutorial or article, otherwise FadCrypt can be terminated from PowerShell.)", variable=self.lock_tools_var)
+        lock_tools_checkbox.pack(anchor="w")
+        
+        # Save settings on state change (Optional, you can also handle this in the save settings function)
+        self.lock_tools_var.trace_add("write", self.save_settings)
+
+
+
+
+
+
+
+
+
+
+
+
+
     def update_config_textbox(self):
         # Update the content of the config text box with the latest config data
         config_json = json.dumps(self.app_locker.config, indent=4)
@@ -322,11 +351,21 @@ class AppLockerGUI:
             messagebox.showerror("Error", "Please select an application to rename.")
 
     def start_monitoring(self):
+            # Check if the user has enabled the tool lock
+        if self.lock_tools_var.get():
+            print("Disabling the cmd, powershell and task managaer...")
+            self.disable_tools()
+
         threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
         messagebox.showinfo("Info", "Monitoring started. Use the system tray icon to stop.")
         self.master.withdraw()  # Hide the main window
 
     def stop_monitoring(self):
+        # Check if the user has enabled the tool lock
+        if self.lock_tools_var.get():
+            print("Enabling the cmd, Registry Editor and task managaer...")
+            self.enable_tools()
+
         if self.app_locker.monitoring:
             password = simpledialog.askstring("Stop Monitoring", "Enter your password to stop monitoring:", show='*')
             if password and self.app_locker.verify_password(password):
@@ -340,6 +379,122 @@ class AppLockerGUI:
 
 
 
+    
+    def block_registry_editor():
+        try:
+            # Disable Registry Editor
+            reg_key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System')
+            winreg.SetValueEx(reg_key, 'DisableRegistryTools', 0, winreg.REG_DWORD, 1)
+            winreg.CloseKey(reg_key)
+            print("Registry Editor blocked.")
+        except Exception as e:
+            print(f"Error blocking Registry Editor: {e}")
+
+    def unblock_registry_editor():
+        try:
+            # Open the registry key
+            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 0, winreg.KEY_SET_VALUE)
+            try:
+                # Attempt to delete the DisableRegistryTools value
+                winreg.DeleteValue(reg_key, 'DisableRegistryTools')
+                print("Registry Editor unblocked.")
+            except FileNotFoundError:
+                print("Registry Editor was not blocked.")
+            finally:
+                winreg.CloseKey(reg_key)
+        except Exception as e:
+            print(f"Error unblocking Registry Editor: {e}")
+
+
+    def disable_tools(self):
+        """Disable Command Prompt, PowerShell, and Task Manager using winreg."""
+        try:
+            # Disable Command Prompt
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Policies\Microsoft\Windows\System', 0, winreg.KEY_CREATE_SUB_KEY | winreg.KEY_SET_VALUE) as cmd_key:
+                winreg.SetValueEx(cmd_key, 'DisableCMD', 0, winreg.REG_DWORD, 1)
+            print("Command Prompt disabled.")
+            
+            # Disable Task Manager
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System') as taskmgr_key:
+                winreg.SetValueEx(taskmgr_key, 'DisableTaskMgr', 0, winreg.REG_DWORD, 1)
+            print("Task Manager disabled.")
+            
+            # Disable PowerShell: cant disable, do it manually!
+            # with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun') as disallow_run_key:
+            #     winreg.SetValueEx(disallow_run_key, '1', 0, winreg.REG_SZ, 'powershell.exe')
+            #     winreg.SetValueEx(disallow_run_key, '2', 0, winreg.REG_SZ, 'powershell_ise.exe')
+            # print("PowerShell disabled, maybe. Please Disable PowerShell manually!")
+
+            AppLockerGUI.block_registry_editor()
+
+        except Exception as e:
+            print(f"Failed to disable tools: {e}")
+
+
+
+    def enable_tools(self):
+        """Enable Command Prompt, PowerShell, and Task Manager using winreg."""
+        try:
+            # Enable Command Prompt
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Policies\Microsoft\Windows\System', 0, winreg.KEY_SET_VALUE) as cmd_key:
+                winreg.SetValueEx(cmd_key, 'DisableCMD', 0, winreg.REG_DWORD, 0)
+            print("Command Prompt enabled.")
+            
+            # Enable Task Manager
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\System') as taskmgr_key:
+                winreg.SetValueEx(taskmgr_key, 'DisableTaskMgr', 0, winreg.REG_DWORD, 0)
+            print("Task Manager enabled.")
+            
+            # Enable PowerShell: Do it manually!
+            # with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun') as disallow_run_key:
+            #     try:
+            #         winreg.DeleteValue(disallow_run_key, '1')
+            #         winreg.DeleteValue(disallow_run_key, '2')
+            #     except FileNotFoundError:
+            #         pass  # If the key doesn't exist, nothing to do
+            # print("PowerShell enabled.")
+
+            AppLockerGUI.unblock_registry_editor()
+
+        except Exception as e:
+            print(f"Failed to enable tools: {e}")
+
+    
+
+
+    def save_settings(self, *args):
+        settings = {
+            "lock_tools": self.lock_tools_var.get(),
+            # Other settings can be added here
+        }
+        with open(self.settings_file, 'w') as f:
+            json.dump(settings, f, indent=4)
+        print(f"Settings saved to {self.settings_file}")  # Debug print
+
+
+
+    def load_settings(self):
+        if os.path.exists(self.settings_file):
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                self.lock_tools_var.set(settings.get("lock_tools", True))
+        else:
+            # If settings file does not exist, use defaults
+            self.lock_tools_var.set(True)  # Default to locking tools
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -350,7 +505,7 @@ class AppLockerGUI:
 class AppLocker:
     # def __init__(self, gui, config_file="config.json", state_file="state.json"):
     def __init__(self, gui):
-        self.gui = gui
+        self.gui = gui # Store reference to the AppLockerGUI instance
         self.config_file = self.get_config_file_path()
         # self.key = self.generate_key()
         # self.fernet = Fernet(self.key)
@@ -674,6 +829,9 @@ class AppLocker:
         password = simpledialog.askstring("Password", "Enter your password to stop monitoring:", show='*', parent=self.gui.master)
         if password is not None and self.verify_password(password):
             self.stop_monitoring()
+            if self.gui.lock_tools_var.get():
+                print("Enabling the cmd, powershell and task managaer...")
+                self.gui.enable_tools()
             messagebox.showinfo("Info", "Monitoring has been stopped.")
         else:
             messagebox.showerror("Error", "Incorrect password or action cancelled. Monitoring will continue.")
