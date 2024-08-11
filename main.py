@@ -25,6 +25,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from tkinterdnd2 import TkinterDnD, DND_FILES  # Import the tkinterdnd2 module
 import ctypes
+from ttkbootstrap import Style
 
 # Embedded configuration and state data
 embedded_config = {
@@ -42,7 +43,7 @@ class AppLockerGUI:
     def __init__(self, master):
         self.master = master
         
-        self.master.title("App Locker")
+        self.master.title("FadCrypt")
         self.master.geometry("600x450") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
 
@@ -218,18 +219,18 @@ class AppLockerGUI:
         self.lock_tools_var = tk.BooleanVar(value=True)
 
         # Add the checkbox with wrapped text and left-aligned text
-        lock_tools_checkbox = tk.Checkbutton(
+        lock_tools_checkbox = ttk.Checkbutton(
             self.settings_frame,
-            text="Disable Command Prompt, Registry Editor, Control Panel, msconfig, and Task Manager during monitoring.\n"
-            "(Default: All are disabled for best security. For added security, please disable PowerShell as well; search on internet for help. Otherwise, FadCrypt could be terminated via PowerShell.)",
+            text="Disable Command Prompt, Registry Editor, Control Panel, msconfig, and Task Manager during\nmonitoring.\n"
+            "(Default: All are disabled for best security. For added security, please disable PowerShell as well; search\non internet for help. Otherwise, FadCrypt could be terminated via PowerShell.)",
             variable=self.lock_tools_var,
-            wraplength=500,  # Adjust this value based on your UI width
+            # wraplength=500,  # Adjust this value based on your UI width
             # anchor="e",      # Align the text to the left
-            justify="left",  # Justify text to left
-            padx="20"
+            # justify="left",  # Justify text to left
+            # padx="20"
         )
 
-        # Use pack with padding
+        # The external padding is controlled by the pack() method's padx and pady options
         lock_tools_checkbox.pack(anchor="w", padx=10, pady=10)  # Adjust padx and pady for desired spacing
         
         # Save settings on state change (Optional, you can also handle this in the save settings function)
@@ -861,7 +862,7 @@ class AppLocker:
             MenuItem('Quit', on_quit)
         )
 
-        self.icon = Icon("AppLocker", image, "App Locker", menu)
+        self.icon = Icon("AppLocker", image, "FadCrypt", menu)
         threading.Thread(target=self.icon.run, daemon=True).start()
 
     def _password_prompt_and_stop(self):
@@ -1005,6 +1006,36 @@ def start_monitoring_thread(monitor):
 
 def main():
     root = TkinterDnD.Tk()
+    style = Style(theme='darkly')  # Apply dark theme, pulse, cyborg, darkly, simplex(red)
+
+
+    # Customize window borders (not directly supported in ttkbootstrap, but can be done with custom themes)
+    style.configure('TNotebook.Tab',
+                    background='#333333',  # Dark gray for tabs
+                    foreground='#FFFFFF')  # White text for tabs
+    
+
+    # Customize button color
+    style.configure('TButton',
+                    background='#333333',  # Dark gray color
+                    foreground='#FFFFFF',  # White text
+                    borderwidth=3,  # Border width
+                    relief='solid',  # Solid border
+                    highlightbackground='#222222',  # Darker border color
+                    highlightthickness=2)  # Thickness of the border
+
+    style.map('TButton',
+            foreground=[('hover', '#D3D3D3')],  # Black text color on hover
+            background=[('active', '#000000')])  # Red color on hover
+
+    # Customize the window frame color (e.g., the title bar)
+    style.configure('TFrame',
+                    background='#333333')  # Dark gray color
+    
+
+    # Style the Checkbutton
+    style.configure('TCheckbutton', background='#181818', foreground='#ffffff', padding=10)
+
     app = AppLockerGUI(root)
     # root.protocol("WM_DELETE_WINDOW", root.iconify)  # Minimize instead of close
     root.mainloop()
