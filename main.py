@@ -571,8 +571,9 @@ class AppLocker:
             decrypted_hash = decryptor.update(encrypted_hash) + decryptor.finalize()
 
             return password.encode() == decrypted_hash
-        except InvalidTag:
-            return False
+        # except InvalidTag as ee:
+        #     messagebox.showerror("Error", f"Encryptepd file corrupted: {ee}")
+        #     return False
         except Exception as e:
             messagebox.showerror("Error", f"Error verifying password: {e}")
         return False
