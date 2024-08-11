@@ -62,12 +62,33 @@ class AppLockerGUI:
         self.apps_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.apps_frame, text="Applications")
 
-        self.apps_listbox = tk.Listbox(self.apps_frame, width=50)
-        self.apps_listbox.pack(pady=5)
+        # Create a frame to hold the listbox and scrollbar
+        list_frame = ttk.Frame(self.apps_frame)
+        list_frame.pack(pady=5, padx=5, fill=tk.BOTH, expand=True)
+
+        # Create the listbox with a scrollbar
+        self.apps_listbox = tk.Listbox(list_frame, width=50, font=("Helvetica", 10), selectmode=tk.SINGLE)
+        self.apps_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.apps_listbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.apps_listbox.config(yscrollcommand=scrollbar.set)
+
         self.update_apps_listbox()
 
-        ttk.Button(self.apps_frame, text="Add Application", command=self.add_application).pack(pady=5)
-        ttk.Button(self.apps_frame, text="Remove Application", command=self.remove_application).pack(pady=5)
+        # Buttons frame
+        button_frame = ttk.Frame(self.apps_frame)
+        button_frame.pack(pady=10, padx=5, fill=tk.X)
+
+        ttk.Button(button_frame, text="Add", command=self.add_application).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Remove", command=self.remove_application).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Rename", command=self.rename_application).pack(side=tk.LEFT, padx=5)
+
+
+
+
+
 
         # Config Tab
         self.config_frame = ttk.Frame(self.notebook)
@@ -104,8 +125,14 @@ class AppLockerGUI:
 
     def update_apps_listbox(self):
         self.apps_listbox.delete(0, tk.END)
-        for app in self.app_locker.config["applications"]:
-            self.apps_listbox.insert(tk.END, app["name"])
+        for index, app in enumerate(self.app_locker.config["applications"]):
+            item = f"  {app['name']} - {app['path']}"  # Added two spaces for left padding
+            self.apps_listbox.insert(tk.END, item)
+            # Apply alternating row colors
+            if index % 2 == 0:
+                self.apps_listbox.itemconfig(index, {'bg': '#f0f0f0'})
+            else:
+                self.apps_listbox.itemconfig(index, {'bg': '#ffffff'})
         self.update_config_display()
 
     def update_config_display(self):
@@ -178,13 +205,29 @@ class AppLockerGUI:
     def remove_application(self):
         selection = self.apps_listbox.curselection()
         if selection:
-            app_name = self.apps_listbox.get(selection[0]).split(" - ")[0]
+            app_name = self.apps_listbox.get(selection[0]).split(" - ")[0].strip()  # Remove leading spaces
             self.app_locker.remove_application(app_name)
             self.update_apps_listbox()
-            self.update_config_display()  # Update config tab
+            self.update_config_display()
             messagebox.showinfo("Success", f"Application {app_name} removed successfully.")
         else:
             messagebox.showerror("Error", "Please select an application to remove.")
+
+    def rename_application(self):
+        selection = self.apps_listbox.curselection()
+        if selection:
+            old_name = self.apps_listbox.get(selection[0]).split(" - ")[0].strip()  # Remove leading spaces
+            new_name = simpledialog.askstring("Rename Application", f"Enter new name for {old_name}:")
+            if new_name:
+                for app in self.app_locker.config["applications"]:
+                    if app["name"] == old_name:
+                        app["name"] = new_name
+                        break
+                self.update_apps_listbox()
+                self.update_config_display()
+                messagebox.showinfo("Success", f"Application renamed from {old_name} to {new_name}.")
+        else:
+            messagebox.showerror("Error", "Please select an application to rename.")
 
     def start_monitoring(self):
         threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
