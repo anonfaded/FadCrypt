@@ -23,6 +23,7 @@ import shutil
 import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from tkinterdnd2 import TkinterDnD, DND_FILES  # Import the tkinterdnd2 module
 
 # Embedded configuration and state data
 embedded_config = {
@@ -43,7 +44,98 @@ class AppLockerGUI:
         self.master.geometry("500x400") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
         
+      
         self.create_widgets()
+
+    def open_add_application_dialog(self):
+        self.add_dialog = tk.Toplevel(self.master)  # Store reference to the dialog
+        self.add_dialog.title("Add Application")
+
+        # Drag and Drop Area
+        drop_frame = tk.LabelFrame(self.add_dialog, text="Drag and Drop .exe Here")
+        drop_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Use TkinterDnD for drag-and-drop functionality
+        drop_area = tk.Canvas(drop_frame, height=100, bg="lightgray")
+        drop_area.pack(padx=10, pady=10, fill="both", expand=True)
+        drop_area.create_text(100, 50, text="Drop your .exe file here", fill="black")
+
+        # Enable the canvas for drag-and-drop
+        drop_area.drop_target_register(DND_FILES)
+        drop_area.dnd_bind('<<Drop>>', self.on_drop)
+
+        # Manual Input Area
+        manual_frame = tk.LabelFrame(self.add_dialog, text="Or Manually Add Application")
+        manual_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        tk.Label(manual_frame, text="Name:").pack(pady=5)
+        self.name_entry = tk.Entry(manual_frame)
+        self.name_entry.pack(padx=10, pady=5, fill="x")
+
+        tk.Label(manual_frame, text="Path:").pack(pady=5)
+        self.path_entry = tk.Entry(manual_frame)
+        self.path_entry.pack(padx=10, pady=5, fill="x")
+
+        browse_button = tk.Button(manual_frame, text="Browse", command=self.browse_for_file)
+        browse_button.pack(pady=5)
+
+        # Save Button
+        save_button = tk.Button(self.add_dialog, text="Save", command=self.save_application)
+        save_button.pack(pady=10)
+
+    def on_drop(self, event):
+        file_path = event.data.strip('{}')  # Strip curly braces if present
+        if file_path.endswith('.exe'):
+            self.path_entry.delete(0, tk.END)
+            self.path_entry.insert(0, file_path)
+
+            app_name = os.path.basename(file_path)
+            self.name_entry.delete(0, tk.END)
+            self.name_entry.insert(0, app_name)
+        else:
+            messagebox.showerror("Invalid File", "Please drop a valid .exe file.")
+
+    def browse_for_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Executable Files", "*.exe")])
+        if file_path:
+            self.path_entry.delete(0, tk.END)
+            self.path_entry.insert(0, file_path)
+            
+            app_name = os.path.basename(file_path)
+            self.name_entry.delete(0, tk.END)
+            self.name_entry.insert(0, app_name)
+
+    def save_application(self):
+        app_name = self.name_entry.get().strip()
+        app_path = self.path_entry.get().strip()
+        
+        if not app_name or not app_path:
+            messagebox.showerror("Error", "Both name and path are required.")
+            return
+
+        # Call the add_application method from AppLocker instance
+        self.app_locker.add_application(app_name, app_path)
+        self.update_apps_listbox()
+        self.update_config_display()  # Update config tab
+
+        # Close the dialog
+        self.add_dialog.destroy()
+
+        messagebox.showinfo("Success", f"Application '{app_name}' added successfully!")
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
 
     def create_widgets(self):
         self.notebook = ttk.Notebook(self.master)
@@ -81,10 +173,10 @@ class AppLockerGUI:
         button_frame = ttk.Frame(self.apps_frame)
         button_frame.pack(pady=10, padx=5, fill=tk.X)
 
-        ttk.Button(button_frame, text="Add", command=self.add_application).pack(side=tk.LEFT, padx=5)
+        # Modify the Add button to open the new dialog
+        ttk.Button(button_frame, text="Add", command=self.open_add_application_dialog).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Remove", command=self.remove_application).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Rename", command=self.rename_application).pack(side=tk.LEFT, padx=5)
-
 
 
 
@@ -714,7 +806,7 @@ def start_monitoring_thread(monitor):
 
 
 def main():
-    root = tk.Tk()
+    root = TkinterDnD.Tk()
     app = AppLockerGUI(root)
     # root.protocol("WM_DELETE_WINDOW", root.iconify)  # Minimize instead of close
     root.mainloop()
