@@ -43,7 +43,7 @@ class AppLockerGUI:
         self.master = master
         
         self.master.title("App Locker")
-        self.master.geometry("500x400") # Adjusted size to accommodate new tabs
+        self.master.geometry("600x450") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
 
         
@@ -216,8 +216,21 @@ class AppLockerGUI:
 
         # Add the checkbox for disabling/enabling cmd, PowerShell, and Task Manager lock
         self.lock_tools_var = tk.BooleanVar(value=True)
-        lock_tools_checkbox = tk.Checkbutton(self.settings_frame, text="Disable Command Prompt, Registry Editor, and Task Manager when monitoring\n(Default: All those disabled for best security. For even more security, please disable the PowerShell by watching any tutorial or article, otherwise FadCrypt can be terminated from PowerShell.)", variable=self.lock_tools_var)
-        lock_tools_checkbox.pack(anchor="w")
+
+        # Add the checkbox with wrapped text and left-aligned text
+        lock_tools_checkbox = tk.Checkbutton(
+            self.settings_frame,
+            text="Disable Command Prompt, Registry Editor, Control Panel, msconfig, and Task Manager during monitoring.\n"
+            "(Default: All are disabled for best security. For added security, please disable PowerShell as well; search on internet for help. Otherwise, FadCrypt could be terminated via PowerShell.)",
+            variable=self.lock_tools_var,
+            wraplength=500,  # Adjust this value based on your UI width
+            # anchor="e",      # Align the text to the left
+            justify="left",  # Justify text to left
+            padx="20"
+        )
+
+        # Use pack with padding
+        lock_tools_checkbox.pack(anchor="w", padx=10, pady=10)  # Adjust padx and pady for desired spacing
         
         # Save settings on state change (Optional, you can also handle this in the save settings function)
         self.lock_tools_var.trace_add("write", self.save_settings)
