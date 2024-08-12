@@ -27,6 +27,8 @@ from tkinterdnd2 import TkinterDnD, DND_FILES  # Import the tkinterdnd2 module
 import ctypes
 from ttkbootstrap import Style
 from PIL import Image, ImageTk
+import webbrowser
+import random
 
 # Embedded configuration and state data
 embedded_config = {
@@ -234,10 +236,43 @@ class AppLockerGUI:
         self.image_label = tk.Label(self.main_frame, image=self.img)
         self.image_label.pack(pady=10)  # Add padding if needed
 
-        ttk.Button(self.main_frame, text="Create Password", command=self.create_password).pack(pady=5)
-        ttk.Button(self.main_frame, text="Change Password", command=self.change_password).pack(pady=5)
-        ttk.Button(self.main_frame, text="Start Monitoring", command=self.start_monitoring).pack(pady=5)
-        ttk.Button(self.main_frame, text="Stop Monitoring", command=self.stop_monitoring).pack(pady=5)
+
+
+        
+
+
+        # Add Start button (centered in the main frame)
+        start_button = ttk.Button(self.main_frame, text="Start Monitoring", command=self.start_monitoring)
+        start_button.pack(pady=10)
+
+        # Add the Read Me button below the Start button
+        readme_button = ttk.Button(self.main_frame, text="Read Me", command=self.show_readme)
+        readme_button.pack(pady=10)
+
+        # Create a frame for the other buttons (stacked on the left side)
+        left_button_frame = ttk.Frame(self.main_frame, padding=10)
+        left_button_frame.pack(side=tk.LEFT, padx=20, pady=10, anchor="n")
+
+        # Add Stop Monitoring button to the left button frame
+        ttk.Button(left_button_frame, text="Stop Monitoring", command=self.stop_monitoring).pack(pady=5)
+
+        # Add Create Password button to the left button frame
+        ttk.Button(left_button_frame, text="Create Password", command=self.create_password).pack(pady=5)
+
+        # Add Change Password button to the left button frame
+        ttk.Button(left_button_frame, text="Change Password", command=self.change_password).pack(pady=5)
+
+        # Add a separator before the footer
+        ttk.Separator(self.main_frame, orient="horizontal").pack(fill=tk.X, pady=20)
+
+        # Change website link color and add it as a footer
+        powered_by_label = ttk.Label(self.main_frame, text="Powered by FadSec-Lab | ©️ 2024 fadedhood.com",
+                                    foreground="#77dd77", cursor="hand2", font=("Helvetica", 10))
+        powered_by_label.pack(side=tk.BOTTOM, pady=5)
+        powered_by_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCrypt"))
+
+
+
 
         # Applications Tab
         self.apps_frame = ttk.Frame(self.notebook)
@@ -255,6 +290,8 @@ class AppLockerGUI:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.apps_listbox.config(yscrollcommand=scrollbar.set)
+
+        
 
         self.update_apps_listbox()
 
@@ -346,23 +383,41 @@ class AppLockerGUI:
         bottom_frame = ttk.Frame(self.scrollable_frame)
         bottom_frame.pack(fill=tk.X, padx=10, pady=10)
 
+
+
+
+
+
+
         # Radio buttons
         ttk.Label(left_frame, text="Password Dialog Style:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=10)
         ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=0)
         ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=20)
-
         ttk.Label(left_frame, text="Full Screen Wallpaper:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=5)
-        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=0)
-        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=20)
-        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=20)
+        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
+
+
+
+
+
+
+
+
 
         # Preview area
-        ttk.Label(right_frame, text="Dialog Preview (Simple/Full Screen):", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=10, padx=50)
+        ttk.Label(right_frame, text="Dialog Preview:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=10, padx=50)
         self.preview_frame = ttk.Frame(right_frame, width=400, height=250)  # Set a fixed size
         self.preview_frame.pack(pady=10)
         self.preview_frame.pack_propagate(False)  # Prevent the frame from shrinking
         self.preview_label = ttk.Label(self.preview_frame)
         self.preview_label.pack(expand=True, fill=tk.BOTH)
+
+
+
+
+
 
         # Checkbox (full width)
         self.lock_tools_var = tk.BooleanVar(value=True)
@@ -402,6 +457,72 @@ class AppLockerGUI:
 
         self.update_preview()
 
+
+    def show_readme(self):
+        # Show the Read Me dialog first
+        self.fullscreen_readme_dialog()
+
+
+    def fullscreen_readme_dialog(self):
+        dialog = tk.Toplevel(self.master)
+        dialog.attributes('-alpha', 0.0)  # Start fully transparent
+        dialog.update_idletasks()  # Update geometry-related information
+
+        # Set dialog to fullscreen
+        dialog.attributes('-fullscreen', True)
+        dialog.geometry(f"{dialog.winfo_screenwidth()}x{dialog.winfo_screenheight()}")
+
+        # Center the dialog on the screen
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        dialog_width = screen_width
+        dialog_height = screen_height
+        position_x = 0
+        position_y = 0
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+
+        dialog.grab_set()
+
+        # Add content to the dialog
+        tk.Label(dialog, text="Read Me", font=("Arial", 24, "bold"), bg='white').pack(pady=10)
+        tk.Label(dialog, text="Important information about the application...", font=("Ubuntu", 14), bg='white').pack(pady=10)
+
+        # Add a button to close the dialog
+        tk.Button(dialog, text="OK", command=dialog.destroy, font=("Arial", 12)).pack(pady=20)
+
+        # Fade in effect
+        self.fade_in(dialog)
+
+        # Ensure the dialog stays on top
+        dialog.wait_window()
+
+    def fade_in(self, window):
+        alpha = 0.0
+        while alpha < 1.0:
+            alpha += 0.05
+            window.attributes('-alpha', alpha)
+            window.update_idletasks()
+            window.after(50)  # Adjust the delay to control the fade-in speed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def configure_canvas(self, event):
         # Update the width of the canvas window to fit the frame
         self.canvas.itemconfig(self.canvas_frame, width=event.width)
@@ -425,6 +546,12 @@ class AppLockerGUI:
         self.update_preview()
 
 
+    def save_and_update_wallpaper(self):
+        self.save_wallpaper_choice()
+        self.update_preview()
+
+
+
     def save_password_dialog_style(self):
         self.save_settings()   
 
@@ -433,19 +560,44 @@ class AppLockerGUI:
 
 
     def update_preview(self):
-        preview_path = "preview1.jpg" if self.password_dialog_style.get() == "simple" else "preview2.jpg"
-        preview_image = Image.open(preview_path)
-        preview_image = preview_image.resize((400, 250), Image.Resampling.LANCZOS)  # Resize to fit the new frame size
-        preview_photo = ImageTk.PhotoImage(preview_image)
-        self.preview_label.config(image=preview_photo)
-        self.preview_label.image = preview_photo
+        dialog_style = self.password_dialog_style.get()
+        wallpaper_choice = self.wallpaper_choice.get()
+
+        if dialog_style == "simple":
+            preview_path = "preview1.jpg"
+        elif dialog_style == "fullscreen":
+            if wallpaper_choice == "default":
+                preview_path = "wall1.jpg"
+            elif wallpaper_choice == "nature":
+                preview_path = "wall2.jpg"
+            elif wallpaper_choice == "abstract":
+                preview_path = "wall3.jpg"
+            else:
+                preview_path = "preview2.jpg"  # Fallback to fullscreen preview if no wallpaper selected
+        else:
+            preview_path = "preview2.jpg"  # Fallback to fullscreen preview if no style selected
+
+        try:
+            preview_image = Image.open(preview_path)
+            preview_image = preview_image.resize((400, 250), Image.Resampling.LANCZOS)
+            preview_photo = ImageTk.PhotoImage(preview_image)
+            self.preview_label.config(image=preview_photo)
+            self.preview_label.image = preview_photo
+        except FileNotFoundError:
+            print(f"Preview image not found: {preview_path}")
+
+
+
+
+
+
 
 
     # image for the main page above the buttons
     def load_image(self):
         # Open and prepare the image
         image = Image.open('1.png')  # Update this path
-        image = image.resize((200, 100), Image.LANCZOS)  # Resize using LANCZOS filter
+        image = image.resize((600, 150), Image.LANCZOS)  # Resize using LANCZOS filter
         self.img = ImageTk.PhotoImage(image)
 
 
@@ -908,7 +1060,7 @@ class AppLockerGUI:
 
     def get_wallpaper_path(self):
         wallpapers = {
-            "default": "default.jpg",
+            "default": "wall1.jpg",
             "nature": "wall2.jpg",
             "abstract": "wall3.jpg"
         }
@@ -1426,6 +1578,11 @@ def main():
     # style.configure('TFrame',
                     # background='#333333')  # Dark gray color
     
+    # style.configure('Card.TFrame',
+    #             background='#333333',  # Dark gray color for the card
+    #             relief='solid',
+    #             borderwidth=2,
+    #             padding=10)
 
     # Style the Checkbutton
     style.configure('TCheckbutton', foreground='#ffffff', padding=10)
