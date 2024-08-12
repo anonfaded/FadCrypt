@@ -34,9 +34,7 @@ embedded_config = {
 }
 
 embedded_state = {
-    "unlocked_apps": [
-        "FreeTube.exe"
-    ]
+    "unlocked_apps": []
 }
 
 
@@ -647,10 +645,21 @@ class AppLockerGUI:
     def custom_dialog(self, title, prompt, fullscreen=False, input_required=True):
         dialog = tk.Toplevel(self.master)
         dialog.attributes('-alpha', 0.0)  # Start fully transparent
+        dialog.update_idletasks()  # Update geometry-related information
+
         if fullscreen:
             dialog.attributes('-fullscreen', True)
         else:
-            dialog.geometry("300x200")
+            dialog.geometry("400x250")
+        # Center the dialog on the screen
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        dialog_width = 400
+        dialog_height = 250
+        position_x = (screen_width // 2) - (dialog_width // 2)
+        position_y = (screen_height // 2) - (dialog_height // 2)
+        dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+
         dialog.grab_set()
 
         if fullscreen:
@@ -669,26 +678,35 @@ class AppLockerGUI:
         else:
             frame.pack(expand=True, fill='both', padx=10, pady=10)
 
-        tk.Label(frame, text=title, font=("Arial", 16, "bold"), bg='white').pack(pady=10)
-        tk.Label(frame, text=prompt, font=("Arial", 12), bg='white').pack(pady=5)
+        tk.Label(frame, text=title, font=("Arial", 14, "bold"), bg='white').pack(pady=10)
+        tk.Label(frame, text=prompt, font=("Arial", 10), bg='white').pack(pady=5)
         
         result = [None]  # Use a list to store the result
 
         if input_required:
             password_entry = tk.Entry(frame, show='*', font=("Arial", 12), width=30)
             password_entry.pack(pady=10)
+            password_entry.focus_set()  # Auto-focus on the input field
 
-            def on_ok():
+            def on_ok(event=None):  # Accept an optional event argument
                 result[0] = password_entry.get()
                 self.fade_out(dialog)
 
-            tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12)).pack(pady=10)
+            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12))
+            ok_button.pack(pady=10)
+
+            # Bind the Enter key to the OK button
+            dialog.bind('<Return>', on_ok)
         else:
-            def on_ok():
+            def on_ok(event=None):  # Accept an optional event argument
                 result[0] = True
                 self.fade_out(dialog)
 
-            tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12)).pack(pady=10)
+            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12))
+            ok_button.pack(pady=10)
+
+            # Bind the Enter key to the OK button
+            dialog.bind('<Return>', on_ok)
 
         self.fade_in(dialog)
         dialog.wait_window()
