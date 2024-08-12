@@ -424,7 +424,7 @@ class AppLockerGUI:
             self.show_message("Error", "Incorrect old password.")
 
     def add_application(self):
-        app_name = simpledialog.askstring("Add Application", "Enter the name of the application:")
+        app_name = self.ask_password("Add Application", "Enter the name of the application:")
         if app_name:
             app_path = filedialog.askopenfilename(title="Select application executable")
             if app_path:
@@ -449,7 +449,7 @@ class AppLockerGUI:
         selection = self.apps_listbox.curselection()
         if selection:
             old_name = self.apps_listbox.get(selection[0]).split(" - ")[0].strip()  # Remove leading spaces
-            new_name = simpledialog.askstring("Rename Application", f"Enter new name for {old_name}:")
+            new_name = self.ask_password("Rename Application", f"Enter new name for {old_name}:")
             if new_name:
                 for app in self.app_locker.config["applications"]:
                     if app["name"] == old_name:
@@ -457,9 +457,9 @@ class AppLockerGUI:
                         break
                 self.update_apps_listbox()
                 self.update_config_display()
-                messagebox.showinfo("Success", f"Application renamed from {old_name} to {new_name}.")
+                self.show_message("Success", f"Application renamed from {old_name} to {new_name}.")
         else:
-            messagebox.showerror("Error", "Please select an application to rename.")
+            self.show_message("Error", "Please select an application to rename.")
 
     def start_monitoring(self):
             # Check if the user has enabled the tool lock
@@ -468,7 +468,7 @@ class AppLockerGUI:
             self.disable_tools()
 
         threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
-        messagebox.showinfo("Info", "Monitoring started. Use the system tray icon to stop.")
+        self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
         self.master.withdraw()  # Hide the main window
 
     def stop_monitoring(self):
@@ -1063,7 +1063,7 @@ class AppLocker:
 
     def _show_password_dialog(self, app_name, app_path):
         try:
-            password = simpledialog.askstring("Password", f"Enter your password to unlock {app_name}:", show='*', parent=self.gui.master)
+            password = self.gui.ask_password("Password", f"Enter your password to unlock {app_name}:")
             if password is None:
                 return
 
@@ -1075,9 +1075,9 @@ class AppLocker:
                     try:
                         subprocess.Popen(app_path)
                     except Exception as e:
-                        messagebox.showerror("Error", f"Failed to start {app_name}: {e}")
+                        self.show_message("Error", f"Failed to start {app_name}: {e}")
             else:
-                messagebox.showerror("Error", f"Incorrect password. {app_name} remains locked.")
+                self.gui.show_message("Error", f"Incorrect password. {app_name} remains locked.")
         except Exception as e:
             print(f"Error in _show_password_dialog: {e}")
 
@@ -1090,7 +1090,7 @@ class AppLocker:
                 threading.Thread(target=self.block_application, args=(app_name, app_path), daemon=True).start()
             self._create_system_tray_icon()
         else:
-            messagebox.showinfo("Info", "Monitoring is already running.")
+            self.show_message("Info", "Monitoring is already running.")
 
     def stop_monitoring(self):
         if self.monitoring:
@@ -1099,7 +1099,7 @@ class AppLocker:
                 self.icon.stop()
             self.gui.master.deiconify()  # Show the main window
         else:
-            messagebox.showinfo("Info", "Monitoring is not running.")
+            self.show_message("Info", "Monitoring is not running.")
 
     def _create_system_tray_icon(self):
         def on_stop(icon, item):
@@ -1123,25 +1123,25 @@ class AppLocker:
         threading.Thread(target=self.icon.run, daemon=True).start()
 
     def _password_prompt_and_stop(self):
-        password = simpledialog.askstring("Password", "Enter your password to stop monitoring:", show='*', parent=self.gui.master)
+        password = self.gui.ask_password("Password", "Enter your password to stop monitoring:")
         if password is not None and self.verify_password(password):
             self.stop_monitoring()
             if self.gui.lock_tools_var.get():
                 print("Enabling the cmd, powershell and task managaer...")
                 self.gui.enable_tools()
-            messagebox.showinfo("Info", "Monitoring has been stopped.")
+            self.gui.show_message("Info", "Monitoring has been stopped.")
         else:
-            messagebox.showerror("Error", "Incorrect password or action cancelled. Monitoring will continue.")
+            self.gui.show_message("Error", "Incorrect password or action cancelled. Monitoring will continue.")
 
     def _password_prompt_and_quit(self, icon):
-        password = simpledialog.askstring("Password", "Enter your password to quit:", show='*', parent=self.gui.master)
+        password = self.gui.ask_password("Password", "Enter your password to quit:")
         if self.verify_password(password):
             self.stop_monitoring()
             icon.stop()
-            messagebox.showinfo("Info", "Application has been stopped.")
+            self.gui.show_message("Info", "Application has been stopped.")
             self.gui.master.quit()
         else:
-            messagebox.showerror("Error", "Incorrect password. Application will continue.")
+            self.gui.show_message("Error", "Incorrect password. Application will continue.")
 
 
 
