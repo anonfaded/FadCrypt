@@ -48,7 +48,7 @@ class AppLockerGUI:
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
         dialog_width = 700  # Adjust width as needed
-        dialog_height = 450  # Adjust height as needed
+        dialog_height = 550  # Adjust height as needed
         position_x = (screen_width // 2) - (dialog_width // 2)
         position_y = (screen_height // 2) - (dialog_height // 2)
         self.master.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
@@ -298,58 +298,123 @@ class AppLockerGUI:
         self.settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.settings_frame, text="Settings")
 
-        left_frame = ttk.Frame(self.settings_frame)
-        left_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+        # Create a canvas with scrollbar
+        self.canvas = tk.Canvas(self.settings_frame)
+        self.scrollbar = ttk.Scrollbar(self.settings_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
 
-        right_frame = ttk.Frame(self.settings_frame)
-        right_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-        ttk.Button(left_frame, text="Export Config", command=self.export_config).pack(pady=5)
-
-
-
-        # Add the checkbox for disabling/enabling cmd, PowerShell, and Task Manager lock
-        self.lock_tools_var = tk.BooleanVar(value=True)
-
-        # Add the checkbox with wrapped text and left-aligned text
-        lock_tools_checkbox = ttk.Checkbutton(
-            self.settings_frame,
-            text="Disable Command Prompt, Registry Editor, Control Panel, msconfig, and Task Manager during\nmonitoring.\n"
-            "(Default: All are disabled for best security. For added security, please disable PowerShell as well; search\non internet for help. Otherwise, FadCrypt could be terminated via PowerShell.)",
-            variable=self.lock_tools_var,
-            # wraplength=500,  # Adjust this value based on your UI width
-            # anchor="e",      # Align the text to the left
-            # justify="left",  # Justify text to left
-            # padx="20"
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
         )
-        # The external padding is controlled by the pack() method's padx and pady options
-        lock_tools_checkbox.pack(anchor="w", padx=10, pady=10)  # Adjust padx and pady for desired spacing
+
+        self.canvas_frame = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        # Configure canvas to expand with window
+        self.canvas.bind('<Configure>', self.configure_canvas)
+
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Enable mousewheel scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        # Title
+        title_label = ttk.Label(self.scrollable_frame, text="Preferences", font=("TkDefaultFont", 16, "bold"))
+        title_label.pack(anchor="w", padx=10, pady=(10, 20))
+        # Separator after top frame
+        ttk.Separator(self.scrollable_frame, orient='horizontal').pack(fill=tk.X, padx=10, pady=5)
         
-        # Save settings on state change (Optional, you can also handle this in the save settings function)
-        self.lock_tools_var.trace_add("write", self.save_settings)
 
+        # Top frame for radio buttons and preview
+        top_frame = ttk.Frame(self.scrollable_frame)
+        top_frame.pack(fill=tk.X, padx=10, pady=10)
 
+        # Left frame for radio buttons
+        left_frame = ttk.Frame(top_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(3, 10))
 
+        # Right frame for preview
+        right_frame = ttk.Frame(top_frame)
+        right_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        # Password dialog style
-        ttk.Label(left_frame, text="Password Dialog Style:").pack(anchor="w", pady=5)
-        ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20)
-        ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20)
+        # Separator after top frame
+        ttk.Separator(self.scrollable_frame, orient='horizontal').pack(fill=tk.X, padx=10, pady=5)
 
-        # Wallpaper choice for full screen dialog
-        ttk.Label(left_frame, text="Full Screen Wallpaper:").pack(anchor="w", pady=5)
-        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
-        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
-        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
+        # Bottom frame for checkboxes and export section
+        bottom_frame = ttk.Frame(self.scrollable_frame)
+        bottom_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        # Radio buttons
+        ttk.Label(left_frame, text="Password Dialog Style:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=10)
+        ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=20)
+
+        ttk.Label(left_frame, text="Full Screen Wallpaper:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=5)
+        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=20)
+        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_wallpaper_choice).pack(anchor="w", padx=20, pady=0)
 
         # Preview area
-        ttk.Label(right_frame, text="Preview:").pack(anchor="w", pady=5)
-        self.preview_frame = ttk.Frame(right_frame)
+        ttk.Label(right_frame, text="Dialog Preview (Simple/Full Screen):", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=10, padx=50)
+        self.preview_frame = ttk.Frame(right_frame, width=400, height=250)  # Set a fixed size
         self.preview_frame.pack(pady=10)
+        self.preview_frame.pack_propagate(False)  # Prevent the frame from shrinking
         self.preview_label = ttk.Label(self.preview_frame)
-        self.preview_label.pack()
+        self.preview_label.pack(expand=True, fill=tk.BOTH)
+
+        # Checkbox (full width)
+        self.lock_tools_var = tk.BooleanVar(value=True)
+        
+        lock_tools_checkbox_title = ttk.Label(bottom_frame, text="Disable Main loopholes", font=("TkDefaultFont", 10, "bold"))
+        lock_tools_checkbox_title.pack(anchor="w", pady=5, padx=27)
+        lock_tools_checkbox = ttk.Checkbutton(
+            bottom_frame,
+            text="Disable Command Prompt, Registry Editor, Control Panel, msconfig, and Task Manager during monitoring.\n"
+            "(Default: All are disabled for best security. For added security, please disable PowerShell as well; search\n"
+            "on internet for help. Otherwise, FadCrypt could be terminated via PowerShell.)",
+            variable=self.lock_tools_var,
+            command=self.save_settings
+        )
+        lock_tools_checkbox.pack(anchor="w", pady=10)
+        
+
+        # Separator before export section
+        ttk.Separator(bottom_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+
+        # Export section
+        export_frame = ttk.Frame(bottom_frame)
+        export_frame.pack(fill=tk.X, pady=10, padx=15)
+
+        export_title = ttk.Label(export_frame, text="Export Configurations", font=("TkDefaultFont", 10, "bold"))
+        export_title.pack(anchor="w", padx=10)
+
+        export_description = ttk.Label(export_frame, text="Export the list of applications added to the lock list.")
+        export_description.pack(anchor="w", pady=(0, 5), padx=10)
+
+        export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config)
+        export_button.pack(anchor="w", padx=12)
+
+        # Pack canvas and scrollbar
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
         self.update_preview()
+
+    def configure_canvas(self, event):
+        # Update the width of the canvas window to fit the frame
+        self.canvas.itemconfig(self.canvas_frame, width=event.width)
+        # Update the initial canvas window height to fit the frame
+        if self.scrollable_frame.winfo_reqheight() < event.height:
+            self.canvas.itemconfig(self.canvas_frame, height=event.height)
+        else:
+            self.canvas.itemconfig(self.canvas_frame, height=self.scrollable_frame.winfo_reqheight())
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        
         
 
 
@@ -370,12 +435,10 @@ class AppLockerGUI:
     def update_preview(self):
         preview_path = "preview1.jpg" if self.password_dialog_style.get() == "simple" else "preview2.jpg"
         preview_image = Image.open(preview_path)
-        preview_image = preview_image.resize((300, 200), Image.LANCZOS)
+        preview_image = preview_image.resize((400, 250), Image.Resampling.LANCZOS)  # Resize to fit the new frame size
         preview_photo = ImageTk.PhotoImage(preview_image)
         self.preview_label.config(image=preview_photo)
         self.preview_label.image = preview_photo
-        # self.load_settings()
-        # self.save_settings()
 
 
     # image for the main page above the buttons
@@ -1360,12 +1423,12 @@ def main():
             background=[('active', '#000000')])  # Red color on hover
 
     # Customize the window frame color (e.g., the title bar)
-    style.configure('TFrame',
-                    background='#333333')  # Dark gray color
+    # style.configure('TFrame',
+                    # background='#333333')  # Dark gray color
     
 
     # Style the Checkbutton
-    style.configure('TCheckbutton', background='#181818', foreground='#ffffff', padding=10)
+    style.configure('TCheckbutton', foreground='#ffffff', padding=10)
 
     app = AppLockerGUI(root)
     # root.protocol("WM_DELETE_WINDOW", root.iconify)  # Minimize instead of close
