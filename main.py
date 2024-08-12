@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidTag
 import psutil
 import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox, filedialog
+from tkinter import ttk, simpledialog, messagebox, filedialog, PhotoImage
 import winreg
 import signal
 from PIL import Image, ImageDraw
@@ -26,6 +26,7 @@ from watchdog.events import FileSystemEventHandler
 from tkinterdnd2 import TkinterDnD, DND_FILES  # Import the tkinterdnd2 module
 import ctypes
 from ttkbootstrap import Style
+from PIL import Image, ImageTk
 
 # Embedded configuration and state data
 embedded_config = {
@@ -52,6 +53,7 @@ class AppLockerGUI:
         self.settings_file = os.path.join(self.app_locker.get_fadcrypt_folder(), 'settings.json')
         self.lock_tools_var = tk.BooleanVar(value=True)  # Default value is True
 
+        self.set_app_icon()  # Set the custom app icon
         self.create_widgets()
         self.load_settings()  # Load settings at startup
 
@@ -138,7 +140,25 @@ class AppLockerGUI:
 
 
 
+    def set_app_icon(self):
+        try:
+            # Load the .ico icon image for the taskbar (Windows)
+            ico_path = '1.ico'  # Update this path to your .ico file
+            if os.path.exists(ico_path):
+                self.master.iconbitmap(ico_path)
+            else:
+                print(f"Icon file {ico_path} not found, skipping .ico icon.")
 
+            # Load the .png icon image for the window icon
+            png_path = '2.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
+            if os.path.exists(png_path):
+                icon_img = PhotoImage(file=png_path)
+                self.master.iconphoto(False, icon_img)
+            else:
+                print(f"Icon file {png_path} not found, skipping .png icon.")
+
+        except Exception as e:
+            print(f"Failed to set application icon: {e}")
 
 
 
@@ -152,6 +172,11 @@ class AppLockerGUI:
         # Main Tab
         self.main_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.main_frame, text="Main")
+
+        # Load and display image
+        self.load_image()
+        self.image_label = tk.Label(self.main_frame, image=self.img)
+        self.image_label.pack(pady=10)  # Add padding if needed
 
         ttk.Button(self.main_frame, text="Create Password", command=self.create_password).pack(pady=5)
         ttk.Button(self.main_frame, text="Change Password", command=self.change_password).pack(pady=5)
@@ -235,6 +260,17 @@ class AppLockerGUI:
         
         # Save settings on state change (Optional, you can also handle this in the save settings function)
         self.lock_tools_var.trace_add("write", self.save_settings)
+
+
+
+
+
+    # image for the main page above the buttons
+    def load_image(self):
+        # Open and prepare the image
+        image = Image.open('1.png')  # Update this path
+        image = image.resize((200, 100), Image.LANCZOS)  # Resize using LANCZOS filter
+        self.img = ImageTk.PhotoImage(image)
 
 
 
