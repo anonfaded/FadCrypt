@@ -483,18 +483,68 @@ class AppLockerGUI:
 
         dialog.grab_set()
 
-        # Add content to the dialog
-        tk.Label(dialog, text="Read Me", font=("Arial", 24, "bold"), bg='white').pack(pady=10)
-        tk.Label(dialog, text="Important information about the application...", font=("Ubuntu", 14), bg='white').pack(pady=10)
+
+        # Add a frame for the text
+        text_frame = tk.Frame(dialog, bg='white')
+        text_frame.pack(expand=True, pady=50)
+
+        welcome_text = (
+            "Welcome to FadCrypt!\n\n"
+            "This tool offers robust security features including:\n"
+            "- Application Locking\n"
+            "- Password Management\n"
+            "- Real-time Monitoring\n\n"
+            "Current Updates:\n"
+            "- Enhanced UI\n"
+            "- New encryption methods\n\n"
+            "Upcoming Features:\n"
+            "- Cloud backup integration\n"
+            "- Advanced monitoring tools\n"
+            "- Additional customization options\n"
+        )
+
+        # Create a label to hold the animated text
+        self.animated_label = tk.Label(text_frame, text="", font=("Ubuntu", 16), bg='white', justify="left", anchor="nw")
+        self.animated_label.pack(padx=50, pady=50, anchor="n")
+
+        # Start the typewriter animation
+        self.animate_text(welcome_text, dialog)
 
         # Add a button to close the dialog
-        tk.Button(dialog, text="OK", command=dialog.destroy, font=("Arial", 12)).pack(pady=20)
+        ok_button = tk.Button(dialog, text="OK", command=lambda: self.fade_out(dialog), font=("Arial", 12), padx=12)
+        ok_button.pack(pady=20)
+
+        # Bind the Enter key to the OK button
+        dialog.bind('<Return>', lambda event: dialog.destroy())
+
+        # Load and place the image in the bottom left corner
+        self.load_readme_image(dialog)
+
 
         # Fade in effect
         self.fade_in(dialog)
 
         # Ensure the dialog stays on top
         dialog.wait_window()
+
+    def animate_text(self, text, dialog, index=0):
+        if index < len(text):
+            self.animated_label.config(text=text[:index+1])
+            dialog.after(7, self.animate_text, text, dialog, index+1)  # Adjust the speed here
+
+    def load_readme_image(self, dialog):
+        # Load the image using PIL
+        img = Image.open("1.ico")
+        img = img.resize((400, 400), Image.LANCZOS)  # Adjust the size as needed
+        photo = ImageTk.PhotoImage(img)
+
+        # Create a label to display the image
+        image_label = tk.Label(dialog, image=photo, bg='white')
+        image_label.image = photo  # Keep a reference to avoid garbage collection
+
+        # Place the image in the bottom left corner
+        image_label.place(x=10, y=dialog.winfo_screenheight() - 400)
+
 
     def fade_in(self, window):
         alpha = 0.0
@@ -504,6 +554,14 @@ class AppLockerGUI:
             window.update_idletasks()
             window.after(50)  # Adjust the delay to control the fade-in speed
 
+    def fade_out(self, window):
+        alpha = window.attributes('-alpha')
+        if alpha > 0:
+            alpha -= 0.05
+            window.attributes('-alpha', alpha)
+            window.after(50, self.fade_out, window)
+        else:
+            window.destroy()
 
 
 
