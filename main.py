@@ -43,7 +43,20 @@ class AppLockerGUI:
         self.master = master
         
         self.master.title("FadCrypt")
-        self.master.geometry("700x450") # Adjusted size to accommodate new tabs
+
+        # Center the dialog on the screen
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+        dialog_width = 700  # Adjust width as needed
+        dialog_height = 450  # Adjust height as needed
+        position_x = (screen_width // 2) - (dialog_width // 2)
+        position_y = (screen_height // 2) - (dialog_height // 2)
+        self.master.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+
+
+        # self.master.geometry("700x450") # Adjusted size to accommodate new tabs
+        # Prevent resizing
+        self.master.resizable(False, False)
         self.app_locker = AppLocker(self)
 
         
@@ -61,8 +74,31 @@ class AppLockerGUI:
 
     def open_add_application_dialog(self):
         self.add_dialog = tk.Toplevel(self.master)  # Store reference to the dialog
-        self.add_dialog.title("Add Application")
+        self.add_dialog.title("Add Application to Encrypt")
 
+        # Set the same icon for the dialog
+        # if hasattr(self, 'icon_img'):
+        #     self.add_dialog.iconphoto(False, self.icon_img)
+        #     self.add_dialog.update_idletasks()  # Force update the dialog to ensure the icon is set
+
+        # Center the dialog on the screen
+        screen_width = self.add_dialog.winfo_screenwidth()
+        screen_height = self.add_dialog.winfo_screenheight()
+        dialog_width = 400  # Adjust width as needed
+        dialog_height = 500  # Adjust height as needed
+        # position_x = (screen_width // 2) - (dialog_width // 2)
+        position_x = 50  # Position the dialog on the left edge of the screen
+        position_y = (screen_height // 2) - (dialog_height // 2)
+        self.add_dialog.geometry(f"{dialog_width}x{dialog_height}+{position_x}+{position_y}")
+        
+        # Prevent resizing
+        self.add_dialog.resizable(False, False)
+
+        # Ensure the dialog is focused
+        self.add_dialog.attributes('-topmost', True)
+        self.add_dialog.focus_set()
+
+        
         # Drag and Drop Area
         drop_frame = tk.LabelFrame(self.add_dialog, text="Drag and Drop .exe Here")
         drop_frame.pack(padx=10, pady=10, fill="both", expand=True)
@@ -70,7 +106,21 @@ class AppLockerGUI:
         # Use TkinterDnD for drag-and-drop functionality
         drop_area = tk.Canvas(drop_frame, height=100, bg="lightgray")
         drop_area.pack(padx=10, pady=10, fill="both", expand=True)
-        drop_area.create_text(100, 50, text="Drop your .exe file here", fill="black")
+        
+        def update_text_position():
+            drop_area.delete("all")  # Clear previous text
+            drop_area.create_text(
+                drop_area.winfo_width() // 2,
+                drop_area.winfo_height() // 2,
+                text="What are you looking at?\nJust drop your .exe files here—I’ve got other work to do!",
+                fill="lightgreen",
+                font=("Arial", 9),
+                anchor="center"
+            )
+    
+        # Update text position after the canvas is rendered
+        drop_area.after(100, update_text_position)  # Adjust delay if needed
+
 
         # Enable the canvas for drag-and-drop
         drop_area.drop_target_register(DND_FILES)
@@ -92,8 +142,12 @@ class AppLockerGUI:
         browse_button.pack(pady=5)
 
         # Save Button
-        save_button = tk.Button(self.add_dialog, text="Save", command=self.save_application)
+        save_button = tk.Button(self.add_dialog, text="Save", command=self.save_application, width=11)
         save_button.pack(pady=10)
+
+        # Bind the Enter key to the Save button
+        self.add_dialog.bind('<Return>', lambda event: save_button.invoke())
+
 
     def on_drop(self, event):
         file_path = event.data.strip('{}')  # Strip curly braces if present
@@ -105,7 +159,7 @@ class AppLockerGUI:
             self.name_entry.delete(0, tk.END)
             self.name_entry.insert(0, app_name)
         else:
-            messagebox.showerror("Invalid File", "Please drop a valid .exe file.")
+            self.show_message("Invalid File", "Please drop a valid .exe file.")
 
     def browse_for_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Executable Files", "*.exe")])
@@ -122,7 +176,7 @@ class AppLockerGUI:
         app_path = self.path_entry.get().strip()
         
         if not app_name or not app_path:
-            messagebox.showerror("Error", "Both name and path are required.")
+            self.show_message("Error", "Both name and path are required.")
             return
 
         # Call the add_application method from AppLocker instance
@@ -133,7 +187,7 @@ class AppLockerGUI:
         # Close the dialog
         self.add_dialog.destroy()
 
-        messagebox.showinfo("Success", f"Application '{app_name}' added successfully!")
+        self.show_message("Success", f"Application '{app_name}' added successfully!")
 
         
 
@@ -152,7 +206,7 @@ class AppLockerGUI:
                 print(f"Icon file {ico_path} not found, skipping .ico icon.")
 
             # Load the .png icon image for the window icon
-            png_path = '2.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
+            png_path = '1.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
             if os.path.exists(png_path):
                 icon_img = PhotoImage(file=png_path)
                 self.master.iconphoto(False, icon_img)
@@ -386,13 +440,13 @@ class AppLockerGUI:
             try:
                 with open(file_path, "w") as f:
                     json.dump(self.app_locker.config, f, indent=4)
-                messagebox.showinfo("Success", f"Config exported successfully to {file_path}")
+                self.show_message("Success", f"Config exported successfully to {file_path}")
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to export config: {e}")
+                self.show_message("Error", f"Failed to export config: {e}")
 
     def export_state(self):
         self.app_locker.export_state()
-        messagebox.showinfo("Info", "State exported to state.json")
+        self.show_message("Info", "State exported to state.json")
 
 
         
@@ -429,7 +483,7 @@ class AppLockerGUI:
                 self.app_locker.add_application(app_name, app_path)
                 self.update_apps_listbox()
                 self.update_config_display()  # Update config tab
-                messagebox.showinfo("Success", f"Application {app_name} added successfully.")
+                self.show_message("Success", f"Application {app_name} added successfully.")
 
 
     def remove_application(self):
@@ -439,9 +493,9 @@ class AppLockerGUI:
             self.app_locker.remove_application(app_name)
             self.update_apps_listbox()
             self.update_config_display()
-            messagebox.showinfo("Success", f"Application {app_name} removed successfully.")
+            self.show_message("Success", f"Application {app_name} removed successfully.")
         else:
-            messagebox.showerror("Error", "Please select an application to remove.")
+            self.show_message("Error", "Please select an application to remove.")
 
     def rename_application(self):
         selection = self.apps_listbox.curselection()
@@ -650,7 +704,7 @@ class AppLockerGUI:
         if fullscreen:
             dialog.attributes('-fullscreen', True)
         else:
-            dialog.geometry("400x250")
+            dialog.geometry("300x200")
         # Center the dialog on the screen
         screen_width = dialog.winfo_screenwidth()
         screen_height = dialog.winfo_screenheight()
@@ -686,14 +740,16 @@ class AppLockerGUI:
         if input_required:
             password_entry = tk.Entry(frame, show='*', font=("Arial", 12), width=30)
             password_entry.pack(pady=10)
-            password_entry.focus_set()  # Auto-focus on the input field
+            
+            # Set focus after the dialog is fully rendered
+            dialog.after(100, password_entry.focus_set)
 
             def on_ok(event=None):  # Accept an optional event argument
                 result[0] = password_entry.get()
                 self.fade_out(dialog)
 
-            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12))
-            ok_button.pack(pady=10)
+            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12), width=11)
+            ok_button.pack(side=tk.BOTTOM, pady=10, anchor='center')
 
             # Bind the Enter key to the OK button
             dialog.bind('<Return>', on_ok)
@@ -702,8 +758,8 @@ class AppLockerGUI:
                 result[0] = True
                 self.fade_out(dialog)
 
-            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12))
-            ok_button.pack(pady=10)
+            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12), width=11)
+            ok_button.pack(side=tk.BOTTOM, pady=10, anchor='center')
 
             # Bind the Enter key to the OK button
             dialog.bind('<Return>', on_ok)
@@ -1006,7 +1062,7 @@ class AppLocker:
             with open(self.password_file, "wb") as f:
                 f.write(salt + encryptor.tag + encrypted_hash)
         except Exception as e:
-            messagebox.showerror("Error", f"Error creating password: {e}")
+            self.show_message("Error", f"Error creating password: {e}")
 
     def change_password(self, old_password, new_password):
         if self.verify_password(old_password):
@@ -1016,7 +1072,7 @@ class AppLocker:
             self.save_config()  # This will use the new password
             print("change_password: Re-encrypt the configuration file with the new password")
         else:
-            messagebox.showerror("Error", "Incorrect old password.")
+            self.show_message("Error", "Incorrect old password.")
 
     def verify_password(self, password):
         try:
