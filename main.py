@@ -45,17 +45,21 @@ class AppLockerGUI:
         self.master = master
         
         self.master.title("FadCrypt")
-        self.master.geometry("600x450") # Adjusted size to accommodate new tabs
+        self.master.geometry("700x450") # Adjusted size to accommodate new tabs
         self.app_locker = AppLocker(self)
 
         
         # Ensure the settings file is correctly initialized
         self.settings_file = os.path.join(self.app_locker.get_fadcrypt_folder(), 'settings.json')
         self.lock_tools_var = tk.BooleanVar(value=True)  # Default value is True
+        self.password_dialog_style = tk.StringVar(value="simple")
+        self.wallpaper_choice = tk.StringVar(value="default")
+        
 
         self.set_app_icon()  # Set the custom app icon
         self.create_widgets()
-        self.load_settings()  # Load settings at startup
+        self.load_settings()
+        
 
     def open_add_application_dialog(self):
         self.add_dialog = tk.Toplevel(self.master)  # Store reference to the dialog
@@ -231,12 +235,24 @@ class AppLockerGUI:
         # self.state_text.pack(pady=5)
         # self.update_state_display()
 
+
+
+
+
+
+
+
         # Settings Tab
         self.settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.settings_frame, text="Settings")
 
-        ttk.Button(self.settings_frame, text="Export Config", command=self.export_config).pack(pady=5)
-        # ttk.Button(self.settings_frame, text="Export State", command=self.export_state).pack(pady=5)
+        left_frame = ttk.Frame(self.settings_frame)
+        left_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        right_frame = ttk.Frame(self.settings_frame)
+        right_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        ttk.Button(left_frame, text="Export Config", command=self.export_config).pack(pady=5)
 
 
 
@@ -254,7 +270,6 @@ class AppLockerGUI:
             # justify="left",  # Justify text to left
             # padx="20"
         )
-
         # The external padding is controlled by the pack() method's padx and pady options
         lock_tools_checkbox.pack(anchor="w", padx=10, pady=10)  # Adjust padx and pady for desired spacing
         
@@ -263,6 +278,52 @@ class AppLockerGUI:
 
 
 
+
+        # Password dialog style
+        ttk.Label(left_frame, text="Password Dialog Style:").pack(anchor="w", pady=5)
+        ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20)
+        ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20)
+
+        # Wallpaper choice for full screen dialog
+        ttk.Label(left_frame, text="Full Screen Wallpaper:").pack(anchor="w", pady=5)
+        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
+        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
+        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_wallpaper_choice).pack(anchor="w", padx=20)
+
+        # Preview area
+        ttk.Label(right_frame, text="Preview:").pack(anchor="w", pady=5)
+        self.preview_frame = ttk.Frame(right_frame)
+        self.preview_frame.pack(pady=10)
+        self.preview_label = ttk.Label(self.preview_frame)
+        self.preview_label.pack()
+
+        self.update_preview()
+        
+
+
+
+
+    def save_and_update_preview(self):
+        self.save_password_dialog_style()
+        self.update_preview()
+
+
+    def save_password_dialog_style(self):
+        self.save_settings()   
+
+    def save_wallpaper_choice(self):
+        self.save_settings()
+
+
+    def update_preview(self):
+        preview_path = "preview1.jpg" if self.password_dialog_style.get() == "simple" else "preview2.jpg"
+        preview_image = Image.open(preview_path)
+        preview_image = preview_image.resize((300, 200), Image.LANCZOS)
+        preview_photo = ImageTk.PhotoImage(preview_image)
+        self.preview_label.config(image=preview_photo)
+        self.preview_label.image = preview_photo
+        # self.load_settings()
+        # self.save_settings()
 
 
     # image for the main page above the buttons
@@ -345,22 +406,22 @@ class AppLockerGUI:
 
     def create_password(self):
         if os.path.exists(self.app_locker.password_file):
-            messagebox.showinfo("Info", "Password already exists. Use 'Change Password' to modify.")
+            self.show_message("Info", "Password already exists. Use 'Change Password' to modify.")
         else:
-            password = simpledialog.askstring("Create Password", "Enter a new password:", show='*')
+            password = self.ask_password("Create Password", "Enter a new password:")
             if password:
                 self.app_locker.create_password(password)
-                messagebox.showinfo("Success", "Password created successfully.")
+                self.show_message("Success", "Password created successfully.")
 
     def change_password(self):
-        old_password = simpledialog.askstring("Change Password", "Enter your old password:", show='*')
+        old_password = self.ask_password("Change Password", "Enter your old password:")
         if old_password and self.app_locker.verify_password(old_password):
-            new_password = simpledialog.askstring("Change Password", "Enter a new password:", show='*')
+            new_password = self.ask_password("Change Password", "Enter a new password:")
             if new_password:
                 self.app_locker.change_password(old_password, new_password)
-                messagebox.showinfo("Success", "Password changed successfully.")
+                self.show_message("Success", "Password changed successfully.")
         else:
-            messagebox.showerror("Error", "Incorrect old password.")
+            self.show_message("Error", "Incorrect old password.")
 
     def add_application(self):
         app_name = simpledialog.askstring("Add Application", "Enter the name of the application:")
@@ -417,15 +478,15 @@ class AppLockerGUI:
             self.enable_tools()
 
         if self.app_locker.monitoring:
-            password = simpledialog.askstring("Stop Monitoring", "Enter your password to stop monitoring:", show='*')
+            password = self.ask_password("Stop Monitoring", "Enter your password to stop monitoring:")
             if password and self.app_locker.verify_password(password):
                 self.app_locker.stop_monitoring()
-                messagebox.showinfo("Success", "Monitoring stopped.")
+                self.show_message("Success", "Monitoring stopped.")
                 self.master.deiconify()  # Show the main window
             else:
-                messagebox.showerror("Error", "Incorrect password. Monitoring will continue.")
+                self.show_message("Error", "Incorrect password. Monitoring will continue.")
         else:
-            messagebox.showinfo("Info", "Monitoring is not running.")
+            self.show_message("Info", "Monitoring is not running.")
 
 
 
@@ -541,6 +602,8 @@ class AppLockerGUI:
     def save_settings(self, *args):
         settings = {
             "lock_tools": self.lock_tools_var.get(),
+            "password_dialog_style": self.password_dialog_style.get(),
+            "wallpaper_choice": self.wallpaper_choice.get()
             # Other settings can be added here
         }
         with open(self.settings_file, 'w') as f:
@@ -551,12 +614,170 @@ class AppLockerGUI:
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
+            print(f"load_settings: Loading settings from {self.settings_file}")
             with open(self.settings_file, 'r') as f:
                 settings = json.load(f)
                 self.lock_tools_var.set(settings.get("lock_tools", True))
+                self.password_dialog_style.set(settings.get("password_dialog_style", "simple"))
+                self.wallpaper_choice.set(settings.get("wallpaper_choice", "default"))
         else:
+            print("load_settings: Probably file does not exist.")
             # If settings file does not exist, use defaults
             self.lock_tools_var.set(True)  # Default to locking tools
+            self.password_dialog_style.set("simple")
+            self.wallpaper_choice.set("default")
+        self.update_preview()
+
+
+
+
+
+    def ask_password(self, title, prompt):
+        if self.password_dialog_style.get() == "simple":
+            return self.custom_dialog(title, prompt, fullscreen=False)
+        else:
+            return self.custom_dialog(title, prompt, fullscreen=True)
+
+
+
+
+
+
+
+    def custom_dialog(self, title, prompt, fullscreen=False, input_required=True):
+        dialog = tk.Toplevel(self.master)
+        dialog.attributes('-alpha', 0.0)  # Start fully transparent
+        if fullscreen:
+            dialog.attributes('-fullscreen', True)
+        else:
+            dialog.geometry("300x200")
+        dialog.grab_set()
+
+        if fullscreen:
+            # Load and display wallpaper
+            wallpaper_path = self.get_wallpaper_path()
+            wallpaper = Image.open(wallpaper_path)
+            wallpaper = wallpaper.resize((dialog.winfo_screenwidth(), dialog.winfo_screenheight()), Image.LANCZOS)
+            wallpaper = ImageTk.PhotoImage(wallpaper)
+            background_label = tk.Label(dialog, image=wallpaper)
+            background_label.place(x=0, y=0, relwidth=1, relheight=1)
+            background_label.image = wallpaper
+
+        frame = tk.Frame(dialog, bg='white', bd=5)
+        if fullscreen:
+            frame.place(relx=0.5, rely=0.5, anchor='center')
+        else:
+            frame.pack(expand=True, fill='both', padx=10, pady=10)
+
+        tk.Label(frame, text=title, font=("Arial", 16, "bold"), bg='white').pack(pady=10)
+        tk.Label(frame, text=prompt, font=("Arial", 12), bg='white').pack(pady=5)
+        
+        result = [None]  # Use a list to store the result
+
+        if input_required:
+            password_entry = tk.Entry(frame, show='*', font=("Arial", 12), width=30)
+            password_entry.pack(pady=10)
+
+            def on_ok():
+                result[0] = password_entry.get()
+                self.fade_out(dialog)
+
+            tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12)).pack(pady=10)
+        else:
+            def on_ok():
+                result[0] = True
+                self.fade_out(dialog)
+
+            tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12)).pack(pady=10)
+
+        self.fade_in(dialog)
+        dialog.wait_window()
+        return result[0]
+
+
+    def fade_in(self, window):
+        alpha = 0.0
+        window.attributes('-alpha', alpha)
+        window.deiconify()
+        while alpha < 1.0:
+            alpha += 0.2  # Increased step for faster animation
+            window.attributes('-alpha', min(alpha, 1.0))
+            window.update()
+            time.sleep(0.02)  # Reduced sleep time for faster animation
+
+    def fade_out(self, window):
+        alpha = 1.0
+        while alpha > 0.0:
+            alpha -= 0.2  # Increased step for faster animation
+            window.attributes('-alpha', max(alpha, 0.0))
+            window.update()
+            time.sleep(0.02)  # Reduced sleep time for faster animation
+        window.destroy()
+
+    def show_message(self, title, message, message_type="info"):
+        return self.custom_dialog(title, message, fullscreen=False, input_required=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def full_screen_password_dialog(self, title, prompt):
+        dialog = tk.Toplevel(self.master)
+        dialog.attributes('-fullscreen', True)
+        dialog.grab_set()
+
+        # Load and display wallpaper
+        wallpaper_path = self.get_wallpaper_path()
+        wallpaper = Image.open(wallpaper_path)
+        wallpaper = wallpaper.resize((dialog.winfo_screenwidth(), dialog.winfo_screenheight()), Image.LANCZOS)
+        wallpaper = ImageTk.PhotoImage(wallpaper)
+        background_label = tk.Label(dialog, image=wallpaper)
+        background_label.place(x=0, y=0, relwidth=1, relheight=1)
+        background_label.image = wallpaper
+
+        frame = tk.Frame(dialog, bg='white', bd=5)
+        frame.place(relx=0.5, rely=0.5, anchor='center')
+
+        tk.Label(frame, text=title, font=("Arial", 16, "bold"), bg='white').pack(pady=10)
+        tk.Label(frame, text=prompt, font=("Arial", 12), bg='white').pack(pady=5)
+        password_entry = tk.Entry(frame, show='*', font=("Arial", 12), width=30)
+        password_entry.pack(pady=10)
+
+        password = [None]  # Use a list to store the password
+
+        def on_ok():
+            password[0] = password_entry.get()
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12)).pack(side=tk.LEFT, padx=10, pady=10)
+        tk.Button(frame, text="Cancel", command=on_cancel, font=("Arial", 12)).pack(side=tk.RIGHT, padx=10, pady=10)
+
+        dialog.wait_window()
+        return password[0]
+
+    def get_wallpaper_path(self):
+        wallpapers = {
+            "default": "default.jpg",
+            "nature": "wall2.jpg",
+            "abstract": "wall3.jpg"
+        }
+        return wallpapers.get(self.wallpaper_choice.get(), wallpapers["default"])
+
+
 
 
 
@@ -806,7 +1027,7 @@ class AppLocker:
         #     messagebox.showerror("Error", f"Encryptepd file corrupted: {ee}")
         #     return False
         except Exception as e:
-            messagebox.showerror("Error", f"Error verifying password: {e}")
+            print("Error", f"Error verifying password: {e}")
         return False
 
     def add_application(self, app_name, app_path):
