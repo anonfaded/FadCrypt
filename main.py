@@ -114,7 +114,7 @@ class AppLockerGUI:
             drop_area.create_text(
                 drop_area.winfo_width() // 2,
                 drop_area.winfo_height() // 2,
-                text="What are you looking at?\nJust drop your .exe files here—I’ve got other work to do!",
+                text="Just drop it in—I'll sort out the name and path,\nno worries",
                 fill="lightgreen",
                 font=("Arial", 9),
                 anchor="center"
