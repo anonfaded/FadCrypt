@@ -29,6 +29,12 @@ from ttkbootstrap import Style
 from PIL import Image, ImageTk
 import webbrowser
 import random
+import requests
+
+# App Version Information
+__version__ = "0.1.0"
+__version_code__ = 1  # Increment this for each release
+
 
 # Embedded configuration and state data
 embedded_config = {
@@ -540,7 +546,140 @@ class AppLockerGUI:
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # About Tab
+        self.about_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.about_frame, text="About")
+
+        # Load App Logo with Error Handling
+        try:
+            app_icon = tk.PhotoImage(file='1.png').subsample(10, 10)  # Resize the logo to 50x50 px
+        except tk.TclError:
+            print("Error: App icon '1.png' not found.")
+            app_icon = None
+
+        if app_icon:
+            icon_label = ttk.Label(self.about_frame, image=app_icon)
+            icon_label.image = app_icon  # Keep a reference to avoid garbage collection
+            icon_label.pack(pady=20)
+        else:
+            icon_label = ttk.Label(self.about_frame, text="FadCrypt", font=("TkDefaultFont", 18, "bold"))
+            icon_label.pack(pady=20)
+
+        # App Name and Version
+        app_name_label = ttk.Label(self.about_frame, text="FadCrypt", font=("TkDefaultFont", 18, "bold"))
+        app_name_label.pack()
+
+        app_version_label = ttk.Label(self.about_frame, text="Version 0.1.0", font=("TkDefaultFont", 10))
+        app_version_label.pack(pady=(0, 10))
+
+        # Check for Updates Button
+        update_button = ttk.Button(self.about_frame, text="Check for Updates", command=self.check_for_updates)
+        update_button.pack(pady=10)
+
+        # Description
+        description_label = ttk.Label(
+            self.about_frame, 
+            text="FadCrypt is a free and open-source application designed to secure your digital workspace. Available exclusively on GitHub.",
+            wraplength=400,
+            justify="center"
+        )
+        description_label.pack(pady=(0, 20))
+
+        # FadSec Lab Suite Information with Darker Background
+        suite_frame = ttk.Frame(self.about_frame, padding=10, relief="ridge", style="Dark.TFrame")
+        suite_frame.pack(pady=10, padx=20, fill="x")
+
+        suite_info_label = ttk.Label(suite_frame, text="FadCrypt is part of the FadSec Lab suite. For more information, click on 'View Source Code' below.")
+        suite_info_label.pack(anchor="center")
+
+        # Source Code Button
+        source_code_button = ttk.Button(self.about_frame, text="View Source Code", command=self.open_source_code)
+        source_code_button.pack(pady=10)
+
+        # Buy Me A Coffee Button
+        coffee_button = ttk.Button(self.about_frame, text="Buy Me A Coffee", command=lambda: webbrowser.open("https://ko-fi.com/fadedx"))
+        coffee_button.pack(pady=(0, 20))
+
+        # Promotion Section for Another App
+        try:
+            fadcam_icon = tk.PhotoImage(file='fadcam_icon.png').subsample(2, 2)  # Resize the logo to 50x50 px
+        except tk.TclError:
+            print("Error: FadCam icon 'fadcam_icon.png' not found.")
+            fadcam_icon = None
+
+        if fadcam_icon:
+            fadcam_label = ttk.Label(self.about_frame, image=fadcam_icon, text="FadCam - Open Source Ad-Free Offscreen Video Recorder",
+                                    compound="left", font=("TkDefaultFont", 10, "bold"))
+            fadcam_label.image = fadcam_icon
+            fadcam_label.pack(pady=10)
+            fadcam_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCam"))
+        else:
+            fadcam_label = ttk.Label(self.about_frame, text="FadCam - Open Source Ad-Free Offscreen Video Recorder",
+                                    font=("TkDefaultFont", 10, "bold"))
+            fadcam_label.pack(pady=10)
+            fadcam_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCam"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         self.update_preview()
+
+
+    # Method to open the GitHub page
+    def open_source_code(self):
+        webbrowser.open("https://github.com/anonfaded/FadCrypt")
+        
+    
+
+    # Method to check for updates
+
+    def check_for_updates(self):
+        try:
+            response = requests.get("https://api.github.com/repos/anonfaded/FadCrypt/releases/latest")
+            response.raise_for_status()  # Ensure we got a valid response
+
+            latest_version = response.json().get("tag_name", None)
+            current_version = __version__
+
+            if latest_version and latest_version != current_version:
+                self.show_message("Update Available", f"New version {latest_version} is available! Visit GitHub for more details.")
+            else:
+                self.show_message("Up to Date", "Your application is up to date.")
+        except requests.ConnectionError:
+            self.show_message("Connection Error", "Unable to check for updates. Please check your internet connection.")
+        except requests.HTTPError as http_err:
+            self.show_message("HTTP Error", f"HTTP error occurred:\n{http_err}")
+        except Exception as e:
+            self.show_message("Error", f"An error occurred while checking for updates: {str(e)}")
+
+
 
 
     def show_readme(self):
