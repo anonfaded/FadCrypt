@@ -585,7 +585,7 @@ class AppLockerGUI:
         app_name_label = ttk.Label(self.about_frame, text="FadCrypt", font=("TkDefaultFont", 18, "bold"))
         app_name_label.pack()
 
-        app_version_label = ttk.Label(self.about_frame, text="Version 0.1.0", font=("TkDefaultFont", 10))
+        app_version_label = ttk.Label(self.about_frame, text=f"Version {__version__}", font=("TkDefaultFont", 10))
         app_version_label.pack(pady=(0, 10))
 
         # Check for Updates Button
@@ -595,46 +595,82 @@ class AppLockerGUI:
         # Description
         description_label = ttk.Label(
             self.about_frame, 
-            text="FadCrypt is a free and open-source application designed to secure your digital workspace. Available exclusively on GitHub.",
+            text="FadCrypt is an open-source app lock/encryption software that prioritizes privacy by not tracking or collecting any data. It is available exclusively on GitHub and through the official links mentioned in the README.",
             wraplength=400,
             justify="center"
         )
         description_label.pack(pady=(0, 20))
 
+
         # FadSec Lab Suite Information with Darker Background
-        suite_frame = ttk.Frame(self.about_frame, padding=10, relief="ridge", style="Dark.TFrame")
-        suite_frame.pack(pady=10, padx=20, fill="x")
+        suite_frame = ttk.Frame(self.about_frame, padding=10,  style="Dark.TFrame")
+        suite_frame.pack(pady=10, padx=20)
 
         suite_info_label = ttk.Label(suite_frame, text="FadCrypt is part of the FadSec Lab suite. For more information, click on 'View Source Code' below.")
         suite_info_label.pack(anchor="center")
 
+
+
+        # Button Frame for Alignment
+        button_frame = ttk.Frame(self.about_frame)
+        button_frame.pack(pady=10)
+
         # Source Code Button
-        source_code_button = ttk.Button(self.about_frame, text="View Source Code", command=self.open_source_code)
-        source_code_button.pack(pady=10)
+        source_code_button = ttk.Button(button_frame, text="View Source Code", command=self.open_source_code)
+        source_code_button.grid(row=0, column=0, padx=(0, 10))
 
         # Buy Me A Coffee Button
-        coffee_button = ttk.Button(self.about_frame, text="Buy Me A Coffee", command=lambda: webbrowser.open("https://ko-fi.com/fadedx"))
-        coffee_button.pack(pady=(0, 20))
+        coffee_button = ttk.Button(button_frame, text="Buy Me A Coffee", command=lambda: webbrowser.open("https://ko-fi.com/fadedx"))
+        coffee_button.grid(row=0, column=1, padx=(0, 10))
+
+        # New Button: Join Discord
+        discord_button = ttk.Button(button_frame, text="Join Discord", command=lambda: webbrowser.open("https://discord.gg/kvAZvdkuuN"))
+        discord_button.grid(row=0, column=2, padx=(0, 10))
+
+        # New Button: Write a Review
+        review_button = ttk.Button(button_frame, text="Write a Review", command=lambda: webbrowser.open("https://forms.gle/wnthyevjkRD41eTFA"))
+        review_button.grid(row=0, column=3)
+
+
+
 
         # Promotion Section for Another App
+        separator = ttk.Separator(self.about_frame, orient='horizontal')
+        separator.pack(fill='x', pady=10)
+
+
+
+
+        # Title for Promotion Section
+        promo_title_label = ttk.Label(self.about_frame, text="Check out FadCam, our Android app from the FadSec Lab suite.", font=("TkDefaultFont", 12, "bold"))
+        promo_title_label.pack(pady=(0, 10))
+
+        # Frame for FadCam Promo and Button
+        fadcam_promo_frame = ttk.Frame(self.about_frame)
+        fadcam_promo_frame.pack(pady=10)
+
+        # App Icon and Title
         try:
-            fadcam_icon = tk.PhotoImage(file='fadcam_icon.png').subsample(2, 2)  # Resize the logo to 50x50 px
+            fadcam_icon = tk.PhotoImage(file='1.png').subsample(12, 12)  # Resize the logo to 50x50 px
         except tk.TclError:
             print("Error: FadCam icon 'fadcam_icon.png' not found.")
             fadcam_icon = None
 
         if fadcam_icon:
-            fadcam_label = ttk.Label(self.about_frame, image=fadcam_icon, text="FadCam - Open Source Ad-Free Offscreen Video Recorder",
+            fadcam_label = ttk.Label(fadcam_promo_frame, image=fadcam_icon, text="FadCam - Open Source Ad-Free Offscreen Video Recorder.",
                                     compound="left", font=("TkDefaultFont", 10, "bold"))
             fadcam_label.image = fadcam_icon
-            fadcam_label.pack(pady=10)
+            fadcam_label.grid(row=0, column=0, padx=(0, 10))
             fadcam_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCam"))
         else:
-            fadcam_label = ttk.Label(self.about_frame, text="FadCam - Open Source Ad-Free Offscreen Video Recorder",
+            fadcam_label = ttk.Label(fadcam_promo_frame, text="FadCam - Open Source Ad-Free Offscreen Video Recorder.",
                                     font=("TkDefaultFont", 10, "bold"))
-            fadcam_label.pack(pady=10)
+            fadcam_label.grid(row=0, column=0, padx=(0, 10))
             fadcam_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCam"))
 
+        # Button to Open FadCam Repo
+        fadcam_button = ttk.Button(fadcam_promo_frame, text="Get FadCam", command=lambda: webbrowser.open("https://github.com/anonfaded/FadCam"))
+        fadcam_button.grid(row=0, column=1)
 
 
 
