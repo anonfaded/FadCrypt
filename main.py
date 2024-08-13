@@ -305,17 +305,6 @@ class AppLockerGUI:
         ttk.Button(button_frame, text="Rename", command=self.rename_application).pack(side=tk.LEFT, padx=5)
 
 
-
-
-
-        # Config Tab
-        self.config_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.config_frame, text="Config")
-
-        self.config_text = tk.Text(self.config_frame, width=60, height=10)
-        self.config_text.pack(pady=5)
-        self.update_config_display()
-
         # State Tab
         # self.state_frame = ttk.Frame(self.notebook)
         # self.notebook.add(self.state_frame, text="State")
@@ -323,6 +312,102 @@ class AppLockerGUI:
         # self.state_text = tk.Text(self.state_frame, width=60, height=10)
         # self.state_text.pack(pady=5)
         # self.update_state_display()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # Config Tab
+        self.config_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.config_frame, text="Config")
+
+        # Title for the config section
+        config_title = ttk.Label(self.config_frame, text="Config File", font=("TkDefaultFont", 16, "bold"))
+        config_title.pack(anchor="w", padx=10, pady=(10, 0))
+        # Separator before textbox section
+        ttk.Separator(self.config_frame, orient='horizontal').pack(fill=tk.X, padx=10, pady=5)
+
+        # Config text box to display the config file content
+        self.config_text = tk.Text(self.config_frame, width=99, height=17)
+        self.config_text.pack(pady=5, padx=10)
+        self.update_config_display()
+
+        # Description below the config text box
+        config_description = ttk.Label(self.config_frame, text=(
+            "This is the list of applications currently locked by FadCrypt.\n"
+            "It is displayed in plain text here for your convenience, "
+            "but rest assured, the data is encrypted when saved on your computer,\n"
+            "keeping your locked apps confidential."
+        ))
+        config_description.pack(anchor="w", padx=10, pady=(10, 10))
+
+        # Separator before export section
+        ttk.Separator(self.config_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+
+        # Export config data section
+        export_frame = ttk.Frame(self.config_frame)
+        export_frame.pack(fill=tk.X, pady=10, padx=15)
+
+        export_title = ttk.Label(export_frame, text="Export Configurations", font=("TkDefaultFont", 10, "bold"))
+        export_title.pack(anchor="w", padx=10)
+
+        export_description = ttk.Label(export_frame, text="Export the list of applications added to the lock list.")
+        export_description.pack(anchor="w", pady=(0, 5), padx=10)
+
+        export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config)
+        export_button.pack(anchor="w", padx=12)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -376,8 +461,8 @@ class AppLockerGUI:
         right_frame = ttk.Frame(top_frame)
         right_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        # Separator after top frame
-        ttk.Separator(self.scrollable_frame, orient='horizontal').pack(fill=tk.X, padx=10, pady=5)
+        # Separator after preview section in settings tab
+        ttk.Separator(self.scrollable_frame, orient='horizontal').pack(fill=tk.X, pady=10)
 
         # Bottom frame for checkboxes and export section
         bottom_frame = ttk.Frame(self.scrollable_frame)
@@ -435,21 +520,21 @@ class AppLockerGUI:
         lock_tools_checkbox.pack(anchor="w", pady=10)
         
 
-        # Separator before export section
-        ttk.Separator(bottom_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+        # Separator before export config section
+        # ttk.Separator(bottom_frame, orient='horizontal').pack(fill=tk.X, pady=10)
 
-        # Export section
-        export_frame = ttk.Frame(bottom_frame)
-        export_frame.pack(fill=tk.X, pady=10, padx=15)
+        # # Export section
+        # export_frame = ttk.Frame(bottom_frame)
+        # export_frame.pack(fill=tk.X, pady=10, padx=15)
 
-        export_title = ttk.Label(export_frame, text="Export Configurations", font=("TkDefaultFont", 10, "bold"))
-        export_title.pack(anchor="w", padx=10)
+        # export_title = ttk.Label(export_frame, text="Export Configurations", font=("TkDefaultFont", 10, "bold"))
+        # export_title.pack(anchor="w", padx=10)
 
-        export_description = ttk.Label(export_frame, text="Export the list of applications added to the lock list.")
-        export_description.pack(anchor="w", pady=(0, 5), padx=10)
+        # export_description = ttk.Label(export_frame, text="Export the list of applications added to the lock list.")
+        # export_description.pack(anchor="w", pady=(0, 5), padx=10)
 
-        export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config)
-        export_button.pack(anchor="w", padx=12)
+        # export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config)
+        # export_button.pack(anchor="w", padx=12)
 
         # Pack canvas and scrollbar
         self.canvas.pack(side="left", fill="both", expand=True)
@@ -661,7 +746,7 @@ class AppLockerGUI:
     def load_image(self):
         # Open and prepare the image
         image = Image.open('1.ico')  # Update this path
-        image = image.resize((600, 150), Image.LANCZOS)  # Resize using LANCZOS filter
+        image = image.resize((200, 200), Image.LANCZOS)  # Resize using LANCZOS filter
         self.img = ImageTk.PhotoImage(image)
 
 
