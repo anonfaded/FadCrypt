@@ -252,7 +252,7 @@ class AppLockerGUI:
         start_button.pack(pady=10)
 
         # Add the Read Me button below the Start button
-        readme_button = ttk.Button(self.main_frame, text="Read Me", command=self.show_readme, style='green.TButton')
+        readme_button = ttk.Button(self.main_frame, text="Read Me", command=self.show_readme, style='navy.TButton')
         readme_button.pack(pady=10)
 
         # Create a frame for the other buttons (stacked on the left side)
@@ -1053,14 +1053,18 @@ class AppLockerGUI:
             self.show_message("Error", "Please select an application to rename.")
 
     def start_monitoring(self):
+        if os.path.exists(self.app_locker.password_file):
             # Check if the user has enabled the tool lock
-        if self.lock_tools_var.get():
-            print("Disabling the cmd, powershell and task managaer...")
-            self.disable_tools()
+            if self.lock_tools_var.get():
+                print("Disabling the cmd, powershell and task managaer...")
+                self.disable_tools()
 
-        threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
-        self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
-        self.master.withdraw()  # Hide the main window
+            threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
+            self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
+            self.master.withdraw()  # Hide the main window
+        else:
+            self.show_message("Hey!", f"You forgot to create the password?")
+            return False
 
     def stop_monitoring(self):
         # Check if the user has enabled the tool lock
@@ -1838,7 +1842,7 @@ class FileMonitor:
             super().__init__()
             self.files_to_monitor = files_to_monitor
             self.backup_folder = backup_folder
-            self.initial_restore()  # Restore any missing files from the backup folder
+            # self.initial_restore()  # Restore any missing files from the backup folder
             print("Initial file recovery completed.")
 
         def on_modified(self, event):
