@@ -146,11 +146,11 @@ class AppLockerGUI:
         self.path_entry = tk.Entry(manual_frame)
         self.path_entry.pack(padx=10, pady=5, fill="x")
 
-        browse_button = tk.Button(manual_frame, text="Browse", command=self.browse_for_file)
+        browse_button = ttk.Button(manual_frame, text="Browse", command=self.browse_for_file, style="navy.TButton")
         browse_button.pack(pady=5)
 
         # Save Button
-        save_button = tk.Button(self.add_dialog, text="Save", command=self.save_application, width=11)
+        save_button = ttk.Button(self.add_dialog, text="Save", command=self.save_application, width=11, style="green.TButton")
         save_button.pack(pady=10)
 
         # Bind the Enter key to the Save button
@@ -248,11 +248,11 @@ class AppLockerGUI:
 
 
         # Add Start button (centered in the main frame)
-        start_button = ttk.Button(self.main_frame, text="Start Monitoring", command=self.start_monitoring)
+        start_button = ttk.Button(self.main_frame, text="Start Monitoring", command=self.start_monitoring, style='red.TButton')
         start_button.pack(pady=10)
 
         # Add the Read Me button below the Start button
-        readme_button = ttk.Button(self.main_frame, text="Read Me", command=self.show_readme)
+        readme_button = ttk.Button(self.main_frame, text="Read Me", command=self.show_readme, style='green.TButton')
         readme_button.pack(pady=10)
 
         # Create a frame for the other buttons (stacked on the left side)
@@ -306,8 +306,8 @@ class AppLockerGUI:
         button_frame.pack(pady=10, padx=5, fill=tk.X)
 
         # Modify the Add button to open the new dialog
-        ttk.Button(button_frame, text="Add", command=self.open_add_application_dialog).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Remove", command=self.remove_application).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Add", command=self.open_add_application_dialog, style="green.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Remove", command=self.remove_application, style="red.TButton").pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Rename", command=self.rename_application).pack(side=tk.LEFT, padx=5)
 
 
@@ -379,7 +379,7 @@ class AppLockerGUI:
         export_description = ttk.Label(export_frame, text="Export the list of applications added to the lock list.")
         export_description.pack(anchor="w", pady=(0, 5), padx=10)
 
-        export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config)
+        export_button = ttk.Button(export_frame, text="Export Config", command=self.export_config, style="green.TButton")
         export_button.pack(anchor="w", padx=12)
 
 
@@ -589,7 +589,7 @@ class AppLockerGUI:
         app_version_label.pack(pady=(0, 10))
 
         # Check for Updates Button
-        update_button = ttk.Button(self.about_frame, text="Check for Updates", command=self.check_for_updates)
+        update_button = ttk.Button(self.about_frame, text="Check for Updates", command=self.check_for_updates, style="green.TButton")
         update_button.pack(pady=10)
 
         # Description
@@ -616,19 +616,19 @@ class AppLockerGUI:
         button_frame.pack(pady=10)
 
         # Source Code Button
-        source_code_button = ttk.Button(button_frame, text="View Source Code", command=self.open_source_code)
+        source_code_button = ttk.Button(button_frame, text="View Source Code", command=self.open_source_code, style="navy.TButton")
         source_code_button.grid(row=0, column=0, padx=(0, 10))
 
         # Buy Me A Coffee Button
-        coffee_button = ttk.Button(button_frame, text="Buy Me A Coffee", command=lambda: webbrowser.open("https://ko-fi.com/fadedx"))
+        coffee_button = ttk.Button(button_frame, text="Buy Me A Coffee", command=lambda: webbrowser.open("https://ko-fi.com/fadedx"), style="yellow.TButton")
         coffee_button.grid(row=0, column=1, padx=(0, 10))
 
         # New Button: Join Discord
-        discord_button = ttk.Button(button_frame, text="Join Discord", command=lambda: webbrowser.open("https://discord.gg/kvAZvdkuuN"))
+        discord_button = ttk.Button(button_frame, text="Join Discord", command=lambda: webbrowser.open("https://discord.gg/kvAZvdkuuN"), style="blue.TButton")
         discord_button.grid(row=0, column=2, padx=(0, 10))
 
         # New Button: Write a Review
-        review_button = ttk.Button(button_frame, text="Write a Review", command=lambda: webbrowser.open("https://forms.gle/wnthyevjkRD41eTFA"))
+        review_button = ttk.Button(button_frame, text="Write a Review", command=lambda: webbrowser.open("https://forms.gle/wnthyevjkRD41eTFA"), style="green.TButton")
         review_button.grid(row=0, column=3)
 
 
@@ -669,7 +669,7 @@ class AppLockerGUI:
             fadcam_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCam"))
 
         # Button to Open FadCam Repo
-        fadcam_button = ttk.Button(fadcam_promo_frame, text="Get FadCam", command=lambda: webbrowser.open("https://github.com/anonfaded/FadCam"))
+        fadcam_button = ttk.Button(fadcam_promo_frame, text="Get FadCam", command=lambda: webbrowser.open("https://github.com/anonfaded/FadCam"), style="green.TButton")
         fadcam_button.grid(row=0, column=1)
 
 
@@ -777,7 +777,7 @@ class AppLockerGUI:
         self.animate_text(welcome_text, dialog)
 
         # Add a button to close the dialog
-        ok_button = tk.Button(dialog, text="OK", command=lambda: self.fade_out(dialog), font=("Arial", 12), padx=12)
+        ok_button = ttk.Button(dialog, text="OK", command=lambda: self.fade_out(dialog), style='red.TButton', width="11")
         ok_button.pack(pady=20)
 
         # Bind the Enter key to the OK button
@@ -1287,7 +1287,7 @@ class AppLockerGUI:
                 result[0] = password_entry.get()
                 self.fade_out(dialog)
 
-            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12), width=11)
+            ok_button = ttk.Button(frame, text="OK", command=on_ok, style="red.TButton", width="11")
             ok_button.pack(side=tk.BOTTOM, pady=10, anchor='center')
 
             # Bind the Enter key to the OK button
@@ -1297,7 +1297,7 @@ class AppLockerGUI:
                 result[0] = True
                 self.fade_out(dialog)
 
-            ok_button = tk.Button(frame, text="OK", command=on_ok, font=("Arial", 12), width=11)
+            ok_button = ttk.Button(frame, text="OK", command=on_ok, style="red.TButton", width="11")
             ok_button.pack(side=tk.BOTTOM, pady=10, anchor='center')
 
             # Bind the Enter key to the OK button
@@ -1517,32 +1517,38 @@ class AppLocker:
             f.write(salt + encryptor.tag + encrypted_data)
 
     def decrypt_data(self, password, file_path):
-        with open(file_path, 'rb') as f:
-            salt = f.read(16)
-            tag = f.read(16)
-            encrypted_data = f.read()
-        print(f"Salt: {salt.hex()}")
-        print(f"Tag: {tag.hex()}")
-        print(f"Encrypted Data: {encrypted_data.hex()}")
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        key = kdf.derive(password)
-        cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag), backend=default_backend())
-        decryptor = cipher.decryptor()
-        decrypted_data = decryptor.update(encrypted_data) + decryptor.finalize()
-        return json.loads(decrypted_data)
+        try:
+            with open(file_path, 'rb') as f:
+                salt = f.read(16)
+                tag = f.read(16)
+                encrypted_data = f.read()
+            print(f"Salt: {salt.hex()}")
+            print(f"Tag: {tag.hex()}")
+            print(f"Encrypted Data: {encrypted_data.hex()}")
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+                backend=default_backend()
+            )
+            key = kdf.derive(password)
+            cipher = Cipher(algorithms.AES(key), modes.GCM(salt, tag), backend=default_backend())
+            decryptor = cipher.decryptor()
+            decrypted_data = decryptor.update(encrypted_data) + decryptor.finalize()
+            return json.loads(decrypted_data)
+        except Exception as e:
+            print(f"Error decrypting data: {e}")
+            self.gui.show_message("Decryption failed", "Config file tampered.\nPlease delete the config.json file and start fresh.")
+            return None
     
     def load_state(self):
         # No file operation, use in-memory state
         pass
 
     def save_state(self):
-        self._update_script("embedded_state", self.state)
+        # self._update_script("embedded_state", self.state)
+        pass
     
     def export_config(self):
         export_path = "FadCrypt_config.json"
@@ -1654,45 +1660,79 @@ class AppLocker:
     def block_application(self, app_name, app_path):
         while self.monitoring:
             try:
-                app_processes = [proc for proc in psutil.process_iter(['name', 'pid']) if proc.info['name'].lower() == app_name.lower()]
+                try:
+                    app_processes = [proc for proc in psutil.process_iter(['name', 'pid']) if proc.info['name'].lower() == app_name.lower()]
+                except Exception as e:
+                    print(f"Error in retrieving processes in block_application: {e}")
+                    continue
 
                 if app_processes:
                     if app_name not in self.state["unlocked_apps"]:
-                        for proc in app_processes:
-                            proc.terminate()
+                        try:
+                            for proc in app_processes:
+                                proc.terminate()
+                        except Exception as e:
+                            print(f"Error in terminating process in block_application: {e}")
+
+                        try:
+                            self.gui.master.after(0, self._show_password_dialog, app_name, app_path)
+                        except Exception as e:
+                            print(f"Error in scheduling password dialog in block_application: {e}")
                         
-                        self.gui.master.after(0, self._show_password_dialog, app_name, app_path)
-                        time.sleep(1)  # Wait for user input
+                        try:
+                            time.sleep(1)  # Wait for user input
+                        except Exception as e:
+                            print(f"Error in sleeping in block_application: {e}")
                     else:
-                        time.sleep(7)
+                        try:
+                            time.sleep(7)
+                        except Exception as e:
+                            print(f"Error in extended sleep in block_application: {e}")
                 
                 if app_name in self.state["unlocked_apps"] and not app_processes:
-                    self.state["unlocked_apps"].remove(app_name)
-                    self.save_state()
+                    try:
+                        self.state["unlocked_apps"].remove(app_name)
+                        self.save_state()
+                    except Exception as e:
+                        print(f"Error in saving state in block_application: {e}")
                 
-                time.sleep(1)
+                try:
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"Error in final sleep in block_application: {e}")
             except Exception as e:
-                print(f"Error in block_application: {e}")
+                print(f"General error in block_application: {e}")
+
 
     def _show_password_dialog(self, app_name, app_path):
         try:
-            password = self.gui.ask_password("Password", f"Enter your password to unlock {app_name}:")
+            try:
+                password = self.gui.ask_password("Password", f"Enter your password to unlock {app_name}:")
+            except Exception as e:
+                print(f"Error in asking for password in _show_password_dialog: {e}")
+                return
+
             if password is None:
                 return
 
-            if self.verify_password(password):
-                self.state["unlocked_apps"].append(app_name)
-                self.save_state()
+            try:
+                if self.verify_password(password):
+                    self.state["unlocked_apps"].append(app_name)
+                    self.save_state()
 
-                if app_path:
-                    try:
-                        subprocess.Popen(app_path)
-                    except Exception as e:
-                        self.show_message("Error", f"Failed to start {app_name}: {e}")
-            else:
-                self.gui.show_message("Error", f"Incorrect password. {app_name} remains locked.")
+                    if app_path:
+                        try:
+                            subprocess.Popen(app_path)
+                        except Exception as e:
+                            print(f"Error in launching application in _show_password_dialog: {e}")
+                            self.show_message("Error", f"Failed to start {app_name}: {e}")
+                else:
+                    self.gui.show_message("Error", f"Incorrect password. {app_name} remains locked.")
+            except Exception as e:
+                print(f"Error in verifying password or saving state in _show_password_dialog: {e}")
         except Exception as e:
-            print(f"Error in _show_password_dialog: {e}")
+            print(f"General error in _show_password_dialog: {e}")
+
 
     def start_monitoring(self):
         if not self.monitoring:
@@ -1884,6 +1924,13 @@ def main():
                     background='#333333',  # Dark gray for tabs
                     foreground='#FFFFFF')  # White text for tabs
     
+    style.configure('TButton', bordercolor="black", background="black")
+    style.configure('red.TButton', bordercolor="#ED2939", background="#ED2939")
+    style.configure('white.TButton', bordercolor="#ffffff", background="#ffffff")
+    style.configure('green.TButton', bordercolor="#009E60", background="#009E60")
+    style.configure('yellow.TButton', bordercolor="#DAA520", background="#DAA520")
+    style.configure('blue.TButton', bordercolor="#004F98", background="#004F98")
+    style.configure('navy.TButton', bordercolor="#4C516D", background="#4C516D")
 
     # Customize button color
     style.configure('TButton',
@@ -1892,11 +1939,12 @@ def main():
                     borderwidth=3,  # Border width
                     relief='solid',  # Solid border
                     highlightbackground='#222222',  # Darker border color
-                    highlightthickness=2)  # Thickness of the border
+                    highlightthickness=0)  # Thickness of the border
 
     style.map('TButton',
-            foreground=[('hover', '#D3D3D3')],  # Black text color on hover
-            background=[('active', '#000000')])  # Red color on hover
+            foreground=[('hover', '#D3D3D3')],  # gray text color on hover
+            background=[('active', '#000000')])  # Black color on hover
+    
 
     # Customize the window frame color (e.g., the title bar)
     # style.configure('TFrame',
