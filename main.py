@@ -1005,14 +1005,17 @@ class AppLockerGUI:
                 self.show_message("Success", "Password created successfully.")
 
     def change_password(self):
-        old_password = self.ask_password("Change Password", "Enter your old password:")
-        if old_password and self.app_locker.verify_password(old_password):
-            new_password = self.ask_password("Change Password", "Enter a new password:")
-            if new_password:
-                self.app_locker.change_password(old_password, new_password)
-                self.show_message("Success", "Password changed successfully.")
+        if os.path.exists(self.app_locker.password_file):
+            old_password = self.ask_password("Change Password", "Enter your old password:")
+            if old_password and self.app_locker.verify_password(old_password):
+                new_password = self.ask_password("Change Password", "Enter a new password:")
+                if new_password:
+                    self.app_locker.change_password(old_password, new_password)
+                    self.show_message("Success", "Password changed successfully.")
+            else:
+                self.show_message("Error", "Incorrect old password.")
         else:
-            self.show_message("Error", "Incorrect old password.")
+            self.show_message("Oops!", "How do I change a password that doesn’t exist? :(")
 
     def add_application(self):
         app_name = self.ask_password("Add Application", "Enter the name of the application:")
@@ -1063,7 +1066,7 @@ class AppLockerGUI:
             self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
             self.master.withdraw()  # Hide the main window
         else:
-            self.show_message("Hey!", f"You forgot to create the password?")
+            self.show_message("Hey!", f"Please set your password, and I'll enjoy some biryani 🍚.\nBy the way, do you like biryani as well?")
             return False
 
     def stop_monitoring(self):
