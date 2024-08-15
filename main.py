@@ -208,14 +208,14 @@ class AppLockerGUI:
     def set_app_icon(self):
         try:
             # Load the .ico icon image for the taskbar (Windows)
-            ico_path = '1.ico'  # Update this path to your .ico file
+            ico_path = 'img/1.ico'  # Update this path to your .ico file
             if os.path.exists(ico_path):
                 self.master.iconbitmap(ico_path)
             else:
                 print(f"Icon file {ico_path} not found, skipping .ico icon.")
 
             # Load the .png icon image for the window icon
-            png_path = '1.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
+            png_path = 'img/1.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
             if os.path.exists(png_path):
                 icon_img = PhotoImage(file=png_path)
                 self.master.iconphoto(False, icon_img)
@@ -238,10 +238,13 @@ class AppLockerGUI:
         self.main_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.main_frame, text="Main")
 
-        # Load and display image
-        self.load_image()
-        self.image_label = tk.Label(self.main_frame, image=self.img)
-        self.image_label.pack(pady=20)
+        try:
+            # Load and display image
+            self.load_image()
+            self.image_label = tk.Label(self.main_frame, image=self.img)
+            self.image_label.pack(pady=20)
+        except:
+            print("create_widget: Failed to load logo image...")
 
         # Frame for centered buttons
         center_buttons_frame = ttk.Frame(self.main_frame)
@@ -292,7 +295,7 @@ class AppLockerGUI:
     
 
         # Add GitHub link with star emoji (right side)
-        github_link = ttk.Label(footer_frame, text="⭐ Star us on GitHub", foreground="#FFD700", cursor="hand2", font=("Helvetica", 10))
+        github_link = ttk.Label(footer_frame, text="⭐ Sponsor on GitHub", foreground="#FFD700", cursor="hand2", font=("Helvetica", 10))
         github_link.pack(side=tk.RIGHT)
         github_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/anonfaded/FadCrypt"))
 
@@ -578,9 +581,9 @@ class AppLockerGUI:
 
         # Load App Logo with Error Handling
         try:
-            app_icon = tk.PhotoImage(file='1.png').subsample(10, 10)  # Resize the logo to 50x50 px
+            app_icon = tk.PhotoImage(file='img/1.png').subsample(10, 10)  # Resize the logo to 50x50 px
         except tk.TclError:
-            print("Error: App icon '1.png' not found.")
+            print("Error: App icon 'img/1.png' not found.")
             app_icon = None
 
         if app_icon:
@@ -661,7 +664,7 @@ class AppLockerGUI:
 
         # App Icon and Title
         try:
-            fadcam_icon = tk.PhotoImage(file='1.png').subsample(12, 12)  # Resize the logo to 50x50 px
+            fadcam_icon = tk.PhotoImage(file='img/1.png').subsample(12, 12)  # Resize the logo to 50x50 px
         except tk.TclError:
             print("Error: FadCam icon 'fadcam_icon.png' not found.")
             fadcam_icon = None
@@ -810,7 +813,7 @@ class AppLockerGUI:
 
     def load_readme_image(self, dialog):
         # Load the image using PIL
-        img = Image.open("1.ico")
+        img = Image.open("img/1.ico")
         img = img.resize((400, 400), Image.LANCZOS)  # Adjust the size as needed
         photo = ImageTk.PhotoImage(img)
 
@@ -898,18 +901,18 @@ class AppLockerGUI:
         wallpaper_choice = self.wallpaper_choice.get()
 
         if dialog_style == "simple":
-            preview_path = "preview1.jpg"
+            preview_path = "img/preview1.jpg"
         elif dialog_style == "fullscreen":
             if wallpaper_choice == "default":
-                preview_path = "wall1.jpg"
+                preview_path = "img/wall1.jpg"
             elif wallpaper_choice == "nature":
-                preview_path = "wall2.jpg"
+                preview_path = "img/wall2.jpg"
             elif wallpaper_choice == "abstract":
-                preview_path = "wall3.jpg"
+                preview_path = "img/wall3.jpg"
             else:
-                preview_path = "preview2.jpg"  # Fallback to fullscreen preview if no wallpaper selected
+                preview_path = "img/preview2.jpg"  # Fallback to fullscreen preview if no wallpaper selected
         else:
-            preview_path = "preview2.jpg"  # Fallback to fullscreen preview if no style selected
+            preview_path = "img/preview2.jpg"  # Fallback to fullscreen preview if no style selected
 
         try:
             preview_image = Image.open(preview_path)
@@ -930,9 +933,12 @@ class AppLockerGUI:
     # image for the main page above the buttons
     def load_image(self):
         # Open and prepare the image
-        image = Image.open('1.ico')  # Update this path
-        image = image.resize((200, 200), Image.LANCZOS)  # Resize using LANCZOS filter
-        self.img = ImageTk.PhotoImage(image)
+        try:
+            image = Image.open('img/1.ico')  # Update this path
+            image = image.resize((200, 200), Image.LANCZOS)  # Resize using LANCZOS filter
+            self.img = ImageTk.PhotoImage(image)
+        except:
+            print("load_image: unable to load 1.ico")
 
 
 
@@ -1401,9 +1407,9 @@ class AppLockerGUI:
 
     def get_wallpaper_path(self):
         wallpapers = {
-            "default": "wall1.jpg",
-            "nature": "wall2.jpg",
-            "abstract": "wall3.jpg"
+            "default": "img/wall1.jpg",
+            "nature": "img/wall2.jpg",
+            "abstract": "img/wall3.jpg"
         }
         return wallpapers.get(self.wallpaper_choice.get(), wallpapers["default"])
     
