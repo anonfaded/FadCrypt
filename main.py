@@ -196,7 +196,7 @@ class AppLockerGUI:
         # Close the dialog
         self.add_dialog.destroy()
 
-        self.show_message("Success", f"Application '{app_name}' added successfully!")
+        self.show_message("Success", f"Application '{app_name}'\nadded successfully!")
 
         
 
@@ -208,6 +208,8 @@ class AppLockerGUI:
     def set_app_icon(self):
         try:
             # Load the .ico icon image for the taskbar (Windows)
+
+            # Image for the main tab's logo above the start monitoring button
             ico_path = 'img/1.ico'  # Update this path to your .ico file
             if os.path.exists(ico_path):
                 self.master.iconbitmap(ico_path)
@@ -215,6 +217,7 @@ class AppLockerGUI:
                 print(f"Icon file {ico_path} not found, skipping .ico icon.")
 
             # Load the .png icon image for the window icon
+            # taskbar and topbar image
             png_path = 'img/1.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
             if os.path.exists(png_path):
                 icon_img = PhotoImage(file=png_path)
@@ -934,8 +937,8 @@ class AppLockerGUI:
     def load_image(self):
         # Open and prepare the image
         try:
-            image = Image.open('img/1.ico')  # Update this path
-            image = image.resize((200, 200), Image.LANCZOS)  # Resize using LANCZOS filter
+            image = Image.open('img/banner.png')  # Update this path
+            image = image.resize((700, 200), Image.LANCZOS)  # Resize using LANCZOS filter
             self.img = ImageTk.PhotoImage(image)
         except:
             print("load_image: unable to load 1.ico")
@@ -1041,7 +1044,7 @@ class AppLockerGUI:
                 self.app_locker.add_application(app_name, app_path)
                 self.update_apps_listbox()
                 self.update_config_display()  # Update config tab
-                self.show_message("Success", f"Application {app_name} added successfully.")
+                self.show_message("Success", f"Application {app_name}\nadded successfully.")
 
 
     def remove_application(self):
@@ -1051,7 +1054,7 @@ class AppLockerGUI:
             self.app_locker.remove_application(app_name)
             self.update_apps_listbox()
             self.update_config_display()
-            self.show_message("Success", f"Application {app_name} removed successfully.")
+            self.show_message("Success", f"Application {app_name}\nremoved successfully.")
         else:
             self.show_message("Error", "Please select an application to remove.")
 
