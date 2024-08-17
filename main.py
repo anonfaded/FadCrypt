@@ -79,6 +79,9 @@ class AppLockerGUI:
         self.set_app_icon()  # Set the custom app icon
         self.create_widgets()
         self.load_settings()
+        # Automatically start monitoring if launched with the --auto-monitor flag
+        if '--auto-monitor' in sys.argv:
+            self.start_monitoring(auto_start=True)
         
 
     def open_add_application_dialog(self):
@@ -1090,19 +1093,37 @@ class AppLockerGUI:
         else:
             self.show_message("Error", "Please select an application to rename.")
 
-    def start_monitoring(self):
+    def start_monitoring(self, auto_start=False):
         if os.path.exists(self.app_locker.password_file):
-            # Check if the user has enabled the tool lock
+            # Lock tools if required
             if self.lock_tools_var.get():
-                print("Disabling the cmd, powershell and task managaer...")
+                print("Disabling the cmd, PowerShell, and Task Manager...")
                 self.disable_tools()
 
+            # Start monitoring in a separate thread
             threading.Thread(target=self.app_locker.start_monitoring, daemon=True).start()
-            self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
+
+            if not auto_start:
+                # Only show this message if not auto-starting
+                self.show_message("Info", "Monitoring started. Use the system tray icon to stop.")
+
+                # Add to startup on manual start
+                print("start_monitring: Adding to startup manually...")
+                self.add_to_startup()
+            
             self.master.withdraw()  # Hide the main window
         else:
-            self.show_message("Hey!", f"Please set your password, and I'll enjoy some biryani 🍚.\nBy the way, do you like biryani as well?")
+            self.show_message("Hey!", "Please set your password, and I'll enjoy some biryani 🍚.\nBy the way, do you like biryani as well?")
             return False
+
+    def add_to_startup(self):
+        app_name = "FadCrypt"
+        app_path = f'"{sys.executable}" --auto-monitor'  # Add the auto-monitor flag
+        key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(registry_key, app_name, 0, winreg.REG_SZ, app_path)
+        winreg.CloseKey(registry_key)
+        print(f"{app_name} added to startup.")
 
     def stop_monitoring(self):
         # Check if the user has enabled the tool lock
@@ -1896,6 +1917,21 @@ class AppLockerGUI:
 
 
 
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2314,7 +2350,7 @@ class AppLocker:
             self.gui.master.withdraw()
         else:
             print("_on_close: not monitoring, can't withdraw window. Quitting...")
-            quit() # quit the app instead of sending to system tray
+            sys.exit() # quit the app instead of sending to system tray
 
     def _password_prompt_and_stop(self):
         password = self.gui.ask_password("Password", "Enter your password to stop monitoring:")
