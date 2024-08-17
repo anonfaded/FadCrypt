@@ -288,10 +288,23 @@ class AppLockerGUI:
 
         # Create a frame for the footer
         footer_frame = ttk.Frame(self.main_frame)
-        footer_frame.pack(fill=tk.X, padx=10, pady=10)
+        footer_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Add branding and license info (left side)
-        branding_text = "FadSec-Lab \u00A9 2024 | fadedhood.com | Licensed under GPL 3.0"
+        # Load and scale the main tab's footer logo image
+        logo_image = Image.open('img/fadsec-main-footer.png')  # Ensure 'fadsec.png' is in the 'img' directory
+        scale_factor = 0.4  # Scale to 40% of the original size
+        logo_image = logo_image.resize((int(logo_image.width * scale_factor), 
+                                        int(logo_image.height * scale_factor)), 
+                                        Image.LANCZOS)
+        logo_photo = ImageTk.PhotoImage(logo_image)
+
+        # Add branding logo (left side)
+        logo_label = tk.Label(footer_frame, image=logo_photo)
+        logo_label.image = logo_photo  # Keep a reference to avoid garbage collection
+        logo_label.pack(side=tk.LEFT, padx=(0, 0))  # Add padding to the right of the logo
+
+        # Add remaining branding and license info (right side)
+        branding_text = " \u00A9 2024 | fadedhood.com | Licensed under GPL 3.0"
         branding_label = ttk.Label(footer_frame, text=branding_text, foreground="gray", font=("Helvetica", 10))
         branding_label.pack(side=tk.LEFT)
 
