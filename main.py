@@ -254,8 +254,8 @@ class AppLockerGUI:
         center_buttons_frame.pack(pady=10)
 
         # Add Start Monitoring and Read Me buttons (centered)
-        start_button = ttk.Button(center_buttons_frame, text="Start Monitoring", command=self.start_monitoring, style='red.TButton')
-        start_button.pack(side=tk.LEFT, padx=10)
+        self.start_button = ttk.Button(center_buttons_frame, text="Start Monitoring", command=self.start_monitoring, style='red.TButton')
+        self.start_button.pack(side=tk.LEFT, padx=10)
 
         readme_button = ttk.Button(center_buttons_frame, text="Read Me", command=self.show_readme, style='navy.TButton')
         readme_button.pack(side=tk.LEFT, padx=10)
@@ -2247,18 +2247,40 @@ class AppLocker:
                 threading.Thread(target=self.block_application, args=(app_name, app_path), daemon=True).start()
             self._create_system_tray_icon()
         else:
-            self.show_message("Info", "Monitoring is already running.")
+            self.gui.show_message("Info", "Monitoring is already running.")
+            return False
 
     def stop_monitoring(self):
+        # if window opened from tray icon, and monitoring is stopped, then show the start button again.
+        self.gui.start_button.pack(side=tk.LEFT, padx=10)
         if self.monitoring:
             self.monitoring = False
             if self.icon:
                 self.icon.stop()
             self.gui.master.deiconify()  # Show the main window
         else:
-            self.show_message("Info", "Monitoring is not running.")
+            self.gui.show_message("Info", "Monitoring is not running.")
 
     def _create_system_tray_icon(self):
+        def on_show_window(icon, item):
+            password = self.gui.ask_password("Password", "Enter your password to open window:")
+            if password is not None and self.verify_password(password):
+                print("on_show_window: correct password, opening window.")
+                self.gui.master.deiconify()
+                self.gui.master.focus()
+                # Disable or hide the Start Monitoring button
+                self.gui.start_button.pack_forget()  # Disable the button
+                # or use self.start_button.pack_forget() to hide the button
+
+                # Set protocol to call the withdraw method instead of destroying the window, and send the app back to tray
+                self.gui.master.protocol("WM_DELETE_WINDOW", self._on_close)
+            else:
+                print("on_show_window: incorrect password, not opening window.")
+                self.gui.show_message("Error", "I won't open without a pass!")
+
+            
+        
+
         def on_stop(icon, item):
             self.gui.master.after(0, self._password_prompt_and_stop)
 
@@ -2277,6 +2299,7 @@ class AppLocker:
             image = Image.new('RGB', (64, 64), color=(73, 109, 137))  # Fallback to a rectangle
 
         menu = Menu(
+            MenuItem('Open window', on_show_window),
             MenuItem('Stop Monitoring', on_stop),
             MenuItem('Quit', on_quit),
             MenuItem('Snake 🪱', on_snake)
@@ -2284,6 +2307,14 @@ class AppLocker:
 
         self.icon = Icon("AppLocker", image, "FadCrypt", menu)
         threading.Thread(target=self.icon.run, daemon=True).start()
+
+    def _on_close(self):
+        if self.monitoring:
+            print("Window minimized to system tray.")
+            self.gui.master.withdraw()
+        else:
+            print("_on_close: not monitoring, can't withdraw window. Quitting...")
+            quit() # quit the app instead of sending to system tray
 
     def _password_prompt_and_stop(self):
         password = self.gui.ask_password("Password", "Enter your password to stop monitoring:")
@@ -2298,7 +2329,7 @@ class AppLocker:
 
     def _password_prompt_and_quit(self, icon):
         password = self.gui.ask_password("Password", "Enter your password to quit:")
-        if self.verify_password(password):
+        if password is not None and self.verify_password(password):
             self.stop_monitoring()
             icon.stop()
             self.gui.show_message("Info", "Application has been stopped.")
