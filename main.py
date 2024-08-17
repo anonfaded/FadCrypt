@@ -1682,10 +1682,16 @@ class AppLockerGUI:
 
             def load_high_score():
                 try:
-                    with open("snake_high_score.json", "r") as f:
+                    # Get the FadCrypt folder path
+                    folder_path = AppLocker.get_fadcrypt_folder(self)
+                    # Define the full path to the snake_high_score.json file
+                    file_path = os.path.join(folder_path, "snake_high_score.json")
+                    # Load the high score from the file
+                    with open(file_path, "r") as f:
                         return json.load(f)["high_score"]
                 except (FileNotFoundError, json.JSONDecodeError, KeyError):
                     return 0
+
 
             # def save_high_score(high_score):
             #     with open("snake_high_score.json", "w") as f:
