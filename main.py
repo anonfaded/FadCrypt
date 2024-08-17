@@ -2202,11 +2202,13 @@ class AppLocker:
         def on_quit(icon, item):
             self.gui.master.after(0, self._password_prompt_and_quit, icon)
 
-        width = 64
-        height = 64
-        image = Image.new('RGB', (width, height), color=(73, 109, 137))
-        draw = ImageDraw.Draw(image)
-        draw.rectangle([(width // 4, height // 4), (3 * width // 4, 3 * height // 4)], fill="white")
+        # Load the custom icon image
+        try:
+            image = Image.open('img/icon.png')  # Replace with the path to your icon.png
+            image = image.resize((64, 64), Image.LANCZOS)  # Resize the image to 64x64 pixels
+        except Exception as e:
+            print(f"Failed to load tray icon: {e}")
+            image = Image.new('RGB', (64, 64), color=(73, 109, 137))  # Fallback to a rectangle
 
         menu = Menu(
             MenuItem('Stop Monitoring', on_stop),
