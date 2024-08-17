@@ -1814,10 +1814,35 @@ class AppLockerGUI:
                         if power_up.active:
                             power_up.draw(window)
                         
+                        # Load the logo
+                        logo = pygame.image.load('img/fadsec.png')  # Ensure 'fadsec.png' is in the same directory
+                        # Determine the new size for the logo
+                        scale_factor = 0.5  # Scale to 50% of the original size
+                        logo_width, logo_height = logo.get_size()
+                        new_logo_width = int(logo_width * scale_factor)
+                        new_logo_height = int(logo_height * scale_factor)
+
+                        # Scale the logo
+                        scaled_logo = pygame.transform.scale(logo, (new_logo_width, new_logo_height))
+
+                        # Position for the bottom center
+                        logo_x = (WINDOW_WIDTH - new_logo_width) // 2  # Center horizontally
+                        logo_y = WINDOW_HEIGHT - new_logo_height - -50  # 10 pixels from the bottom
+                        
+
                         draw_text(window, f"Score: {snake.score}", 25, WINDOW_WIDTH - 70, 10)
                         draw_text(window, f"High Score: {high_score}", 25, WINDOW_WIDTH - 100, 40)
                         draw_text(window, f"Level: {level}", 25, 70, 10)
-                        draw_text(window, "Press ESC to pause", 25, WINDOW_WIDTH // 2, 10)
+                        draw_text(window, "Press ESC to pause, and hold SHIFT to move faster.", 25, WINDOW_WIDTH // 2, 10)
+
+                        # Draw the scaled logo
+                        window.blit(scaled_logo, (logo_x, logo_y))
+                        
+                        # # logo in gray at the bottom left
+                        # logo_text = "FadSec-Lab © 2024"
+                        # logo_color = (169, 169, 169)  # Gray color (RGB)
+                        # # the value after logo text is for font
+                        # draw_text(window, logo_text, 15, WINDOW_WIDTH // 2, WINDOW_HEIGHT - 40, color=logo_color)
                         
                         pygame.display.update()
                     
