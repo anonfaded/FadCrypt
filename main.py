@@ -792,23 +792,25 @@ class AppLockerGUI:
         text_frame.pack(expand=True, pady=50)
 
         welcome_text = (
-        "Welcome to FadCrypt!\n\n"
-        "Experience top security and sleek design with FadCrypt.\n\n"
-        "Features:\n"
-        "- Application Locking: Secure apps with a password. Save passwords safely; they can't be recovered.\n"
-        "- Real-time Monitoring: Protects and auto-recovers critical files.\n"
-        "- Aesthetic UI: Choose wallpapers or a minimal style with smooth animations.\n\n"
-        "Security:\n"
-        "- System Tools Disabled: Disables cmd, Task Manager, msconfig, Control Panel and Registry Editor;\na real nightmare for attacker trying to bypass it.\nManual PowerShell disabling is recommended as it's a significant loophole!\n"
-        "- Encrypted Storage: Passwords are encrypted; files are backed up.\n\n"
-        "Testing:\n"
-        "- Test blocked tools (cmd, Task Manager) via Windows search to confirm effectiveness.\n\n"
-        "Upcoming Features:\n"
-        "- Logging and Alerts: Includes screenshots, email alerts on wrong passwords, and detailed logs.\n"
-        "- Community Input: Integrating feedback for improved security and usability.\n\n"
-        "Extras:\n"
-        "- Snake Game: Try out the Snake game on the main tab for a bit of fun!\n"
+            "Welcome to FadCrypt!\n\n"
+            "Experience top-notch security and sleek design with FadCrypt.\n\n"
+            "Features:\n"
+            "- Application Locking: Secure apps with an encrypted password. Save your password safely;\nit can't be recovered if lost!\n"
+            "- Real-time Monitoring: Detects and auto-recovers critical files if they are deleted.\n"
+            "- Aesthetic UI: Choose custom wallpapers or a minimal style with smooth animations.\n\n"
+            "Security:\n"
+            "- System Tools Disabled: Disables Command Prompt, Task Manager, msconfig, Control Panel, and Registry Editor;\n  a real nightmare for attackers trying to bypass it.\n  Manual PowerShell disabling is recommended as it's a significant loophole!\n"
+            "- Encrypted Storage: Passwords and config file data (list of locked apps) are encrypted and backed up.\n\n"
+            "Testing:\n"
+            "- Test blocked tools (Command Prompt, Task Manager) via Windows search to confirm effectiveness.\nSearch for Control Panel or Task Manager in Windows+S search and see the disabled message box.\n\n"
+            "Upcoming Features:\n"
+            "- Password Recovery: In case of a forgotten password, users will be able to recover their passwords.\n"
+            "- Logging and Alerts: Includes screenshots, email alerts on wrong password attempts, and detailed logs.\n"
+            "- Community Input: Integrating feedback for improved security and usability.\n\n"
+            "Extras:\n"
+            "- Snake Game: Enjoy the classic Snake game on the main tab or from the tray icon for a bit of fun!\n"
         )
+
 
 
 
@@ -839,7 +841,7 @@ class AppLockerGUI:
     def animate_text(self, text, dialog, index=0):
         if index < len(text):
             self.animated_label.config(text=text[:index+1])
-            dialog.after(4, self.animate_text, text, dialog, index+1)  # Adjust the speed here
+            dialog.after(2, self.animate_text, text, dialog, index+1)  # Adjust the speed here
 
     def load_readme_image(self, dialog):
         # Load the image using PIL
