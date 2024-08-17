@@ -84,6 +84,16 @@ class AppLockerGUI:
             self.start_monitoring(auto_start=True)
         
 
+    def resource_path(self, relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
+    
     def open_add_application_dialog(self):
         self.add_dialog = tk.Toplevel(self.master)  # Store reference to the dialog
         self.add_dialog.title("Add Application to Encrypt")
@@ -213,7 +223,7 @@ class AppLockerGUI:
             # Load the .ico icon image for the taskbar (Windows)
 
             # Image for the main tab's logo above the start monitoring button
-            ico_path = 'img/1.ico'  # Update this path to your .ico file
+            ico_path = self.resource_path('img/1.ico')  # Update this path to your .ico file
             if os.path.exists(ico_path):
                 self.master.iconbitmap(ico_path)
             else:
@@ -221,7 +231,7 @@ class AppLockerGUI:
 
             # Load the .png icon image for the window icon
             # taskbar and topbar image
-            png_path = 'img/icon.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
+            png_path = self.resource_path('img/icon.png')  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
             if os.path.exists(png_path):
                 icon_img = PhotoImage(file=png_path)
                 self.master.iconphoto(False, icon_img)
@@ -294,7 +304,7 @@ class AppLockerGUI:
         footer_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Load and scale the main tab's footer logo image
-        logo_image = Image.open('img/fadsec-main-footer.png')  # Ensure 'fadsec.png' is in the 'img' directory
+        logo_image = Image.open(self.resource_path('img/fadsec-main-footer.png'))  # Ensure 'fadsec.png' is in the 'img' directory
         scale_factor = 0.4  # Scale to 40% of the original size
         logo_image = logo_image.resize((int(logo_image.width * scale_factor), 
                                         int(logo_image.height * scale_factor)), 
@@ -601,7 +611,7 @@ class AppLockerGUI:
 
         # Load App Logo with Error Handling
         try:
-            app_icon = tk.PhotoImage(file='img/icon.png').subsample(4, 4)  # Resize the logo to 50x50 px
+            app_icon = tk.PhotoImage(file=self.resource_path('img/icon.png')).subsample(4, 4)  # Resize the logo to 50x50 px
         except tk.TclError:
             print("Error: App icon 'img/icon.png' not found.")
             app_icon = None
@@ -684,7 +694,7 @@ class AppLockerGUI:
 
         #  fad cam App Icon and Title
         try:
-            fadcam_icon = tk.PhotoImage(file='img/fadcam.png').subsample(12, 12)  # Resize the logo to 50x50 px
+            fadcam_icon = tk.PhotoImage(file=self.resource_path('img/fadcam.png')).subsample(12, 12)  # Resize the logo to 50x50 px
         except tk.TclError:
             print("Error: FadCam icon 'fadcam_icon.png' not found.")
             fadcam_icon = None
@@ -833,7 +843,7 @@ class AppLockerGUI:
 
     def load_readme_image(self, dialog):
         # Load the image using PIL
-        img = Image.open("img/readme.png")
+        img = Image.open(self.resource_path("img/readme.png"))
         img = img.resize((400, 400), Image.LANCZOS)  # Adjust the size as needed
         photo = ImageTk.PhotoImage(img)
 
@@ -921,20 +931,20 @@ class AppLockerGUI:
         wallpaper_choice = self.wallpaper_choice.get()
 
         if dialog_style == "simple":
-            preview_path = "img/preview1.png"
+            preview_path = self.resource_path("img/preview1.png")
         elif dialog_style == "fullscreen":
             if wallpaper_choice == "default":
-                preview_path = "img/wall1.png"
+                preview_path = self.resource_path("img/wall1.png")
             elif wallpaper_choice == "H4ck3r":
-                preview_path = "img/wall2.png"
+                preview_path = self.resource_path("img/wall2.png")
             elif wallpaper_choice == "Binary":
-                preview_path = "img/wall3.png"
+                preview_path = self.resource_path("img/wall3.png")
             elif wallpaper_choice == "encrypted":
-                preview_path = "img/wall4.png"
+                preview_path = self.resource_path("img/wall4.png")
             else:
-                preview_path = "img/preview2.png"  # Fallback to fullscreen preview if no wallpaper selected
+                preview_path = self.resource_path("img/preview2.png")  # Fallback to fullscreen preview if no wallpaper selected
         else:
-            preview_path = "img/preview2.png"  # Fallback to fullscreen preview if no style selected
+            preview_path = self.resource_path("img/preview2.png")  # Fallback to fullscreen preview if no style selected
 
         try:
             preview_image = Image.open(preview_path)
@@ -956,7 +966,7 @@ class AppLockerGUI:
     def load_image(self):
         # Open and prepare the image
         try:
-            image = Image.open('img/banner.png')  # Update this path
+            image = Image.open(self.resource_path('img/banner.png'))  # Update this path
             image = image.resize((700, 200), Image.LANCZOS)  # Resize using LANCZOS filter
             self.img = ImageTk.PhotoImage(image)
         except:
@@ -1037,7 +1047,7 @@ class AppLockerGUI:
         if os.path.exists(self.app_locker.password_file):
             self.show_message("Info", "Password already exists. Use 'Change Password' to modify.")
         else:
-            password = self.ask_password("Create Password", "Enter a new password:")
+            password = self.ask_password("Create Password", "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:")
             if password:
                 self.app_locker.create_password(password)
                 self.show_message("Success", "Password created successfully.")
@@ -1046,7 +1056,7 @@ class AppLockerGUI:
         if os.path.exists(self.app_locker.password_file):
             old_password = self.ask_password("Change Password", "Enter your old password:")
             if old_password and self.app_locker.verify_password(old_password):
-                new_password = self.ask_password("Change Password", "Enter a new password:")
+                new_password = self.ask_password("New Password", "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:")
                 if new_password:
                     self.app_locker.change_password(old_password, new_password)
                     self.show_message("Success", "Password changed successfully.")
@@ -1447,10 +1457,10 @@ class AppLockerGUI:
 
     def get_wallpaper_path(self):
         wallpapers = {
-            "default": "img/wall1.jpg",
-            "H4ck3r": "img/wall2.jpg",
-            "Binary": "img/wall3.jpg",
-            "encrypted": "img/wall4.jpg"
+            "default": self.resource_path("img/wall1.jpg"),
+            "H4ck3r": self.resource_path("img/wall2.jpg"),
+            "Binary": self.resource_path("img/wall3.jpg"),
+            "encrypted": self.resource_path("img/wall4.jpg")
         }
         return wallpapers.get(self.wallpaper_choice.get(), wallpapers["default"])
     
@@ -1853,7 +1863,7 @@ class AppLockerGUI:
                             power_up.draw(window)
                         
                         # Load the logo
-                        logo = pygame.image.load('img/fadsec.png')  # Ensure 'fadsec.png' is in the same directory
+                        logo = pygame.image.load(self.resource_path('img/fadsec.png'))  # Ensure 'fadsec.png' is in the same directory
                         # Determine the new size for the logo
                         scale_factor = 0.5  # Scale to 50% of the original size
                         logo_width, logo_height = logo.get_size()
@@ -2010,6 +2020,9 @@ class AppLocker:
             print(f"Config saved to {self.config_file}")  # Debug print
         else:
             print("Password file does not exist. Cannot save config.")
+            self.gui.show_message("Important!", "Please create a password before proceeding and ensure\n it's securely noted down. If forgotten, recovery can be\nchallenging, and the tool cannot be stopped.\n\nDon't forget to review the ReadMe for\nessential information about the tool and its options.")
+
+
 
 
     def load_password(self):
@@ -2328,7 +2341,7 @@ class AppLocker:
 
         # Load the custom icon image
         try:
-            image = Image.open('img/icon.png')  # Replace with the path to your icon.png
+            image = Image.open(self.gui.resource_path('img/icon.png'))  # Replace with the path to your icon.png
             image = image.resize((64, 64), Image.LANCZOS)  # Resize the image to 64x64 pixels
         except Exception as e:
             print(f"Failed to load tray icon: {e}")
