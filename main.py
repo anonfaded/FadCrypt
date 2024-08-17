@@ -1418,417 +1418,428 @@ class AppLockerGUI:
     
     
 
+
+
+
+
+
+
+    
+
     def start_snake_game(self):
-        # Initialize Pygame
-        pygame.init()
+        def run_snake_game():
+            # Initialize Pygame
+            pygame.init()
 
-        # Colors
-        BLACK = (0, 0, 0)
-        WHITE = (255, 255, 255)
-        RED = (255, 0, 0)
-        GREEN = (0, 255, 0)
-        YELLOW = (255, 255, 0)
-        TRANSPARENT = (0, 0, 0)
+            # Colors
+            BLACK = (0, 0, 0)
+            WHITE = (255, 255, 255)
+            RED = (255, 0, 0)
+            GREEN = (0, 255, 0)
+            YELLOW = (255, 255, 0)
+            TRANSPARENT = (0, 0, 0)
 
-        # New dark mode colors
-        DARK_GRAY = (30, 30, 30)
-        DARKER_GRAY = (20, 20, 20)
-        OBSTACLE_COLOR = (100, 100, 100)  # Single color for obstacles
-
-
-
-        # Game settings
-        FPS = 10
-
-        # Pygame setup
-        info = pygame.display.Info()
-        WINDOW_WIDTH = info.current_w
-        WINDOW_HEIGHT = info.current_h
-        window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.FULLSCREEN)
-        pygame.display.set_caption('Minimal Snake Game - FadSec-Lab')
-        clock = pygame.time.Clock()
-
-        # Fonts
-        font_small = pygame.font.SysFont('arial', 25)
-        font_medium = pygame.font.SysFont('arial', 50)
-        font_large = pygame.font.SysFont('arial', 80)
-
-        # Calculate game area to maintain aspect ratio
-        game_area_height = int(WINDOW_HEIGHT * 0.9)
-        game_area_width = int(game_area_height * 4 / 3)
-        if game_area_width > int(WINDOW_WIDTH * 0.9):
-            game_area_width = int(WINDOW_WIDTH * 0.9)
-            game_area_height = int(game_area_width * 3 / 4)
+            # New dark mode colors
+            DARK_GRAY = (30, 30, 30)
+            DARKER_GRAY = (20, 20, 20)
+            OBSTACLE_COLOR = (100, 100, 100)  # Single color for obstacles
 
 
-        game_area_top = (WINDOW_HEIGHT - game_area_height) // 2
-        game_area_left = (WINDOW_WIDTH - game_area_width) // 2
+
+            # Game settings
+            FPS = 10
+
+            # Pygame setup
+            info = pygame.display.Info()
+            WINDOW_WIDTH = info.current_w
+            WINDOW_HEIGHT = info.current_h
+            window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.FULLSCREEN)
+            pygame.display.set_caption('Minimal Snake Game - FadSec-Lab')
+            clock = pygame.time.Clock()
+
+            # Fonts
+            font_small = pygame.font.SysFont('arial', 25)
+            font_medium = pygame.font.SysFont('arial', 50)
+            font_large = pygame.font.SysFont('arial', 80)
+
+            # Calculate game area to maintain aspect ratio
+            game_area_height = int(WINDOW_HEIGHT * 0.9)
+            game_area_width = int(game_area_height * 4 / 3)
+            if game_area_width > int(WINDOW_WIDTH * 0.9):
+                game_area_width = int(WINDOW_WIDTH * 0.9)
+                game_area_height = int(game_area_width * 3 / 4)
 
 
-        BLOCK_SIZE = min(game_area_width // 60, game_area_height // 45)
-        BORDER_WIDTH = 8  # Increase border width for visibility
+            game_area_top = (WINDOW_HEIGHT - game_area_height) // 2
+            game_area_left = (WINDOW_WIDTH - game_area_width) // 2
 
-        class Snake:
-            def __init__(self):
-                self.length = 1
-                self.positions = [((game_area_width // 2), (game_area_height // 2))]
-                self.direction = random.choice([UP, DOWN, LEFT, RIGHT])
-                self.color1 = (0, 200, 0)
-                self.color2 = (0, 255, 0)
-                self.score = 0
 
-            def get_head_position(self):
-                return self.positions[0]
+            BLOCK_SIZE = min(game_area_width // 60, game_area_height // 45)
+            BORDER_WIDTH = 8  # Increase border width for visibility
 
-            def move(self):
-                cur = self.get_head_position()
-                x, y = self.direction
-                new = (((cur[0] + (x * BLOCK_SIZE)) % (game_area_width - 2*BORDER_WIDTH)), 
-                    ((cur[1] + (y * BLOCK_SIZE)) % (game_area_height - 2*BORDER_WIDTH)))
-                
-                if len(self.positions) > 2 and new in self.positions[2:]:
-                    return False
-                
-                self.positions.insert(0, new)
-                if len(self.positions) > self.length:
-                    self.positions.pop()
-                return True
+            class Snake:
+                def __init__(self):
+                    self.length = 1
+                    self.positions = [((game_area_width // 2), (game_area_height // 2))]
+                    self.direction = random.choice([UP, DOWN, LEFT, RIGHT])
+                    self.color1 = (0, 200, 0)
+                    self.color2 = (0, 255, 0)
+                    self.score = 0
 
-            def reset(self):
-                self.length = 1
-                self.positions = [((game_area_width // 2), (game_area_height // 2))]
-                self.direction = random.choice([UP, DOWN, LEFT, RIGHT])
-                self.score = 0
+                def get_head_position(self):
+                    return self.positions[0]
 
-            def draw(self, surface):
-                for i, p in enumerate(self.positions):
-                    color = self.color1 if i % 2 == 0 else self.color2
-                    pygame.draw.rect(surface, color, 
-                                    (p[0] + game_area_left + BORDER_WIDTH, 
-                                    p[1] + game_area_top + BORDER_WIDTH, 
-                                    BLOCK_SIZE, BLOCK_SIZE))
+                def move(self):
+                    cur = self.get_head_position()
+                    x, y = self.direction
+                    new = (((cur[0] + (x * BLOCK_SIZE)) % (game_area_width - 2*BORDER_WIDTH)), 
+                        ((cur[1] + (y * BLOCK_SIZE)) % (game_area_height - 2*BORDER_WIDTH)))
+                    
+                    if len(self.positions) > 2 and new in self.positions[2:]:
+                        return False
+                    
+                    self.positions.insert(0, new)
+                    if len(self.positions) > self.length:
+                        self.positions.pop()
+                    return True
 
-            def handle_keys(self):
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        print("handle_keys: Quitting game...")
-                        pygame.quit()
-                        sys.exit()
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_UP:
-                            self.turn(UP)
-                        elif event.key == pygame.K_DOWN:
-                            self.turn(DOWN)
-                        elif event.key == pygame.K_LEFT:
-                            self.turn(LEFT)
-                        elif event.key == pygame.K_RIGHT:
-                            self.turn(RIGHT)
-                        elif event.key == pygame.K_ESCAPE:
-                            return "PAUSE"
-                
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-                    return "FAST"
-                return "NORMAL"
+                def reset(self):
+                    self.length = 1
+                    self.positions = [((game_area_width // 2), (game_area_height // 2))]
+                    self.direction = random.choice([UP, DOWN, LEFT, RIGHT])
+                    self.score = 0
 
-            def turn(self, direction):
-                if (direction[0] * -1, direction[1] * -1) == self.direction:
-                    return
-                else:
-                    self.direction = direction
+                def draw(self, surface):
+                    for i, p in enumerate(self.positions):
+                        color = self.color1 if i % 2 == 0 else self.color2
+                        pygame.draw.rect(surface, color, 
+                                        (p[0] + game_area_left + BORDER_WIDTH, 
+                                        p[1] + game_area_top + BORDER_WIDTH, 
+                                        BLOCK_SIZE, BLOCK_SIZE))
 
-        class Food:
-            def __init__(self):
-                self.position = (0, 0)
-                self.color = RED
-                self.randomize_position()
+                def handle_keys(self):
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            print("handle_keys: Quitting game...")
+                            pygame.quit()
+                            sys.exit()
+                        elif event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_UP:
+                                self.turn(UP)
+                            elif event.key == pygame.K_DOWN:
+                                self.turn(DOWN)
+                            elif event.key == pygame.K_LEFT:
+                                self.turn(LEFT)
+                            elif event.key == pygame.K_RIGHT:
+                                self.turn(RIGHT)
+                            elif event.key == pygame.K_ESCAPE:
+                                return "PAUSE"
+                    
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                        return "FAST"
+                    return "NORMAL"
 
-            def randomize_position(self):
-                self.position = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
-                                random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
+                def turn(self, direction):
+                    if (direction[0] * -1, direction[1] * -1) == self.direction:
+                        return
+                    else:
+                        self.direction = direction
 
-            def draw(self, surface):
-                pygame.draw.rect(surface, self.color, 
-                                (self.position[0] + game_area_left + BORDER_WIDTH, 
-                                self.position[1] + game_area_top + BORDER_WIDTH, 
-                                BLOCK_SIZE, BLOCK_SIZE))
+            class Food:
+                def __init__(self):
+                    self.position = (0, 0)
+                    self.color = RED
+                    self.randomize_position()
 
-        class Obstacle:
-            def __init__(self):
-                self.positions = []
+                def randomize_position(self):
+                    self.position = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
+                                    random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
 
-            def add_obstacle(self):
-                new_pos = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
-                        random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
-                if new_pos not in self.positions:
-                    self.positions.append(new_pos)
-
-            def draw(self, surface):
-                for pos in self.positions:
-                    pygame.draw.rect(surface, OBSTACLE_COLOR, 
-                                    (pos[0] + game_area_left + BORDER_WIDTH, 
-                                    pos[1] + game_area_top + BORDER_WIDTH, 
-                                    BLOCK_SIZE, BLOCK_SIZE))
-        class PowerUp:
-            def __init__(self):
-                self.position = (0, 0)
-                self.color = YELLOW
-                self.active = False
-                self.type = None
-
-            def spawn(self):
-                self.position = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
-                                random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
-                self.type = random.choice(['speed', 'slow', 'shrink'])
-                self.active = True
-
-            def draw(self, surface):
-                if self.active:
+                def draw(self, surface):
                     pygame.draw.rect(surface, self.color, 
                                     (self.position[0] + game_area_left + BORDER_WIDTH, 
                                     self.position[1] + game_area_top + BORDER_WIDTH, 
                                     BLOCK_SIZE, BLOCK_SIZE))
 
-        def draw_patterned_background(surface, rect, color1, color2, block_size):
-            for y in range(rect.top, rect.bottom, block_size):
-                for x in range(rect.left, rect.right, block_size):
-                    color = color1 if (x // block_size + y // block_size) % 2 == 0 else color2
-                    pygame.draw.rect(surface, color, (x, y, block_size, block_size))
+            class Obstacle:
+                def __init__(self):
+                    self.positions = []
 
-        def draw_text(surface, text, size, x, y, color=WHITE):
-            font = pygame.font.SysFont('arial', size)
-            text_surface = font.render(text, True, color)
-            text_rect = text_surface.get_rect()
-            text_rect.midtop = (x, y)
-            surface.blit(text_surface, text_rect)
+                def add_obstacle(self):
+                    new_pos = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
+                            random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
+                    if new_pos not in self.positions:
+                        self.positions.append(new_pos)
 
-        def show_menu(surface):
-            surface.fill(BLACK)
-            draw_text(surface, "SNAKE GAME", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
-            draw_text(surface, "Press SPACE to start", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
-            draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
-            pygame.display.flip()
-            waiting = True
-            while waiting:
-                clock.tick(FPS)
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        print("show_menu: Quitting game...")
-                        pygame.quit()
-                        sys.exit()
-                    if event.type == pygame.KEYUP:
-                        if event.key == pygame.K_SPACE:
-                            waiting = False
-                        elif event.key == pygame.K_q:
-                            print("show_menu2: Quitting game...")
+                def draw(self, surface):
+                    for pos in self.positions:
+                        pygame.draw.rect(surface, OBSTACLE_COLOR, 
+                                        (pos[0] + game_area_left + BORDER_WIDTH, 
+                                        pos[1] + game_area_top + BORDER_WIDTH, 
+                                        BLOCK_SIZE, BLOCK_SIZE))
+            class PowerUp:
+                def __init__(self):
+                    self.position = (0, 0)
+                    self.color = YELLOW
+                    self.active = False
+                    self.type = None
+
+                def spawn(self):
+                    self.position = (random.randint(0, (game_area_width - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE,
+                                    random.randint(0, (game_area_height - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE)
+                    self.type = random.choice(['speed', 'slow', 'shrink'])
+                    self.active = True
+
+                def draw(self, surface):
+                    if self.active:
+                        pygame.draw.rect(surface, self.color, 
+                                        (self.position[0] + game_area_left + BORDER_WIDTH, 
+                                        self.position[1] + game_area_top + BORDER_WIDTH, 
+                                        BLOCK_SIZE, BLOCK_SIZE))
+
+            def draw_patterned_background(surface, rect, color1, color2, block_size):
+                for y in range(rect.top, rect.bottom, block_size):
+                    for x in range(rect.left, rect.right, block_size):
+                        color = color1 if (x // block_size + y // block_size) % 2 == 0 else color2
+                        pygame.draw.rect(surface, color, (x, y, block_size, block_size))
+
+            def draw_text(surface, text, size, x, y, color=WHITE):
+                font = pygame.font.SysFont('arial', size)
+                text_surface = font.render(text, True, color)
+                text_rect = text_surface.get_rect()
+                text_rect.midtop = (x, y)
+                surface.blit(text_surface, text_rect)
+
+            def show_menu(surface):
+                surface.fill(BLACK)
+                draw_text(surface, "SNAKE GAME", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
+                draw_text(surface, "Press SPACE to start", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
+                draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
+                pygame.display.flip()
+                waiting = True
+                while waiting:
+                    clock.tick(FPS)
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            print("show_menu: Quitting game...")
                             pygame.quit()
                             sys.exit()
+                        if event.type == pygame.KEYUP:
+                            if event.key == pygame.K_SPACE:
+                                waiting = False
+                            elif event.key == pygame.K_q:
+                                print("show_menu2: Quitting game...")
+                                pygame.quit()
+                                sys.exit()
 
-        def pause_menu(surface):
-            overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
-            overlay.set_alpha(128)
-            overlay.fill(BLACK)
-            surface.blit(overlay, (0, 0))
-            draw_text(surface, "PAUSED", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
-            draw_text(surface, "Press SPACE to continue", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
-            draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
-            pygame.display.flip()
-            waiting = True
-            while waiting:
-                clock.tick(FPS)
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        print("pause_menu: Quitting game...")
-                        pygame.quit()
-                        sys.exit()
-                    if event.type == pygame.KEYUP:
-                        if event.key == pygame.K_SPACE:
-                            return "CONTINUE"
-                        elif event.key == pygame.K_q:
-                            print("pause_menu returning quit: Quitting game...")
-                            return "QUIT"
-
-        def game_over(surface, score, high_score):
-            surface.fill(BLACK)
-            draw_text(surface, "GAME OVER", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
-            draw_text(surface, f"Score: {score}", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 50)
-            draw_text(surface, f"High Score: {high_score}", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 50)
-            draw_text(surface, "Press SPACE to play again", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
-            draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 7 // 8)
-            pygame.display.flip()
-            waiting = True
-            while waiting:
-                clock.tick(FPS)
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        print("game_over: Quitting game...")
-                        pygame.quit()
-                        sys.exit()
-                    if event.type == pygame.KEYUP:
-                        if event.key == pygame.K_SPACE:
-                            return "PLAY_AGAIN"
-                        elif event.key == pygame.K_q:
-                            print("game_over returning quit: Quitting game...")
-                            return "QUIT"
-
-        def load_high_score():
-            try:
-                with open("snake_high_score.json", "r") as f:
-                    return json.load(f)["high_score"]
-            except (FileNotFoundError, json.JSONDecodeError, KeyError):
-                return 0
-
-        # def save_high_score(high_score):
-        #     with open("snake_high_score.json", "w") as f:
-        #         json.dump({"high_score": high_score}, f)
-        # def get_fadcrypt_folder(self):
-        #     path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
-        #     os.makedirs(path, exist_ok=True)
-        #     return path
-
-        def save_high_score(self, high_score):
-            # Get the FadCrypt folder path
-            folder_path = AppLocker.get_fadcrypt_folder(self)
-            # Define the full path to the snake_high_score.json file
-            file_path = os.path.join(folder_path, "snake_high_score.json")
-            # Save the high score to the file
-            with open(file_path, "w") as f:
-                json.dump({"high_score": high_score}, f)
-                
-
-        def main():
-            snake = Snake()
-            food = Food()
-            obstacles = Obstacle()
-            power_up = PowerUp()
-            high_score = load_high_score()
-            
-            level = 1
-            obstacles_per_level = 5
-            
-            for _ in range(obstacles_per_level):
-                obstacles.add_obstacle()
-
-            while True:
-                show_menu(window)
-                
-                game_over_flag = False
-                power_up_timer = 0
-                speed_modifier = 0
-                
-                while not game_over_flag:
-                    move_speed = FPS + speed_modifier
-                    action = snake.handle_keys()
-                    if action == "PAUSE":
-                        pause_action = pause_menu(window)
-                        if pause_action == "QUIT":
-                            print("main: Quitting game...")
+            def pause_menu(surface):
+                overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+                overlay.set_alpha(128)
+                overlay.fill(BLACK)
+                surface.blit(overlay, (0, 0))
+                draw_text(surface, "PAUSED", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
+                draw_text(surface, "Press SPACE to continue", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
+                draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
+                pygame.display.flip()
+                waiting = True
+                while waiting:
+                    clock.tick(FPS)
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            print("pause_menu: Quitting game...")
                             pygame.quit()
                             sys.exit()
-                        continue
-                    elif action == "FAST":
-                        move_speed = FPS + 10
-                    
-                    clock.tick(move_speed)
-                    
-                    if not snake.move():
-                        game_over_flag = True
-                        break
-                    
-                    head_pos = snake.get_head_position()
-                    if (abs(head_pos[0] - food.position[0]) < BLOCK_SIZE and 
-                        abs(head_pos[1] - food.position[1]) < BLOCK_SIZE):
-                        snake.length += 1
-                        snake.score += 10
-                        food.randomize_position()
-                        while any(abs(food.position[0] - obs[0]) < BLOCK_SIZE and 
-                                abs(food.position[1] - obs[1]) < BLOCK_SIZE 
-                                for obs in obstacles.positions + snake.positions):
-                            food.randomize_position()
-                        if snake.score % 50 == 0:
-                            level += 1
-                            for _ in range(obstacles_per_level):
-                                obstacles.add_obstacle()
-                    
-                    if not power_up.active and random.randint(1, 100) == 1:
-                        power_up.spawn()
-                        while any(abs(power_up.position[0] - obs[0]) < BLOCK_SIZE and 
-                                abs(power_up.position[1] - obs[1]) < BLOCK_SIZE 
-                                for obs in obstacles.positions + snake.positions + [food.position]):
-                            power_up.spawn()
-                    
-                    if power_up.active and (abs(head_pos[0] - power_up.position[0]) < BLOCK_SIZE and 
-                                            abs(head_pos[1] - power_up.position[1]) < BLOCK_SIZE):
-                        if power_up.type == 'speed':
-                            speed_modifier = 5
-                        elif power_up.type == 'slow':
-                            speed_modifier = -5
-                        elif power_up.type == 'shrink':
-                            snake.length = max(1, snake.length - 2)
-                        power_up.active = False
-                        power_up_timer = pygame.time.get_ticks()
-                    
-                    if pygame.time.get_ticks() - power_up_timer > 5000:
-                        speed_modifier = 0
-                    
-                    if any(abs(head_pos[0] - obs[0]) < BLOCK_SIZE and 
-                        abs(head_pos[1] - obs[1]) < BLOCK_SIZE 
-                        for obs in obstacles.positions):
-                        game_over_flag = True
-                        break
+                        if event.type == pygame.KEYUP:
+                            if event.key == pygame.K_SPACE:
+                                return "CONTINUE"
+                            elif event.key == pygame.K_q:
+                                print("pause_menu returning quit: Quitting game...")
+                                return "QUIT"
 
-                    # Clear the entire window
-                    window.fill(BLACK)
+            def game_over(surface, score, high_score):
+                surface.fill(BLACK)
+                draw_text(surface, "GAME OVER", 80, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 4)
+                draw_text(surface, f"Score: {score}", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 50)
+                draw_text(surface, f"High Score: {high_score}", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 50)
+                draw_text(surface, "Press SPACE to play again", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 3 // 4)
+                draw_text(surface, "Press Q to quit", 50, WINDOW_WIDTH // 2, WINDOW_HEIGHT * 7 // 8)
+                pygame.display.flip()
+                waiting = True
+                while waiting:
+                    clock.tick(FPS)
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            print("game_over: Quitting game...")
+                            pygame.quit()
+                            sys.exit()
+                        if event.type == pygame.KEYUP:
+                            if event.key == pygame.K_SPACE:
+                                return "PLAY_AGAIN"
+                            elif event.key == pygame.K_q:
+                                print("game_over returning quit: Quitting game...")
+                                return "QUIT"
+
+            def load_high_score():
+                try:
+                    with open("snake_high_score.json", "r") as f:
+                        return json.load(f)["high_score"]
+                except (FileNotFoundError, json.JSONDecodeError, KeyError):
+                    return 0
+
+            # def save_high_score(high_score):
+            #     with open("snake_high_score.json", "w") as f:
+            #         json.dump({"high_score": high_score}, f)
+            # def get_fadcrypt_folder(self):
+            #     path = os.path.join(os.getenv('APPDATA'), 'FadCrypt')
+            #     os.makedirs(path, exist_ok=True)
+            #     return path
+
+            def save_high_score(self, high_score):
+                # Get the FadCrypt folder path
+                folder_path = AppLocker.get_fadcrypt_folder(self)
+                # Define the full path to the snake_high_score.json file
+                file_path = os.path.join(folder_path, "snake_high_score.json")
+                # Save the high score to the file
+                with open(file_path, "w") as f:
+                    json.dump({"high_score": high_score}, f)
                     
-                    # Draw patterned background with new dark mode colors
-                    draw_patterned_background(window, 
-                                            pygame.Rect(game_area_left + BORDER_WIDTH, 
-                                                        game_area_top + BORDER_WIDTH, 
-                                                        game_area_width - 1.5*BORDER_WIDTH, 
-                                                        game_area_height - 2*BORDER_WIDTH),
-                                            DARK_GRAY, DARKER_GRAY, BLOCK_SIZE)
-                    
-                    # Draw game area border
-                    # pygame.draw.rect(window, BLACK, 
-                    #                 (game_area_left, game_area_top, game_area_width, game_area_height), 
-                    #                 BORDER_WIDTH)
-                    
-                    snake.draw(window)
-                    food.draw(window)
-                    obstacles.draw(window)
-                    if power_up.active:
-                        power_up.draw(window)
-                    
-                    draw_text(window, f"Score: {snake.score}", 25, WINDOW_WIDTH - 70, 10)
-                    draw_text(window, f"High Score: {high_score}", 25, WINDOW_WIDTH - 100, 40)
-                    draw_text(window, f"Level: {level}", 25, 70, 10)
-                    draw_text(window, "Press ESC to pause", 25, WINDOW_WIDTH // 2, 10)
-                    
-                    pygame.display.update()
-                
-                if snake.score > high_score:
-                    high_score = snake.score
-                    save_high_score(self, high_score)
-                
-                action = game_over(window, snake.score, high_score)
-                if action == "QUIT":
-                    print("main, game: Quitting game...")
-                    pygame.quit()
-                    sys.exit()
-                snake.reset()
-                level = 1
+
+            def main():
+                snake = Snake()
+                food = Food()
                 obstacles = Obstacle()
+                power_up = PowerUp()
+                high_score = load_high_score()
+                
+                level = 1
+                obstacles_per_level = 5
+                
                 for _ in range(obstacles_per_level):
                     obstacles.add_obstacle()
 
-        if __name__ == "__main__":
-            UP = (0, -1)
-            DOWN = (0, 1)
-            LEFT = (-1, 0)
-            RIGHT = (1, 0)
-            main()
+                while True:
+                    show_menu(window)
+                    
+                    game_over_flag = False
+                    power_up_timer = 0
+                    speed_modifier = 0
+                    
+                    while not game_over_flag:
+                        move_speed = FPS + speed_modifier
+                        action = snake.handle_keys()
+                        if action == "PAUSE":
+                            pause_action = pause_menu(window)
+                            if pause_action == "QUIT":
+                                print("main: Quitting game...")
+                                pygame.quit()
+                                sys.exit()
+                            continue
+                        elif action == "FAST":
+                            move_speed = FPS + 10
+                        
+                        clock.tick(move_speed)
+                        
+                        if not snake.move():
+                            game_over_flag = True
+                            break
+                        
+                        head_pos = snake.get_head_position()
+                        if (abs(head_pos[0] - food.position[0]) < BLOCK_SIZE and 
+                            abs(head_pos[1] - food.position[1]) < BLOCK_SIZE):
+                            snake.length += 1
+                            snake.score += 10
+                            food.randomize_position()
+                            while any(abs(food.position[0] - obs[0]) < BLOCK_SIZE and 
+                                    abs(food.position[1] - obs[1]) < BLOCK_SIZE 
+                                    for obs in obstacles.positions + snake.positions):
+                                food.randomize_position()
+                            if snake.score % 50 == 0:
+                                level += 1
+                                for _ in range(obstacles_per_level):
+                                    obstacles.add_obstacle()
+                        
+                        if not power_up.active and random.randint(1, 100) == 1:
+                            power_up.spawn()
+                            while any(abs(power_up.position[0] - obs[0]) < BLOCK_SIZE and 
+                                    abs(power_up.position[1] - obs[1]) < BLOCK_SIZE 
+                                    for obs in obstacles.positions + snake.positions + [food.position]):
+                                power_up.spawn()
+                        
+                        if power_up.active and (abs(head_pos[0] - power_up.position[0]) < BLOCK_SIZE and 
+                                                abs(head_pos[1] - power_up.position[1]) < BLOCK_SIZE):
+                            if power_up.type == 'speed':
+                                speed_modifier = 5
+                            elif power_up.type == 'slow':
+                                speed_modifier = -5
+                            elif power_up.type == 'shrink':
+                                snake.length = max(1, snake.length - 2)
+                            power_up.active = False
+                            power_up_timer = pygame.time.get_ticks()
+                        
+                        if pygame.time.get_ticks() - power_up_timer > 5000:
+                            speed_modifier = 0
+                        
+                        if any(abs(head_pos[0] - obs[0]) < BLOCK_SIZE and 
+                            abs(head_pos[1] - obs[1]) < BLOCK_SIZE 
+                            for obs in obstacles.positions):
+                            game_over_flag = True
+                            break
 
+                        # Clear the entire window
+                        window.fill(BLACK)
+                        
+                        # Draw patterned background with new dark mode colors
+                        draw_patterned_background(window, 
+                                                pygame.Rect(game_area_left + BORDER_WIDTH, 
+                                                            game_area_top + BORDER_WIDTH, 
+                                                            game_area_width - 1.5*BORDER_WIDTH, 
+                                                            game_area_height - 2*BORDER_WIDTH),
+                                                DARK_GRAY, DARKER_GRAY, BLOCK_SIZE)
+                        
+                        # Draw game area border
+                        # pygame.draw.rect(window, BLACK, 
+                        #                 (game_area_left, game_area_top, game_area_width, game_area_height), 
+                        #                 BORDER_WIDTH)
+                        
+                        snake.draw(window)
+                        food.draw(window)
+                        obstacles.draw(window)
+                        if power_up.active:
+                            power_up.draw(window)
+                        
+                        draw_text(window, f"Score: {snake.score}", 25, WINDOW_WIDTH - 70, 10)
+                        draw_text(window, f"High Score: {high_score}", 25, WINDOW_WIDTH - 100, 40)
+                        draw_text(window, f"Level: {level}", 25, 70, 10)
+                        draw_text(window, "Press ESC to pause", 25, WINDOW_WIDTH // 2, 10)
+                        
+                        pygame.display.update()
+                    
+                    if snake.score > high_score:
+                        high_score = snake.score
+                        save_high_score(self, high_score)
+                    
+                    action = game_over(window, snake.score, high_score)
+                    if action == "QUIT":
+                        print("main, game: Quitting game...")
+                        pygame.quit()
+                        sys.exit()
+                    snake.reset()
+                    level = 1
+                    obstacles = Obstacle()
+                    for _ in range(obstacles_per_level):
+                        obstacles.add_obstacle()
 
+            if __name__ == "__main__":
+                UP = (0, -1)
+                DOWN = (0, 1)
+                LEFT = (-1, 0)
+                RIGHT = (1, 0)
+                main()
+
+        # Run the game in a new thread
+        snake_game_thread = threading.Thread(target=run_snake_game)
+        snake_game_thread.start()
 
 
 
