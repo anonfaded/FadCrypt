@@ -529,10 +529,11 @@ class AppLockerGUI:
         ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=0)
         ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=20)
         ttk.Label(left_frame, text="Full Screen Wallpaper:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=5)
-        ttk.Radiobutton(left_frame, text="Encrypteddd (Default)", variable=self.wallpaper_choice, value="default", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Lab (Default)", variable=self.wallpaper_choice, value="default", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
         ttk.Radiobutton(left_frame, text="H4ck3r", variable=self.wallpaper_choice, value="H4ck3r", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=20)
         ttk.Radiobutton(left_frame, text="Binary", variable=self.wallpaper_choice, value="Binary", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
-
+        ttk.Radiobutton(left_frame, text="Encryptedddddd", variable=self.wallpaper_choice, value="encrypted", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=20)
+        # ttk.Radiobutton(left_frame, text="Lab", variable=self.wallpaper_choice, value="Lab", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
 
 
 
@@ -917,18 +918,20 @@ class AppLockerGUI:
         wallpaper_choice = self.wallpaper_choice.get()
 
         if dialog_style == "simple":
-            preview_path = "img/preview1.jpg"
+            preview_path = "img/preview1.png"
         elif dialog_style == "fullscreen":
             if wallpaper_choice == "default":
-                preview_path = "img/wall1.jpg"
+                preview_path = "img/wall1.png"
             elif wallpaper_choice == "H4ck3r":
-                preview_path = "img/wall2.jpg"
+                preview_path = "img/wall2.png"
             elif wallpaper_choice == "Binary":
-                preview_path = "img/wall3.jpg"
+                preview_path = "img/wall3.png"
+            elif wallpaper_choice == "encrypted":
+                preview_path = "img/wall4.png"
             else:
-                preview_path = "img/preview2.jpg"  # Fallback to fullscreen preview if no wallpaper selected
+                preview_path = "img/preview2.png"  # Fallback to fullscreen preview if no wallpaper selected
         else:
-            preview_path = "img/preview2.jpg"  # Fallback to fullscreen preview if no style selected
+            preview_path = "img/preview2.png"  # Fallback to fullscreen preview if no style selected
 
         try:
             preview_image = Image.open(preview_path)
@@ -1425,7 +1428,8 @@ class AppLockerGUI:
         wallpapers = {
             "default": "img/wall1.jpg",
             "H4ck3r": "img/wall2.jpg",
-            "Binary": "img/wall3.jpg"
+            "Binary": "img/wall3.jpg",
+            "encrypted": "img/wall4.jpg"
         }
         return wallpapers.get(self.wallpaper_choice.get(), wallpapers["default"])
     
@@ -1460,7 +1464,7 @@ class AppLockerGUI:
 
 
             # Game settings
-            FPS = 10
+            FPS = 14
 
             # Pygame setup
             info = pygame.display.Info()
