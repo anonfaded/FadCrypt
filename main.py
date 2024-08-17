@@ -218,7 +218,7 @@ class AppLockerGUI:
 
             # Load the .png icon image for the window icon
             # taskbar and topbar image
-            png_path = 'img/1.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
+            png_path = 'img/icon.png'  # Update this path to your .png file to set the app icon which appears in startbar and in the topbar
             if os.path.exists(png_path):
                 icon_img = PhotoImage(file=png_path)
                 self.master.iconphoto(False, icon_img)
@@ -516,9 +516,9 @@ class AppLockerGUI:
         ttk.Radiobutton(left_frame, text="Simple Dialog", variable=self.password_dialog_style, value="simple", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=0)
         ttk.Radiobutton(left_frame, text="Full Screen", variable=self.password_dialog_style, value="fullscreen", command=self.save_and_update_preview).pack(anchor="w", padx=20, pady=20)
         ttk.Label(left_frame, text="Full Screen Wallpaper:", font=("TkDefaultFont", 10, "bold")).pack(anchor="w", pady=5)
-        ttk.Radiobutton(left_frame, text="Default", variable=self.wallpaper_choice, value="default", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
-        ttk.Radiobutton(left_frame, text="Nature", variable=self.wallpaper_choice, value="nature", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=20)
-        ttk.Radiobutton(left_frame, text="Abstract", variable=self.wallpaper_choice, value="abstract", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="Encrypteddd (Default)", variable=self.wallpaper_choice, value="default", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
+        ttk.Radiobutton(left_frame, text="H4ck3r", variable=self.wallpaper_choice, value="H4ck3r", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=20)
+        ttk.Radiobutton(left_frame, text="Binary", variable=self.wallpaper_choice, value="Binary", command=self.save_and_update_wallpaper).pack(anchor="w", padx=20, pady=0)
 
 
 
@@ -584,9 +584,9 @@ class AppLockerGUI:
 
         # Load App Logo with Error Handling
         try:
-            app_icon = tk.PhotoImage(file='img/1.png').subsample(10, 10)  # Resize the logo to 50x50 px
+            app_icon = tk.PhotoImage(file='img/icon.png').subsample(4, 4)  # Resize the logo to 50x50 px
         except tk.TclError:
-            print("Error: App icon 'img/1.png' not found.")
+            print("Error: App icon 'img/icon.png' not found.")
             app_icon = None
 
         if app_icon:
@@ -665,9 +665,9 @@ class AppLockerGUI:
         fadcam_promo_frame = ttk.Frame(self.about_frame)
         fadcam_promo_frame.pack(pady=10)
 
-        # App Icon and Title
+        #  fad cam App Icon and Title
         try:
-            fadcam_icon = tk.PhotoImage(file='img/1.png').subsample(12, 12)  # Resize the logo to 50x50 px
+            fadcam_icon = tk.PhotoImage(file='img/fadcam.png').subsample(12, 12)  # Resize the logo to 50x50 px
         except tk.TclError:
             print("Error: FadCam icon 'fadcam_icon.png' not found.")
             fadcam_icon = None
@@ -816,7 +816,7 @@ class AppLockerGUI:
 
     def load_readme_image(self, dialog):
         # Load the image using PIL
-        img = Image.open("img/1.ico")
+        img = Image.open("img/readme.png")
         img = img.resize((400, 400), Image.LANCZOS)  # Adjust the size as needed
         photo = ImageTk.PhotoImage(img)
 
@@ -908,9 +908,9 @@ class AppLockerGUI:
         elif dialog_style == "fullscreen":
             if wallpaper_choice == "default":
                 preview_path = "img/wall1.jpg"
-            elif wallpaper_choice == "nature":
+            elif wallpaper_choice == "H4ck3r":
                 preview_path = "img/wall2.jpg"
-            elif wallpaper_choice == "abstract":
+            elif wallpaper_choice == "Binary":
                 preview_path = "img/wall3.jpg"
             else:
                 preview_path = "img/preview2.jpg"  # Fallback to fullscreen preview if no wallpaper selected
@@ -1411,8 +1411,8 @@ class AppLockerGUI:
     def get_wallpaper_path(self):
         wallpapers = {
             "default": "img/wall1.jpg",
-            "nature": "img/wall2.jpg",
-            "abstract": "img/wall3.jpg"
+            "H4ck3r": "img/wall2.jpg",
+            "Binary": "img/wall3.jpg"
         }
         return wallpapers.get(self.wallpaper_choice.get(), wallpapers["default"])
     
