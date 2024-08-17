@@ -1890,20 +1890,23 @@ class AppLocker:
         if os.path.exists(self.config_file):
             if os.path.exists(self.password_file):
                 password = self.load_password()
-                self.config = self.decrypt_data(password, self.config_file)
-                print(f"Config loaded: {self.config}")  # Debug print
+                try:
+                    self.config = self.decrypt_data(password, self.config_file)
+                    print(f"Config loaded: {self.config}")  # Debug print
+                except Exception as e:
+                    print(f"Error decrypting config: {e}")
+                    self.config = {"applications": []}
+                    self.save_config()  # Save a new encrypted config if decryption fails
             else:
                 print("Password file does not exist.")
                 self.config = {"applications": []}
                 # Optionally, save default config if password file is missing
                 self.save_config()
         else:
-            print("Config file does not exist. Initialized with default config.")  # Debug print
+            print("load_config: Config file does not exist. Initialized with default config.")  # Debug print
             self.config = {"applications": []}
-            # Create the config file with default content
-            with open(self.config_file, 'w') as f:
-                json.dump(self.config, f, indent=4)
-            print(f"Config file created at {self.config_file} with default settings.")  # Debug print
+            # Create the config file with default content and encrypt it
+            self.save_config()
 
     def save_config(self):
         if os.path.exists(self.password_file):
@@ -1912,6 +1915,7 @@ class AppLocker:
             print(f"Config saved to {self.config_file}")  # Debug print
         else:
             print("Password file does not exist. Cannot save config.")
+
 
     def load_password(self):
         with open(self.password_file, 'rb') as f:
@@ -2282,7 +2286,7 @@ class FileMonitor:
             self.files_to_monitor = files_to_monitor
             self.backup_folder = backup_folder
             # self.initial_restore()  # Restore any missing files from the backup folder
-            print("Initial file recovery completed.")
+            print("Initial file recovery disabled.")
 
         def on_modified(self, event):
             if event.src_path in self.files_to_monitor:
