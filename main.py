@@ -808,14 +808,15 @@ class AppLockerGUI:
             "- Logging and Alerts: Includes screenshots, email alerts on wrong password attempts, and detailed logs.\n"
             "- Community Input: Integrating feedback for improved security and usability.\n\n"
             "Extras:\n"
-            "- Snake Game: Enjoy the classic Snake game on the main tab or from the tray icon for a bit of fun!\n"
+            "- Snake Game: Enjoy the classic Snake game on the main tab or from the tray icon for a bit of fun!\n\n"
+            "# Join our Discord community via the 'Settings' tab\nfor help, questions, or to share your ideas and feedback."
         )
 
 
 
 
         # Create a label to hold the animated text
-        self.animated_label = tk.Label(text_frame, text="", font=("Ubuntu", 16), bg='white', justify="left", anchor="nw")
+        self.animated_label = tk.Label(text_frame, text="", font=("Arial", 16), bg='white', justify="left", anchor="nw")
         self.animated_label.pack(padx=50, pady=50, anchor="n")
 
         # Start the typewriter animation
