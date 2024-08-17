@@ -1424,7 +1424,7 @@ class AppLockerGUI:
 
 
 
-    
+
 
     def start_snake_game(self):
         def run_snake_game():
@@ -2217,6 +2217,9 @@ class AppLocker:
         def on_quit(icon, item):
             self.gui.master.after(0, self._password_prompt_and_quit, icon)
 
+        def on_snake(icon, item):
+            self.gui.master.after(0, AppLockerGUI.start_snake_game, icon)
+
         # Load the custom icon image
         try:
             image = Image.open('img/icon.png')  # Replace with the path to your icon.png
@@ -2227,7 +2230,8 @@ class AppLocker:
 
         menu = Menu(
             MenuItem('Stop Monitoring', on_stop),
-            MenuItem('Quit', on_quit)
+            MenuItem('Quit', on_quit),
+            MenuItem('Snake 🪱', on_snake)
         )
 
         self.icon = Icon("AppLocker", image, "FadCrypt", menu)
