@@ -99,17 +99,17 @@ Download the latest `windows .exe setup` file directly from the [releases page](
 
 ## Features:
 
-- **Application Locking:** Secure apps with an encrypted password; it can't be recovered if lost.
+- **Application Locking:** Secure apps with an encrypted password; it can't be recovered if lost nor the tool can be stopped.
 - **Real-time Monitoring:** Detects and auto-recovers critical files if deleted.
 - **Auto-Startup:** Automatically enabled for every session after starting monitoring.
 - **Aesthetic UI:** Choose custom wallpapers or a minimal style with smooth animations.
   
 **Security:**
-- **System Tools Disabled:** Disables Command Prompt, Task Manager, msconfig, Control Panel, and Registry Editor; a nighmare for a layman to bypass; manual PowerShell disabling is recommended.
-- **Encrypted Storage:** Passwords and config data are encrypted and backed up somewhere in `C://`.
+- **System Tools Disabled:** Disables Command Prompt, Task Manager, msconfig, Control Panel, and Registry Editor; a nightmare for a layman to bypass. (Manual PowerShell disabling is recommended for maximum security.)
+- **Encrypted Storage:** Password and config data are encrypted and backed up somewhere in `C://` drive.
 
 **Testing:**
-- **Testing Blocked Tools:** Confirm effectiveness by searching for Control Panel or Task Manager and try to open it during monitoring is started.
+- **Testing Blocked Tools:** Confirm effectiveness by searching for Control Panel or Task Manager and try to open it during monitoring.
 
 **Extras:**
 - **Snake Game:** Enjoy the classic Snake game on the main tab or from the tray icon! :)
