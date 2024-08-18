@@ -10,9 +10,7 @@
 | :exclamation: | This project is part of the [FadSec Lab suite](https://github.com/fadsec-lab). <br> Discover our focus on ad-free, privacy-first applications and stay updated on future releases!  |
 |---------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
-![disabled]()
 
-https://github.com/user-attachments/assets/8eea8177-67f9-4e0e-b37e-988077b733da
 
 
 ---
