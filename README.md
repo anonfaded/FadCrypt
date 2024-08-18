@@ -47,6 +47,7 @@
         
 
 - [Screenshots](#-screenshots)
+- [How FadCrypt Works](#how-fadcrypt-works)
 - [Download](https://github.com/anonfaded/FadCrypt#-download)
 - [Features](#features)
 - [Join Community](#join-community)
@@ -90,6 +91,20 @@
         <br>
         <img src="/img/5.png" style="width: 700px; height: auto;" >
     </details> -->
+    
+## How FadCrypt Works:
+
+1. **Password Creation:** When you set a password, it's encrypted and saved with the configuration file of locked apps. During monitoring, these files are backed up to `C:\ProgramData\FadCrypt\Backup\`. If detected as deleted, they are automatically recovered and restored.
+
+2. **Monitoring Mode:** Press "Start Monitoring" to set FadCrypt as a startup app. It will automatically activate every time your PC starts, and will persistently run unless you press "Stop Monitoring."
+
+3. **Security Features:** FadCrypt can't be stopped without the correct password. The app also disables Control Panel, Registry Editor, Task Manager, and msconfig to prevent tampering.
+
+4. **Mutex Protection:** FadCrypt uses mutual exclusion to ensure only one instance runs at a time, blocking new instances until the current one is closed with the password. This prevents bypass attempts.
+
+**Note:** The password recovery feature is not available yet.
+
+
 
 ## ⬇️ Download
 
