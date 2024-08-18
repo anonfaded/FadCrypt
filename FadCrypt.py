@@ -31,6 +31,7 @@ import webbrowser
 import random
 import requests
 import pygame
+from ctypes import wintypes
 
 # App Version Information
 __version__ = "0.1.0"
@@ -65,7 +66,7 @@ class AppLockerGUI:
 
         # self.master.geometry("700x450") # Adjusted size to accommodate new tabs
         # Prevent resizing
-        # self.master.resizable(False, False)
+        self.master.resizable(False, False)
         self.app_locker = AppLocker(self)
 
         
@@ -797,6 +798,7 @@ class AppLockerGUI:
             "Features:\n"
             "- Application Locking: Secure apps with an encrypted password. Save your password safely;\nit can't be recovered if lost!\n"
             "- Real-time Monitoring: Detects and auto-recovers critical files if they are deleted.\n"
+            "- Auto-Startup: After starting monitoring, the app will be automatically enabled for every session.\n"
             "- Aesthetic UI: Choose custom wallpapers or a minimal style with smooth animations.\n\n"
             "Security:\n"
             "- System Tools Disabled: Disables Command Prompt, Task Manager, msconfig, Control Panel, and Registry Editor;\n  a real nightmare for attackers trying to bypass it.\n  Manual PowerShell disabling is recommended as it's a significant loophole!\n"
@@ -1866,7 +1868,7 @@ class AppLockerGUI:
                             power_up.draw(window)
                         
                         # Load the logo
-                        logo = pygame.image.load(self.resource_path('img/fadsec.png'))  # Ensure 'fadsec.png' is in the same directory
+                        logo = pygame.image.load(self.resource_path("img/fadsec.png"))  # Ensure 'fadsec.png' is in the same directory
                         # Determine the new size for the logo
                         scale_factor = 0.5  # Scale to 50% of the original size
                         logo_width, logo_height = logo.get_size()
@@ -2339,8 +2341,8 @@ class AppLocker:
         def on_quit(icon, item):
             self.gui.master.after(0, self._password_prompt_and_quit, icon)
 
-        def on_snake(icon, item):
-            self.gui.master.after(0, AppLockerGUI.start_snake_game, icon)
+        def on_snake(item):
+            self.gui.master.after(0, self.gui.start_snake_game)
 
         # Load the custom icon image
         try:
@@ -2394,8 +2396,8 @@ class AppLocker:
 
 class FileMonitor:
     def __init__(self):
-        self.pid_file = "fadcrypt.pid"
-        self.lock_file = "fadcrypt.lock"
+        # self.pid_file = "fadcrypt.pid"
+        # self.lock_file = "fadcrypt.lock"
 
         self.observer = Observer()
         self.backup_folder = None
@@ -2426,126 +2428,18 @@ class FileMonitor:
 
 
 
-    def get_current_pid(self):
-        """Return the PID of the current process."""
-        return os.getpid()
-
-    def get_process_name(self, pid):
-        """Return the name of the process with the given PID."""
-        try:
-            return psutil.Process(pid).name()
-        except psutil.NoSuchProcess:
-            return None
-
-    def get_process_creation_time(self, pid):
-        """Return the creation time of the process with the given PID."""
-        try:
-            return psutil.Process(pid).create_time()
-        except psutil.NoSuchProcess:
-            return None
-
-    def find_existing_processes(self, process_name):
-        """Find all processes with the given name."""
-        pids = []
-        for proc in psutil.process_iter(['pid', 'name']):
-            if proc.info['name'] == process_name:
-                pids.append(proc.info['pid'])
-        return pids
-
-    def store_pid(self, pid):
-        """Store the PID of the running process."""
-        with open(self.pid_file, "w") as f:
-            f.write(str(pid))
-
-    def read_pid(self):
-        """Read the PID of the running process."""
-        if os.path.exists(self.pid_file):
-            with open(self.pid_file, "r") as f:
-                return int(f.read().strip())
-        return None
-
-    def create_lock_file(self):
-        """Create a lock file to prevent multiple instances."""
-        if os.path.exists(self.lock_file):
-            raise RuntimeError("Another instance is already running.")
-        with open(self.lock_file, "w") as f:
-            f.write(str(self.get_current_pid()))
-
-    def remove_lock_file(self):
-        """Remove the lock file when exiting."""
-        if os.path.exists(self.lock_file):
-            os.remove(self.lock_file)
-
-    def terminate_new_instances(self):
-        """Terminate processes with the same name but created after the original process."""
-        process_name = self.get_process_name(self.get_current_pid())
-        if not process_name:
-            print("Failed to get process name. Exiting...")
-            sys.exit()
-
-        all_pids = self.find_existing_processes(process_name)
-        current_pid = self.get_current_pid()
-
-        # Read the PID of the original instance
-        stored_pid = self.read_pid()
-
-        if stored_pid:
-            print(f"Stored PID: {stored_pid}")
-
-            for pid in all_pids:
-                if pid != stored_pid and pid != current_pid:
-                    creation_time = self.get_process_creation_time(pid)
-                    if creation_time:
-                        print(f"Process PID {pid} created at {creation_time}")
-
-                        if creation_time > self.get_process_creation_time(current_pid):
-                            try:
-                                proc = psutil.Process(pid)
-                                proc.terminate()
-                                proc.wait(timeout=3)  # Wait for the process to terminate
-                                print(f"Terminated new process with PID {pid}.")
-                            except psutil.NoSuchProcess:
-                                print(f"Process with PID {pid} no longer exists.")
-                            except psutil.AccessDenied:
-                                print(f"Access denied to terminate process with PID {pid}.")
-                            except Exception as e:
-                                print(f"Failed to terminate process with PID {pid}: {e}")
-
 
         
     def start_monitoring(self):
         """Start monitoring and handle multiple instances."""
-        try:
-            # Create a lock file to prevent multiple instances
-            self.create_lock_file()
-
-            # Store the PID of the current instance
-            self.original_pid = self.get_current_pid()
-            self.original_start_time = self.get_process_creation_time(self.original_pid)
-
-            print(f"Original PID: {self.original_pid}")
-            print(f"Original Start Time: {self.original_start_time}")
-
-            self.store_pid(self.original_pid)
-
-            # Continuously check for new instances
-            while True:
-                self.terminate_new_instances()
-                time.sleep(1)  # Check every 5 seconds
-
-            # Proceed with monitoring setup
-            self.set_files_to_monitor()
-            event_handler = self.FileChangeHandler(self.files_to_monitor, self.backup_folder)
-            self.observer.schedule(event_handler, os.path.dirname(self.files_to_monitor[0]), recursive=False)
-            self.observer.start()
+        # Proceed with monitoring setup
+        self.set_files_to_monitor()
+        event_handler = self.FileChangeHandler(self.files_to_monitor, self.backup_folder)
+        self.observer.schedule(event_handler, os.path.dirname(self.files_to_monitor[0]), recursive=False)
+        self.observer.start()
                 
-            print("Started monitoring files...")
-        except RuntimeError as e:
-            print(e)
-            sys.exit(1)
-        finally:
-            # Ensure lock file is removed when exiting
-            self.remove_lock_file()
+        print("Started monitoring files...")
+    
 
     class FileChangeHandler(FileSystemEventHandler):
         def __init__(self, files_to_monitor, backup_folder):
@@ -2630,7 +2524,35 @@ def start_monitoring_thread(monitor):
 
 
 
+
+
+
+# check for more than one instances, and terminate them so no new window will be opened to access the app
+# A mutex (short for "mutual exclusion") is a synchronization primitive that ensures only one instance of a program can run at a time.
+
+class SingleInstance:
+    def __init__(self):
+        self.mutex_name = "Global\\FadCrypt"
+
+    def create_mutex(self):
+        """Create a mutex to ensure only one instance is running."""
+        self.mutex = ctypes.windll.kernel32.CreateMutexW(None, True, self.mutex_name)
+        self.error = ctypes.windll.kernel32.GetLastError()
+
+        if self.error == 183:  # ERROR_ALREADY_EXISTS
+            print("Another instance is already running. Exiting...")
+            sys.exit(1)  # Exit immediately if another instance is running
+
+
+
+
+
+
 def main():
+    # Step 1: Create a SingleInstance object and check for existing instance
+    single_instance = SingleInstance()
+    single_instance.create_mutex()
+
     root = TkinterDnD.Tk()
     style = Style(theme='darkly')  # Apply dark theme, pulse, cyborg, darkly, simplex(red)
 
