@@ -47,14 +47,11 @@
         
 
 - [Screenshots](#-screenshots)
-- [Featured on](#featured-on)
 - [Download](https://github.com/anonfaded/FadCrypt#-download)
 - [Features](#features)
-- [Upcoming Features](#upcoming-features)
 - [Join Community](#join-community)
 - [Support](#support)
 - [Contributions](#contributions)
-- [Credits](#credits)
 
 </details>
 
@@ -70,10 +67,12 @@
     <img src="https://github.com/user-attachments/assets/b81daec5-8c0f-49f0-9cac-bec61d303eef" style="width: 500px; height: auto;" >
     <img src="https://github.com/user-attachments/assets/df93ac6d-d8eb-45e7-b150-3a1e6d6a80c2" style="width: 500px; height: auto;" >
     <img src="https://github.com/user-attachments/assets/28db5d03-0b08-47fa-bdc6-01244947c124" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/b016d43d-0105-46b5-b2eb-5c697230fcd8" style="width: 500px; height: auto;" >
     <img src="https://github.com/user-attachments/assets/01e1a2b1-8cdf-40a2-95e0-41109c07db5c" style="width: 500px; height: auto;" >
+    <img src="https://github.com/user-attachments/assets/bcbf1b09-6920-46fb-8c3d-b475536060a0" style="width: 500px; height: auto;" >
+    <img src="https://github.com/user-attachments/assets/b016d43d-0105-46b5-b2eb-5c697230fcd8" style="width: 500px; height: auto;" >
     <img src="https://github.com/user-attachments/assets/ec7dcc78-2a36-42ef-81a3-8cdda3e33195" style="width: 500px; height: auto;" >
  <br>
+
 
 
 
@@ -100,29 +99,25 @@ Download the latest `windows .exe setup` file directly from the [releases page](
 
 ## Features:
 
-- **Background Video Recording:** Record with screen off.
-- **Material Design UI:** Modern and easy-to-use.
-- **No ads:** Completely ad-free.
-- **Internal Storage Options:** Save videos internally or to the gallery.
-- **Inbuilt Videoplayer** ExoPlayer integration; play videos in-app.
-- **Dynamic Watermarks:** Timestamp, logo, location options.
-- **Real-time Storage Updates:** Inspect remaining storage with estimated recording times.
-- **Video Quality Selection:** SD, HD, FHD options.
-- **Video Renaming:** Rename videos in-app.
-- **Location Data in Watermarks:** Precise location in watermarks.
-- **Long Press Haptic Feedback:** Haptic feedback with animations.
-- **Date and Time Widget:** Customizable widget.
+- **Application Locking:** Secure apps with an encrypted password; it can't be recovered if lost.
+- **Real-time Monitoring:** Detects and auto-recovers critical files if deleted.
+- **Auto-Startup:** Automatically enabled for every session after starting monitoring.
+- **Aesthetic UI:** Choose custom wallpapers or a minimal style with smooth animations.
+  
+**Security:**
+- **System Tools Disabled:** Disables Command Prompt, Task Manager, msconfig, Control Panel, and Registry Editor; a nighmare for a layman to bypass; manual PowerShell disabling is recommended.
+- **Encrypted Storage:** Passwords and config data are encrypted and backed up somewhere in `C://`.
 
+**Testing:**
+- **Testing Blocked Tools:** Confirm effectiveness by searching for Control Panel or Task Manager and try to open it during monitoring is started.
 
-## Upcoming Features:
+**Extras:**
+- **Snake Game:** Enjoy the classic Snake game on the main tab or from the tray icon! :)
 
-- **Scheduled Recording:** Automatic start and stop at set times.
-- **Google Drive Auto-Upload:** Auto-upload videos to Google Drive.
-- **Custom Icon:** Personalize with custom app icons.
-- **Custom Notifications:** Custom messages for discreet notifications.
-- **App Lock:** Secure the app with an applock.
-- **Custom FPS:** Selection of 30/60fps.
-- **Custom Saving:** Provide custom location saving option.
+**Upcoming Features:**
+- **Password Recovery:** Recover forgotten passwords with ease.
+- **Logging and Alerts:** Includes screenshots, email alerts on wrong password attempts, and detailed logs.
+- **Community Input:** Integrates feedback for improved security and usability.
 
 
 ## Join Community
