@@ -108,7 +108,7 @@
 
 ## ⬇️ Download
 
-Download the latest `windows .exe setup` file directly from the [releases page](https://github.com/anonfaded/FadCrypt/releases).
+Download the latest `windows setup installer` file directly from the [releases page](https://github.com/anonfaded/FadCrypt/releases).
 
 [<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/FadCrypt/releases)
 
