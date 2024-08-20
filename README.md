@@ -51,6 +51,7 @@
 - [How FadCrypt Works](#how-fadcrypt-works)
 - [Download](https://github.com/anonfaded/FadCrypt#-download)
 - [Features](#features)
+- [Featured-on](#featured-on)
 - [Join Community](#join-community)
 - [Support](#support)
 - [Contributions](#contributions)
@@ -135,6 +136,9 @@ Download the latest `windows setup installer` file directly from the [releases p
 - **Logging and Alerts:** Includes screenshots, email alerts on wrong password attempts, and detailed logs.
 - **Community Input:** Integrates feedback for improved security and usability.
 
+## Featured On
+- [VPN Club on Telegram](https://t.me/s/wbnet?q=fadcrypt)
+- [popMods on Telegram](https://t.me/s/popmods?q=fadcrypt)
 
 ## Join Community
 Join our [Discord server](https://discord.gg/kvAZvdkuuN) to share ideas, seek help, or connect with other users. Your feedback and contributions are welcome!
