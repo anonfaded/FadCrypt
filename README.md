@@ -141,7 +141,7 @@ Download the latest `windows setup installer` file directly from the [releases p
 - [VPN Club on Telegram](https://t.me/s/wbnet?q=fadcrypt)
 - [popMods on Telegram](https://t.me/s/popmods?q=fadcrypt)
 - [blog.csdn.net](https://blog.csdn.net/qq_29607687/article/details/141366524)
-- [rhkb.cn](http://www.rhkb.cn/news/405585.html)
+<!-- - [rhkb.cn](http://www.rhkb.cn/news/405585.html) -->
 
 ## Join Community
 Join our [Discord server](https://discord.gg/kvAZvdkuuN) to share ideas, seek help, or connect with other users. Your feedback and contributions are welcome!
