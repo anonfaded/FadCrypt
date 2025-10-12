@@ -3,22 +3,26 @@ import os
 import sys
 import tkinterdnd2
 
-# Get tkdnd library path
+# Resolve paths
+base_path = os.path.abspath(os.path.dirname(__file__))
 tkdnd_path = os.path.join(os.path.dirname(tkinterdnd2.__file__), 'tkdnd')
 
+# Encryption (if needed, leave as None otherwise)
 block_cipher = None
 
+# Analysis block
 a = Analysis(
     ['FadCrypt_Linux.py'],
-    pathex=[],
+    pathex=[base_path],  # ensure relative imports work
     binaries=[],
     datas=[
-        ('img', 'img'),
-        (tkdnd_path, 'tkinterdnd2/tkdnd'),
-        ('ttkbootstrap', 'ttkbootstrap'),  # Include ttkbootstrap themes
+        (os.path.join(base_path, 'img'), 'img'),  # Images folder
+        (tkdnd_path, 'tkinterdnd2/tkdnd'),         # Required tkdnd binaries
+        (os.path.join(base_path, 'ttkbootstrap'), 'ttkbootstrap'),  # Bootstrap themes
     ],
     hiddenimports=[
         'tkinterdnd2',
+        'tkinterdnd2.TkinterDnD',
         'ttkbootstrap',
         'ttkbootstrap.themes',
         'PIL',
@@ -27,7 +31,6 @@ a = Analysis(
         'pystray',
         'pystray._xorg',
         'pygame',
-        'tkinterdnd2.TkinterDnD',
         'cryptography',
         'psutil',
         'watchdog',
@@ -42,8 +45,10 @@ a = Analysis(
     noarchive=False,
 )
 
+# Create Python archive
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Executable creation
 exe = EXE(
     pyz,
     a.scripts,
@@ -51,16 +56,16 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='fadcrypt',  # Lowercase for Linux CLI convention
+    name='fadcrypt',  # Lowercase CLI convention
     debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
+    bootloader_ignore_signals=True,  # recommended for Linux GUI apps
+    strip=True,                      # reduce size
+    upx=True,                        # compress output
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # GUI app, no console
+    console=False,                   # GUI app
     disable_windowed_traceback=False,
-    argv_emulation=False,
+    argv_emulation=False,           # macOS only, safe to leave false
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
