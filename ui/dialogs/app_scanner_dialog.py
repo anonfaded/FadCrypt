@@ -167,47 +167,379 @@ class AppScannerThread(QThread):
     def _scan_windows_applications(self) -> List[Dict[str, str]]:
         """Scan Windows system for applications."""
         apps = []
-        program_dirs = [
-            r"C:\Program Files",
-            r"C:\Program Files (x86)",
-            os.path.expanduser(r"~\AppData\Local\Programs")
+
+        # Method 1: Scan Start Menu shortcuts (most reliable)
+        start_menu_apps = self._scan_windows_start_menu()
+        apps.extend(start_menu_apps)
+
+        # Method 2: Scan Desktop shortcuts
+        desktop_apps = self._scan_windows_desktop()
+        for app in desktop_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                apps.append(app)
+
+        # Method 3: Scan registry uninstall keys for additional apps
+        registry_apps = self._scan_windows_registry_uninstall()
+        for app in registry_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                apps.append(app)
+
+        # Filter out system utilities and junk apps
+        filtered_apps = []
+        for app in apps:
+            if self._should_include_app(app):
+                filtered_apps.append(app)
+
+        return sorted(filtered_apps, key=lambda x: x['name'].lower())
+
+    def _scan_windows_start_menu(self) -> List[Dict[str, str]]:
+        """Scan Windows Start Menu for application shortcuts."""
+        apps = []
+        start_menu_paths = [
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+            os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs")
+        ]
+
+        self.scan_progress.emit("Scanning Start Menu...")
+
+        for start_path in start_menu_paths:
+            if not os.path.exists(start_path):
+                continue
+
+            try:
+                for root, dirs, files in os.walk(start_path):
+                    for file in files:
+                        if file.endswith('.lnk'):
+                            lnk_path = os.path.join(root, file)
+                            app_info = self._parse_windows_shortcut(lnk_path)
+                            if app_info and app_info['name'] and app_info['path']:
+                                # Avoid duplicates
+                                if not any(app['name'] == app_info['name'] for app in apps):
+                                    apps.append(app_info)
+                                    self.scan_progress.emit(f"Found: {app_info['name']}")
+            except (PermissionError, OSError) as e:
+                print(f"[Scanner] Error scanning Start Menu {start_path}: {e}")
+
+        return apps
+
+    def _scan_windows_desktop(self) -> List[Dict[str, str]]:
+        """Scan Windows Desktop for application shortcuts."""
+        apps = []
+        desktop_path = os.path.expanduser(r"~\Desktop")
+
+        if not os.path.exists(desktop_path):
+            return apps
+
+        self.scan_progress.emit("Scanning Desktop...")
+
+        try:
+            for file in os.listdir(desktop_path):
+                if file.endswith('.lnk'):
+                    lnk_path = os.path.join(desktop_path, file)
+                    app_info = self._parse_windows_shortcut(lnk_path)
+                    if app_info and app_info['name'] and app_info['path']:
+                        # Only include if it's an actual application (not just a shortcut to a folder/file)
+                        if app_info['path'].endswith('.exe'):
+                            apps.append(app_info)
+                            self.scan_progress.emit(f"Found: {app_info['name']}")
+        except (PermissionError, OSError) as e:
+            print(f"[Scanner] Error scanning Desktop: {e}")
+
+        return apps
+
+    def _scan_windows_registry_uninstall(self) -> List[Dict[str, str]]:
+        """Scan Windows registry uninstall keys for installed applications."""
+        apps = []
+
+        try:
+            import winreg
+        except ImportError:
+            print("[Scanner] winreg not available, skipping registry scan")
+            return apps
+
+        self.scan_progress.emit("Scanning registry...")
+
+        # Registry paths to check
+        reg_paths = [
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        ]
+
+        for reg_path in reg_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path)
+                i = 0
+                while True:
+                    try:
+                        subkey = winreg.EnumKey(key, i)
+                        subkey_path = f"{reg_path}\\{subkey}"
+                        app_info = self._parse_registry_uninstall_key(winreg.HKEY_LOCAL_MACHINE, subkey_path)
+                        if app_info and app_info['name'] and app_info['path']:
+                            # Avoid duplicates and system entries
+                            if (not any(app['name'] == app_info['name'] for app in apps) and
+                                not self._is_system_app(app_info['name'])):
+                                apps.append(app_info)
+                                self.scan_progress.emit(f"Found: {app_info['name']}")
+                        i += 1
+                    except OSError:
+                        break
+                winreg.CloseKey(key)
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                print(f"[Scanner] Error scanning registry {reg_path}: {e}")
+
+        return apps
+
+    def _parse_windows_shortcut(self, lnk_path: str) -> Optional[Dict[str, str]]:
+        """Parse a Windows .lnk shortcut file."""
+        # Try to use win32com for proper shortcut parsing
+        try:
+            import pythoncom
+            from win32com.shell import shell
+
+            shortcut = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink,
+                None,
+                pythoncom.CLSCTX_INPROC_SERVER,
+                shell.IID_IShellLink
+            )
+
+            # Load the shortcut
+            persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+            persist_file.Load(lnk_path)
+
+            # Get target path
+            target_path = shortcut.GetPath(0)[0]
+
+            if not target_path or not target_path.endswith('.exe'):
+                return None
+
+            # Get description/name
+            name = shortcut.GetDescription()
+            if not name:
+                name = os.path.splitext(os.path.basename(target_path))[0]
+
+            return {
+                'name': name,
+                'path': target_path,
+                'icon': target_path,  # Use exe for icon extraction
+                'category': self._categorize_windows_app(target_path),
+                'desktop_file': lnk_path  # Store shortcut path
+            }
+
+        except ImportError:
+            # win32com not available, use fallback method
+            return self._parse_windows_shortcut_fallback(lnk_path)
+        except Exception as e:
+            # Any other error, use fallback
+            return self._parse_windows_shortcut_fallback(lnk_path)
+
+    def _parse_windows_shortcut_fallback(self, lnk_path: str) -> Optional[Dict[str, str]]:
+        """Fallback method to parse Windows shortcuts without win32com."""
+        try:
+            # Read the .lnk file as binary and extract target path
+            # This is a simplified approach - .lnk files have a complex structure
+            with open(lnk_path, 'rb') as f:
+                data = f.read()
+
+            # Look for common executable extensions in the binary data
+            # This is a very basic heuristic
+            data_str = data.decode('latin-1', errors='ignore')
+
+            # Common executable paths to look for
+            common_paths = [
+                'C:\\Program Files',
+                'C:\\Program Files (x86)',
+                'C:\\Users',
+                'C:\\Windows'
+            ]
+
+            target_path = None
+            for path_start in common_paths:
+                if path_start in data_str:
+                    # Find the start of the path
+                    start_idx = data_str.find(path_start)
+                    if start_idx != -1:
+                        # Look for .exe extension after the path start
+                        exe_idx = data_str.find('.exe', start_idx)
+                        if exe_idx != -1:
+                            # Extract path up to and including .exe
+                            potential_path = data_str[start_idx:exe_idx + 4]
+                            if os.path.exists(potential_path):
+                                target_path = potential_path
+                                break
+
+            if target_path:
+                name = os.path.splitext(os.path.basename(target_path))[0]
+                return {
+                    'name': name,
+                    'path': target_path,
+                    'icon': target_path,
+                    'category': self._categorize_windows_app(target_path),
+                    'desktop_file': lnk_path
+                }
+
+        except Exception as e:
+            pass
+
+        # Final fallback: just use the shortcut filename
+        name = os.path.splitext(os.path.basename(lnk_path))[0]
+        return {
+            'name': name,
+            'path': lnk_path,  # Use shortcut itself as path
+            'icon': '',
+            'category': 'Other',
+            'desktop_file': lnk_path
+        }
+
+    def _parse_registry_uninstall_key(self, hkey, subkey_path: str) -> Optional[Dict[str, str]]:
+        """Parse a Windows registry uninstall key."""
+        try:
+            import winreg
+        except ImportError:
+            return None
+
+        try:
+            key = winreg.OpenKey(hkey, subkey_path)
+            display_name = None
+            install_location = None
+            uninstall_string = None
+
+            try:
+                display_name, _ = winreg.QueryValueEx(key, "DisplayName")
+            except FileNotFoundError:
+                pass
+
+            try:
+                install_location, _ = winreg.QueryValueEx(key, "InstallLocation")
+            except FileNotFoundError:
+                pass
+
+            try:
+                uninstall_string, _ = winreg.QueryValueEx(key, "UninstallString")
+            except FileNotFoundError:
+                pass
+
+            winreg.CloseKey(key)
+
+            if not display_name:
+                return None
+
+            # Try to find the executable path
+            exe_path = None
+            if install_location and os.path.exists(install_location):
+                # Look for exe files in install location (recursive search)
+                for root, dirs, files in os.walk(install_location):
+                    for file in files:
+                        if file.endswith('.exe') and not file.lower().endswith('uninstall.exe'):
+                            exe_path = os.path.join(root, file)
+                            break
+                    if exe_path:
+                        break
+
+            # If no exe found, try to extract from uninstall string
+            if not exe_path and uninstall_string:
+                # Uninstall strings often contain the exe path
+                if '.exe' in uninstall_string.lower():
+                    # Extract path from quotes or before parameters
+                    import re
+                    match = re.search(r'["\']([^"\']*\.exe)["\']', uninstall_string)
+                    if match:
+                        exe_path = match.group(1)
+                    else:
+                        # Try to find exe path without quotes
+                        exe_match = re.search(r'([A-Za-z]:[^\s]*\.exe)', uninstall_string)
+                        if exe_match:
+                            exe_path = exe_match.group(1)
+
+            # For system apps like Notepad, use known paths
+            if not exe_path and display_name:
+                display_lower = display_name.lower()
+                if 'notepad' in display_lower:
+                    exe_path = r'C:\Windows\System32\notepad.exe'
+                elif 'wordpad' in display_lower:
+                    exe_path = r'C:\Program Files\Windows NT\Accessories\wordpad.exe'
+                elif 'paint' in display_lower:
+                    exe_path = r'C:\Windows\System32\mspaint.exe'
+                elif 'calculator' in display_lower:
+                    exe_path = r'C:\Windows\System32\calc.exe'
+
+            if exe_path and os.path.exists(exe_path):
+                return {
+                    'name': display_name,
+                    'path': exe_path,
+                    'icon': exe_path,
+                    'category': self._categorize_windows_app(exe_path),
+                    'desktop_file': ''
+                }
+
+        except Exception as e:
+            pass
+
+        return None
+
+    def _is_system_app(self, app_name: str) -> bool:
+        """Check if an application is a system component that shouldn't be locked."""
+        system_apps = [
+            'microsoft', 'windows', 'system', 'update', 'driver', 'hotfix',
+            'security', 'defender', 'malware', 'antivirus', 'firewall',
+            'service pack', 'kb', 'patch', 'redistributable', 'runtime',
+            'visual c++', 'directx', '.net framework', 'silverlight'
+        ]
+
+        app_lower = app_name.lower()
+        return any(sys_app in app_lower for sys_app in system_apps)
+    
+    def _should_include_app(self, app: Dict[str, str]) -> bool:
+        """Check if an app should be included in the results."""
+        name = app.get('name', '').lower()
+        path = app.get('path', '').lower()
+        
+        # Exclude system utilities
+        if self._is_system_app(app.get('name', '')):
+            return False
+        
+        # Exclude if path is a directory (not an exe)
+        if path and not path.endswith('.exe'):
+            return False
+        
+        # Exclude common junk/shortcut names
+        exclude_names = [
+            'uninstall', 'setup', 'installer', 'update', 'patch', 'hotfix',
+            'readme', 'help', 'support', 'website', 'license', 'eula',
+            'shortcut', 'link', 'url', 'internet', 'default', 'unknown'
         ]
         
-        self.scan_progress.emit(f"Scanning {len(program_dirs)} directories...")
+        if any(excl in name for excl in exclude_names):
+            return False
         
-        for prog_dir in program_dirs:
-            if not os.path.exists(prog_dir):
-                continue
-            
-            self.scan_progress.emit(f"Scanning {prog_dir}...")
-            
-            try:
-                for root, dirs, files in os.walk(prog_dir):
-                    for file in files:
-                        if file.endswith('.exe'):
-                            filepath = os.path.join(root, file)
-                            name = os.path.splitext(file)[0]
-                            
-                            # Skip system files and installers
-                            if any(skip in name.lower() for skip in ['unins', 'uninst', 'setup', 'install']):
-                                continue
-                            
-                            # Avoid duplicates
-                            if not any(app['name'] == name for app in apps):
-                                apps.append({
-                                    'name': name,
-                                    'path': filepath,
-                                    'icon': filepath,  # Windows can extract icon from .exe
-                                    'category': self._categorize_windows_app(filepath),
-                                    'desktop_file': ''
-                                })
-                                self.scan_progress.emit(f"Found: {name}")
-            except (PermissionError, OSError) as e:
-                print(f"[Scanner] Error scanning {prog_dir}: {e}")
+        # Exclude if exe doesn't exist
+        if not os.path.exists(app.get('path', '')):
+            return False
         
-        return sorted(apps, key=lambda x: x['name'].lower())
+        return True
     
     def _categorize_windows_app(self, filepath: str) -> str:
+        """Categorize Windows app based on install location"""
+        filepath_lower = filepath.lower()
+        
+        if 'steam' in filepath_lower or 'games' in filepath_lower:
+            return 'Games'
+        elif 'microsoft office' in filepath_lower or 'libreoffice' in filepath_lower:
+            return 'Office'
+        elif any(x in filepath_lower for x in ['chrome', 'firefox', 'edge', 'browser']):
+            return 'Internet'
+        elif any(x in filepath_lower for x in ['vscode', 'visual studio', 'pycharm', 'intellij', 'eclipse']):
+            return 'Development'
+        elif any(x in filepath_lower for x in ['photoshop', 'gimp', 'paint', 'illustrator']):
+            return 'Graphics'
+        elif any(x in filepath_lower for x in ['vlc', 'media', 'spotify', 'itunes', 'winamp']):
+            return 'Multimedia'
+        elif 'system32' in filepath_lower or 'windows' in filepath_lower:
+            return 'System'
+        else:
+            return 'Other'
         """Categorize Windows app based on install location"""
         filepath_lower = filepath.lower()
         
@@ -382,7 +714,52 @@ class AppCard(QFrame):
         if not icon_name:
             return None
         
-        # Try common icon paths
+        # Windows: Try to extract icon from exe file
+        if sys.platform.startswith('win') and icon_name.endswith('.exe'):
+            try:
+                # Try to use Windows API to extract icon
+                import ctypes
+                from ctypes import wintypes
+                
+                # Load shell32.dll
+                shell32 = ctypes.windll.shell32
+                
+                # SHGetFileInfo function
+                SHGetFileInfo = shell32.SHGetFileInfoW
+                SHGetFileInfo.argtypes = [
+                    wintypes.LPWSTR,  # pszPath
+                    wintypes.DWORD,   # dwFileAttributes
+                    ctypes.POINTER(ctypes.c_void_p),  # psfi
+                    wintypes.UINT,    # cbFileInfo
+                    wintypes.UINT     # uFlags
+                ]
+                SHGetFileInfo.restype = wintypes.DWORD
+                
+                # SHFILEINFO structure
+                class SHFILEINFO(ctypes.Structure):
+                    _fields_ = [
+                        ('hIcon', wintypes.HICON),
+                        ('iIcon', ctypes.c_int),
+                        ('dwAttributes', wintypes.DWORD),
+                        ('szDisplayName', wintypes.WCHAR * 260),
+                        ('szTypeName', wintypes.WCHAR * 80),
+                    ]
+                
+                # Get icon
+                shfi = SHFILEINFO()
+                flags = 0x100  # SHGFI_ICON
+                result = SHGetFileInfo(icon_name, 0, ctypes.byref(shfi), ctypes.sizeof(shfi), flags)
+                
+                if result and shfi.hIcon:
+                    # Convert HICON to QPixmap
+                    # This is complex, so for now return None and use emoji fallback
+                    # TODO: Implement proper HICON to QPixmap conversion
+                    pass
+                    
+            except Exception:
+                pass
+        
+        # Linux: Try common icon paths
         icon_paths = [
             f"/usr/share/pixmaps/{icon_name}.png",
             f"/usr/share/pixmaps/{icon_name}.svg",
@@ -507,6 +884,8 @@ class AppScannerDialog(QDialog):
         self.category_filter = None
         # Track if we've centered on first show (for Wayland compatibility)
         self._first_show = True
+        # Loading overlay
+        self.loading_overlay = None
 
         self.init_ui()
         # Don't center here - will center on showEvent after dialog has proper size
@@ -637,6 +1016,37 @@ class AppScannerDialog(QDialog):
                 pass
         
         scroll.setWidget(self.scroll_widget)
+        
+        # Create loading overlay that covers the scroll area
+        self.loading_overlay = QWidget(scroll)
+        overlay_layout = QVBoxLayout(self.loading_overlay)
+        
+        loading_container = QWidget()
+        loading_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(43, 45, 58, 0.9);
+                border-radius: 10px;
+                padding: 20px;
+            }
+        """)
+        loading_inner_layout = QVBoxLayout(loading_container)
+        loading_inner_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        loading_label = QLabel("🔍 Scanning for applications...")
+        loading_label.setStyleSheet("""
+            QLabel {
+                color: #e5e7eb;
+                font-size: 16px;
+                font-weight: bold;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_label)
+        
+        overlay_layout.addWidget(loading_container, alignment=Qt.AlignmentFlag.AlignCenter)
+        overlay_layout.setContentsMargins(0, 0, 0, 0)
+        self.loading_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.5);")
+        self.loading_overlay.setVisible(True)  # Show initially
+        
         layout.addWidget(scroll, stretch=1)
         # keep a reference to the scroll area so we can use its viewport width for responsive math
         self.scroll_area = scroll
@@ -929,6 +1339,10 @@ class AppScannerDialog(QDialog):
     
     def display_results(self, apps: List[Dict[str, str]]):
         """Display scanned applications in grid."""
+        # Hide loading overlay
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.setVisible(False)
+        
         # Store scanned apps and add a normalized lowercase category key for reliable filtering
         self.scanned_apps = apps
         for a in self.scanned_apps:
