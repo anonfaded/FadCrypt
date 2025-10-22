@@ -2160,15 +2160,7 @@ class MainWindowBase(QMainWindow):
         """Save applications configuration to unified JSON file"""
         config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
         
-        # Temporarily unlock config if needed using file_lock_manager
-        should_relock = False
-        if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-            try:
-                self.file_lock_manager.temporarily_unlock_config('apps_config.json')
-                should_relock = True
-            except:
-                pass
-        
+        # apps_config.json is now daemon-protected, no need for permission unlocking
         # Load existing config to preserve locked files/folders
         existing_config = {"applications": [], "locked_files_and_folders": []}
         if os.path.exists(config_file):
@@ -2203,21 +2195,20 @@ class MainWindowBase(QMainWindow):
         }
         
         try:
-            with open(config_file, 'w') as f:
-                json.dump(unified_config, f, indent=4)
-            print(f"Applications config saved: {len(applications)} apps (preserved {len(unified_config.get('locked_files_and_folders', []))} locked items)")
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(unified_config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
             
-            # Also update the config tab display
-            self.update_config_display()
+            if success:
+                print(f"Applications config saved: {len(applications)} apps (preserved {len(unified_config.get('locked_files_and_folders', []))} locked items)")
+                
+                # Also update the config tab display
+                self.update_config_display()
+            else:
+                print(f"Error saving applications config: {error}")
         except Exception as e:
             print(f"Error saving applications config: {e}")
-        finally:
-            # Relock config if it was unlocked using file_lock_manager
-            if should_relock and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                try:
-                    self.file_lock_manager.relock_config('apps_config.json')
-                except:
-                    pass
     
     def update_config_display(self):
         """Update the config display in Config tab - show raw JSON with applications and locked files"""
@@ -2346,26 +2337,30 @@ class MainWindowBase(QMainWindow):
         # Check if any apps or locked items are added
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
         
-        # Get locked files/folders from config - handle locked config file
+        # Get locked files/folders from config - handle immutable protected config file
         locked_items = []
         try:
             config_file = os.path.join(self.get_fadcrypt_folder(), "apps_config.json")
             if os.path.exists(config_file):
-                # Temporarily unlock config if it's locked (chmod 000)
-                should_relock = False
-                if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-                    self.file_lock_manager.temporarily_unlock_config('apps_config.json')
-                    should_relock = True
+                # Temporarily unlock immutable file for reading
+                from core.file_protection import get_file_protection_manager
+                file_protection = get_file_protection_manager()
                 
-                try:
-                    with open(config_file, 'r') as f:
-                        import json
-                        config = json.load(f)
-                        locked_items = config.get('locked_files_and_folders', [])
-                finally:
-                    # Re-lock after reading
-                    if should_relock and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                        self.file_lock_manager.relock_config('apps_config.json')
+                unlock_success, unlock_error = file_protection.temporarily_unlock_file(config_file)
+                if not unlock_success:
+                    print(f"⚠️  Warning: Could not unlock config for reading: {unlock_error}")
+                    locked_items = []
+                else:
+                    try:
+                        with open(config_file, 'r') as f:
+                            import json
+                            config = json.load(f)
+                            locked_items = config.get('locked_files_and_folders', [])
+                    finally:
+                        # Re-lock after reading
+                        relock_success, relock_error = file_protection.relock_file(config_file)
+                        if not relock_success:
+                            print(f"⚠️  Warning: Could not relock config after reading: {relock_error}")
         except Exception as e:
             print(f"⚠️  Warning reading locked items at startup: {e}")
             locked_items = []
@@ -2396,16 +2391,10 @@ class MainWindowBase(QMainWindow):
         # CRITICAL: Check for crash recovery - unlock any stuck files from previous crash
         print("🔍 Checking for crash recovery...")
         if self.file_lock_manager:
-            if hasattr(self.file_lock_manager, 'unlock_all_with_configs'):
-                # Unlock all items silently (in case they're stuck from crash)
-                success, failed = self.file_lock_manager.unlock_all_with_configs(silent=True)
-                if success > 0:
-                    print(f"♻️  Crash recovery: Restored {success} stuck items from previous session")
-            else:
-                # Windows fallback
-                success, failed = self.file_lock_manager.unlock_all()
-                if success > 0:
-                    print(f"♻️  Crash recovery: Restored {success} stuck items")
+            # Unlock all application/file items (not config files - those are daemon-protected)
+            success, failed = self.file_lock_manager.unlock_all()
+            if success > 0:
+                print(f"♻️  Crash recovery: Restored {success} stuck items from previous session")
         
         # Initialize UnifiedMonitor
         from core.unified_monitor import UnifiedMonitor
@@ -2450,11 +2439,13 @@ class MainWindowBase(QMainWindow):
             file_protection = get_file_protection_manager()
             fadcrypt_folder = self.get_fadcrypt_folder()
             
-            # List of critical files to protect
+            # List of critical files to protect - these need to be writable by FadCrypt
+            # but should be protected from external tampering
             critical_files = [
                 os.path.join(fadcrypt_folder, "recovery_codes.json"),
                 os.path.join(fadcrypt_folder, "encrypted_password.bin"),
                 os.path.join(fadcrypt_folder, "apps_config.json"),
+                os.path.join(fadcrypt_folder, "monitoring_state.json"),
             ]
             
             # Filter to only existing files
@@ -2463,7 +2454,7 @@ class MainWindowBase(QMainWindow):
             if existing_files:
                 success_count, errors = file_protection.protect_multiple_files(existing_files)
                 if success_count > 0:
-                    print(f"✅ Protected {success_count}/{len(existing_files)} critical files")
+                    print(f"✅ Protected {success_count}/{len(existing_files)} immutable critical files")
                     print(f"✅ Works seamlessly after reboot (daemon auto-starts with root permissions)")
                 else:
                     error_msg = "❌ File protection failed - elevated daemon required to start monitoring"
@@ -2516,7 +2507,7 @@ class MainWindowBase(QMainWindow):
                 if self.file_lock_manager.start_monitoring():
                     print("✅ Fanotify monitoring started (kernel-level file access interception)")
                 else:
-                    print("⚠️  Failed to start fanotify monitoring")
+                    print("ℹ️  Fanotify monitoring skipped - no files/folders to monitor")
             
             # Log lock event
             self.log_activity(
@@ -2526,9 +2517,7 @@ class MainWindowBase(QMainWindow):
                 details=f"Locked {success} items"
                 )
                 
-            # Lock FadCrypt's own config files
-            print("🔒 Protecting FadCrypt config files...")
-            self.file_lock_manager.lock_fadcrypt_configs()
+            # Config files are now protected by daemon - no permission locking needed
         
         # Update UI button state
         self.update_monitoring_button_state(True)
@@ -2605,17 +2594,14 @@ class MainWindowBase(QMainWindow):
             # Save monitoring state to disk (for crash recovery)
             self.save_monitoring_state_to_disk()
             
-            # Unlock files and folders + config files
+            # Unlock files and folders (config files are daemon-protected)
             if self.file_lock_manager:
-                print("🔓 Unlocking files, folders, and config files...")
+                print("🔓 Unlocking files and folders...")
                 success, failed = self.file_lock_manager.unlock_all()
                 if success > 0:
                     print(f"✅ Unlocked {success} items")
                 if failed > 0:
                     print(f"⚠️  Failed to unlock {failed} items")
-                
-                # Unlock config files
-                self.file_lock_manager.unlock_fadcrypt_configs()
                 
                 # Log unlock event
                 self.log_activity(
@@ -2683,19 +2669,12 @@ class MainWindowBase(QMainWindow):
         import json
         state_file = os.path.join(self.get_fadcrypt_folder(), 'monitoring_state.json')
         
-        # Temporarily unlock config file if locked (for writing)
-        if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-            self.file_lock_manager.temporarily_unlock_config('monitoring_state.json')
-        
+        # monitoring_state.json is now daemon-protected, no need for permission unlocking
         try:
             with open(state_file, 'w') as f:
                 json.dump(self.monitoring_state, f, indent=4)
         except Exception as e:
             print(f"Error saving monitoring state: {e}")
-        finally:
-            # Re-lock config file if monitoring is active
-            if self.monitoring_active and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                self.file_lock_manager.relock_config('monitoring_state.json')
     
     def load_monitoring_state(self):
         """Load monitoring state from JSON file"""
@@ -2927,23 +2906,22 @@ class MainWindowBase(QMainWindow):
         import json
         state_file = os.path.join(self.get_fadcrypt_folder(), 'monitoring_state.json')
         
-        # Temporarily unlock config file if locked (for writing)
-        if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-            self.file_lock_manager.temporarily_unlock_config('monitoring_state.json')
-        
+        # monitoring_state.json may be daemon-protected, use safe write
         try:
             # Add monitoring_active flag
             self.monitoring_state['monitoring_active'] = self.monitoring_active
             
-            with open(state_file, 'w') as f:
-                json.dump(self.monitoring_state, f, indent=2)
-            print(f"💾 Saved monitoring state: active={self.monitoring_active}")
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(self.monitoring_state, indent=2)
+            success, error = safe_write_to_protected_file(state_file, content)
+            
+            if success:
+                print(f"💾 Saved monitoring state: active={self.monitoring_active}")
+            else:
+                print(f"❌ Error saving monitoring state: {error}")
         except Exception as e:
             print(f"❌ Error saving monitoring state: {e}")
-        finally:
-            # Re-lock config file if monitoring is active
-            if self.monitoring_active and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                self.file_lock_manager.relock_config('monitoring_state.json')
     
     def check_crash_recovery(self):
         """

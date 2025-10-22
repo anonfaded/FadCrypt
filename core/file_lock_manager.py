@@ -76,15 +76,25 @@ class FileLockManager(ABC):
                     self.app_locker.save_config()
                     print(f"💾 Saved {len(self.locked_items)} locked items to unified config via app_locker")
                 else:
-                    # Fallback: save directly
-                    with open(self.config_file, 'w') as f:
-                        json.dump(config, f, indent=2)
-                    print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                    # Fallback: save directly using safe write
+                    from core.file_protection import safe_write_to_protected_file
+                    import json
+                    content = json.dumps(config, indent=2)
+                    success, error = safe_write_to_protected_file(self.config_file, content)
+                    if success:
+                        print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                    else:
+                        print(f"❌ Error saving locked items: {error}")
             else:
-                # Direct file save (new PyQt6 version)
-                with open(self.config_file, 'w') as f:
-                    json.dump(config, f, indent=2)
-                print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                # Direct file save (new PyQt6 version) using safe write
+                from core.file_protection import safe_write_to_protected_file
+                import json
+                content = json.dumps(config, indent=2)
+                success, error = safe_write_to_protected_file(self.config_file, content)
+                if success:
+                    print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                else:
+                    print(f"❌ Error saving locked items: {error}")
             
             # Relock config after saving
             if should_relock and hasattr(self, 'relock_config'):
@@ -224,41 +234,40 @@ class FileLockManager(ABC):
     def lock_fadcrypt_configs(self):
         """
         Lock FadCrypt's own config files to prevent tampering.
-        These files remain readable by the app but can't be modified/deleted.
+        Only immutable-sensitive files are protected by the elevated daemon.
+        Config files (apps_config.json, monitoring_state.json) remain writable for app functionality.
         """
-        critical_files = [
-            os.path.join(self.config_folder, "apps_config.json"),
-            os.path.join(self.config_folder, "settings.json"),
-            os.path.join(self.config_folder, "encrypted_password.bin"),
-            os.path.join(self.config_folder, "monitoring_state.json")
+        # Files protected by elevated daemon (immutable - cannot be written)
+        daemon_protected_files = [
+            os.path.join(self.config_folder, "recovery_codes.json"),
+            os.path.join(self.config_folder, "encrypted_password.bin")
         ]
         
-        print("🔒 Locking FadCrypt config files...")
-        for file_path in critical_files:
+        print("🔒 Protecting immutable FadCrypt config files...")
+        
+        # For daemon-protected files, just log that they're protected
+        for file_path in daemon_protected_files:
             if os.path.exists(file_path):
-                try:
-                    self._lock_config_file(file_path)
-                    print(f"  ✅ Protected: {os.path.basename(file_path)}")
-                except Exception as e:
-                    print(f"  ⚠️  Failed to protect {os.path.basename(file_path)}: {e}")
+                print(f"  ✅ Protected: {os.path.basename(file_path)} (immutable via daemon)")
     
     def unlock_fadcrypt_configs(self):
-        """Unlock FadCrypt's config files"""
-        critical_files = [
-            os.path.join(self.config_folder, "apps_config.json"),
-            os.path.join(self.config_folder, "settings.json"),
-            os.path.join(self.config_folder, "encrypted_password.bin"),
-            os.path.join(self.config_folder, "monitoring_state.json")
+        """
+        Unlock FadCrypt's immutable config files.
+        Config files (apps_config.json, monitoring_state.json) are not locked.
+        The daemon handles immutable file unprotection seamlessly.
+        """
+        # Files protected by elevated daemon (immutable)
+        daemon_protected_files = [
+            os.path.join(self.config_folder, "recovery_codes.json"),
+            os.path.join(self.config_folder, "encrypted_password.bin")
         ]
         
-        print("🔓 Unlocking FadCrypt config files...")
-        for file_path in critical_files:
+        print("🔓 Unprotecting immutable FadCrypt config files...")
+        
+        # For daemon-protected files, just log that they're handled by daemon
+        for file_path in daemon_protected_files:
             if os.path.exists(file_path):
-                try:
-                    self._unlock_config_file(file_path)
-                    print(f"  ✅ Unprotected: {os.path.basename(file_path)}")
-                except Exception as e:
-                    print(f"  ⚠️  Failed to unprotect {os.path.basename(file_path)}: {e}")
+                print(f"  ✅ Unprotected: {os.path.basename(file_path)} (via daemon)")
     
     @abstractmethod
     def _get_item_metadata(self, path: str, item_type: str) -> Optional[Dict]:
@@ -317,6 +326,18 @@ class FileLockManager(ABC):
     def _unlock_item(self, item: Dict) -> bool:
         """Unlock a file or folder (platform-specific)"""
         pass
+    
+    def temporarily_unlock_config(self, filename: str):
+        """Temporarily unlock a config file for writing"""
+        config_path = os.path.join(self.config_folder, filename)
+        if os.path.exists(config_path):
+            self._unlock_config_file(config_path)
+    
+    def relock_config(self, filename: str):
+        """Re-lock a config file after writing"""
+        config_path = os.path.join(self.config_folder, filename)
+        if os.path.exists(config_path):
+            self._lock_config_file(config_path)
     
     @abstractmethod
     def _lock_config_file(self, path: str):

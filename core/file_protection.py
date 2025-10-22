@@ -554,17 +554,166 @@ class FileProtectionManager:
         """
         return self.protected_files.copy()
     
-    def is_file_protected(self, file_path: str) -> bool:
+    def temporarily_unlock_file(self, file_path: str) -> Tuple[bool, Optional[str]]:
         """
-        Check if a file is currently protected.
+        Temporarily unlock a file for writing by FadCrypt.
+        
+        This removes immutable flags temporarily so FadCrypt can write to the file,
+        then the caller should call relock_file() after writing.
         
         Args:
-            file_path: Path to file
+            file_path: Path to file to temporarily unlock
             
         Returns:
-            True if file is in protected list
+            Tuple of (success: bool, error_message: Optional[str])
         """
-        return file_path in self.protected_files
+        if not os.path.exists(file_path):
+            return False, f"File not found: {file_path}"
+        
+        filename = os.path.basename(file_path)
+        print(f"[FileProtection] 🔓 Temporarily unlocking {filename} for FadCrypt write...")
+        
+        try:
+            if IS_LINUX:
+                # Check if file is immutable
+                if self._verify_immutable_flag(file_path):
+                    # Remove immutable flag temporarily
+                    success, error = self._try_chattr_with_daemon([file_path], set_immutable=False)
+                    if not success:
+                        return False, f"Failed to remove immutable flag: {error}"
+                    
+                    print(f"[FileProtection] ✅ Removed immutable flag from {filename}")
+                    return True, None
+                else:
+                    print(f"[FileProtection] ℹ️  {filename} not immutable, no unlock needed")
+                    return True, None
+                    
+            elif IS_WINDOWS:
+                # On Windows, we might need to temporarily remove read-only attribute
+                if WINDOWS_AVAILABLE:
+                    # Check if file is read-only
+                    attrs = windll.kernel32.GetFileAttributesW(file_path)
+                    if attrs & self.FILE_ATTRIBUTE_READONLY:
+                        # Remove read-only attribute temporarily
+                        new_attrs = attrs & ~self.FILE_ATTRIBUTE_READONLY
+                        result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
+                        if result == 0:
+                            error_code = windll.kernel32.GetLastError()
+                            return False, f"Failed to remove read-only: {error_code}"
+                        
+                        print(f"[FileProtection] ✅ Removed read-only from {filename}")
+                        return True, None
+                    else:
+                        print(f"[FileProtection] ℹ️  {filename} not read-only, no unlock needed")
+                        return True, None
+                else:
+                    return False, "Windows ctypes not available"
+            else:
+                return False, f"Unsupported platform: {sys.platform}"
+                
+        except Exception as e:
+            return False, f"Exception unlocking file: {e}"
+    
+    def relock_file(self, file_path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Re-lock a file after FadCrypt has finished writing.
+        
+        This restores the immutable/read-only protection.
+        
+        Args:
+            file_path: Path to file to relock
+            
+        Returns:
+            Tuple of (success: bool, error_message: Optional[str])
+        """
+        if not os.path.exists(file_path):
+            return False, f"File not found: {file_path}"
+        
+        filename = os.path.basename(file_path)
+        print(f"[FileProtection] 🔒 Re-locking {filename} after FadCrypt write...")
+        
+        try:
+            if IS_LINUX:
+                # Re-apply immutable flag
+                success, error = self._try_chattr_with_daemon([file_path], set_immutable=True)
+                if not success:
+                    return False, f"Failed to set immutable flag: {error}"
+                
+                print(f"[FileProtection] ✅ Re-applied immutable flag to {filename}")
+                return True, None
+                
+            elif IS_WINDOWS:
+                # On Windows, restore read-only attribute
+                if WINDOWS_AVAILABLE:
+                    # Set read-only attribute
+                    attrs = windll.kernel32.GetFileAttributesW(file_path)
+                    new_attrs = attrs | self.FILE_ATTRIBUTE_READONLY
+                    result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
+                    if result == 0:
+                        error_code = windll.kernel32.GetLastError()
+                        return False, f"Failed to set read-only: {error_code}"
+                    
+                    print(f"[FileProtection] ✅ Re-applied read-only to {filename}")
+                    return True, None
+                else:
+                    return False, "Windows ctypes not available"
+            else:
+                return False, f"Unsupported platform: {sys.platform}"
+                
+        except Exception as e:
+            return False, f"Exception relocking file: {e}"
+
+
+def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') -> Tuple[bool, Optional[str]]:
+    """
+    Safely write to a protected file by temporarily unlocking it.
+    
+    This function:
+    1. Temporarily removes protection (immutable/read-only)
+    2. Writes the content
+    3. Re-applies protection
+    4. Logs all operations
+    
+    Args:
+        file_path: Path to the file to write
+        content: Content to write
+        mode: File mode ('w' for text, 'wb' for binary)
+    
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    manager = get_file_protection_manager()
+    filename = os.path.basename(file_path)
+    
+    print(f"[SafeWrite] 🔐 Starting safe write to protected file: {filename}")
+    
+    # Step 1: Temporarily unlock
+    unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
+    if not unlock_success:
+        error_msg = f"Failed to unlock {filename}: {unlock_error}"
+        print(f"[SafeWrite] ❌ {error_msg}")
+        return False, error_msg
+    
+    # Step 2: Write content
+    try:
+        print(f"[SafeWrite] ✍️  Writing content to {filename}...")
+        with open(file_path, mode) as f:
+            f.write(content)
+        print(f"[SafeWrite] ✅ Successfully wrote to {filename}")
+    except Exception as e:
+        error_msg = f"Failed to write to {filename}: {e}"
+        print(f"[SafeWrite] ❌ {error_msg}")
+        return False, error_msg
+    
+    # Step 3: Re-lock
+    relock_success, relock_error = manager.relock_file(file_path)
+    if not relock_success:
+        error_msg = f"Failed to relock {filename}: {relock_error}"
+        print(f"[SafeWrite] ❌ {error_msg}")
+        return False, error_msg
+    
+    print(f"[SafeWrite] 🔒 Safe write completed successfully for {filename}")
+    return True, None
 
 
 # Singleton instance
