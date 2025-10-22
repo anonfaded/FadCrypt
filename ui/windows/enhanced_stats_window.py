@@ -318,6 +318,10 @@ class EnhancedStatsWindow(QWidget):
     def init_ui(self):
         """Initialize UI"""
         self.setWindowTitle("FadCrypt Statistics & Analytics")
+        
+        # Set window flags to appear in taskbar on Windows
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
+        
         self.setGeometry(100, 100, 1200, 800)
         
         # Dark theme

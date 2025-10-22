@@ -589,22 +589,26 @@ class FileProtectionManager:
                     return True, None
                     
             elif IS_WINDOWS:
-                # On Windows, we might need to temporarily remove read-only attribute
+                # On Windows, we need to temporarily remove HIDDEN + SYSTEM + READONLY attributes
                 if WINDOWS_AVAILABLE:
-                    # Check if file is read-only
+                    # Get current attributes
                     attrs = windll.kernel32.GetFileAttributesW(file_path)
-                    if attrs & self.FILE_ATTRIBUTE_READONLY:
-                        # Remove read-only attribute temporarily
-                        new_attrs = attrs & ~self.FILE_ATTRIBUTE_READONLY
+                    
+                    # Check if file has any protection attributes
+                    has_protection = bool(attrs & (self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM))
+                    
+                    if has_protection:
+                        # Remove all protection attributes temporarily (set to NORMAL)
+                        new_attrs = attrs & ~(self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM)
                         result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
                         if result == 0:
                             error_code = windll.kernel32.GetLastError()
-                            return False, f"Failed to remove read-only: {error_code}"
+                            return False, f"Failed to remove protection attributes: {error_code}"
                         
-                        print(f"[FileProtection] ✅ Removed read-only from {filename}")
+                        print(f"[FileProtection] ✅ Removed HIDDEN+SYSTEM+READONLY from {filename}")
                         return True, None
                     else:
-                        print(f"[FileProtection] ℹ️  {filename} not read-only, no unlock needed")
+                        print(f"[FileProtection] ℹ️  {filename} not protected, no unlock needed")
                         return True, None
                 else:
                     return False, "Windows ctypes not available"
@@ -643,17 +647,19 @@ class FileProtectionManager:
                 return True, None
                 
             elif IS_WINDOWS:
-                # On Windows, restore read-only attribute
+                # On Windows, restore HIDDEN + SYSTEM + READONLY attributes
                 if WINDOWS_AVAILABLE:
-                    # Set read-only attribute
+                    # Get current attributes
                     attrs = windll.kernel32.GetFileAttributesW(file_path)
-                    new_attrs = attrs | self.FILE_ATTRIBUTE_READONLY
+                    
+                    # Add all protection attributes
+                    new_attrs = attrs | self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM
                     result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
                     if result == 0:
                         error_code = windll.kernel32.GetLastError()
-                        return False, f"Failed to set read-only: {error_code}"
+                        return False, f"Failed to set protection attributes: {error_code}"
                     
-                    print(f"[FileProtection] ✅ Re-applied read-only to {filename}")
+                    print(f"[FileProtection] ✅ Re-applied HIDDEN+SYSTEM+READONLY to {filename}")
                     return True, None
                 else:
                     return False, "Windows ctypes not available"

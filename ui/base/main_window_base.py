@@ -2667,17 +2667,14 @@ class MainWindowBase(QMainWindow):
     def save_monitoring_state(self):
         """Save monitoring state to JSON file"""
         import json
-        from core.file_protection import safe_write_to_protected_file
         
         state_file = os.path.join(self.get_fadcrypt_folder(), 'monitoring_state.json')
         
         try:
             # Include monitoring_active flag
             self.monitoring_state['monitoring_active'] = self.monitoring_active
-            content = json.dumps(self.monitoring_state, indent=4)
-            success, error = safe_write_to_protected_file(state_file, content)
-            if not success:
-                print(f"Error saving monitoring state: {error}")
+            with open(state_file, 'w') as f:
+                json.dump(self.monitoring_state, f, indent=4)
         except Exception as e:
             print(f"Error saving monitoring state: {e}")
     
