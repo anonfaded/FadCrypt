@@ -669,10 +669,12 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
     Safely write to a protected file by temporarily unlocking it.
     
     This function:
-    1. Temporarily removes protection (immutable/read-only)
+    1. Temporarily removes protection (immutable/read-only) if file exists
     2. Writes the content
     3. Re-applies protection
     4. Logs all operations
+    
+    If the file doesn't exist, it writes normally and then protects it.
     
     Args:
         file_path: Path to the file to write
@@ -687,12 +689,17 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
     
     print(f"[SafeWrite] 🔐 Starting safe write to protected file: {filename}")
     
-    # Step 1: Temporarily unlock
-    unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
-    if not unlock_success:
-        error_msg = f"Failed to unlock {filename}: {unlock_error}"
-        print(f"[SafeWrite] ❌ {error_msg}")
-        return False, error_msg
+    file_exists = os.path.exists(file_path)
+    
+    if file_exists:
+        # Step 1: Temporarily unlock existing file
+        unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
+        if not unlock_success:
+            error_msg = f"Failed to unlock {filename}: {unlock_error}"
+            print(f"[SafeWrite] ❌ {error_msg}")
+            return False, error_msg
+    else:
+        print(f"[SafeWrite] ℹ️  {filename} doesn't exist yet, will create and protect")
     
     # Step 2: Write content
     try:
@@ -705,10 +712,10 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
         print(f"[SafeWrite] ❌ {error_msg}")
         return False, error_msg
     
-    # Step 3: Re-lock
+    # Step 3: Re-lock (or initially protect)
     relock_success, relock_error = manager.relock_file(file_path)
     if not relock_success:
-        error_msg = f"Failed to relock {filename}: {relock_error}"
+        error_msg = f"Failed to protect {filename}: {relock_error}"
         print(f"[SafeWrite] ❌ {error_msg}")
         return False, error_msg
     
