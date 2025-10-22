@@ -144,18 +144,39 @@ class AppCard(QFrame):
         """Load icon for the application"""
         try:
             # Windows: Try to extract icon from exe file
-            if os.name == 'nt' and self.app_path.lower().endswith('.exe'):
-                try:
-                    pixmap = self._extract_windows_icon(self.app_path)
-                    if pixmap:
-                        return pixmap
-                except Exception as e:
-                    print(f"Error extracting Windows icon for {self.app_name}: {e}")
+            if os.name == 'nt':
+                # First try direct extraction if it's an exe
+                if self.app_path.lower().endswith('.exe'):
+                    try:
+                        pixmap = self._extract_windows_icon(self.app_path)
+                        if pixmap:
+                            return pixmap
+                    except Exception as e:
+                        print(f"Error extracting Windows icon from {self.app_path}: {e}")
+                
+                # Try to find exe path via Windows-specific methods
+                exe_path = self._find_windows_icon()
+                if exe_path and exe_path.lower().endswith('.exe'):
+                    try:
+                        pixmap = self._extract_windows_icon(exe_path)
+                        if pixmap:
+                            return pixmap
+                    except Exception as e:
+                        print(f"Error extracting Windows icon from {exe_path}: {e}")
             
-            # Try to find icon from .desktop file (Linux)
+            # Try to find icon from .desktop file (Linux) or Windows methods
             icon_path = self.find_desktop_icon()
-            if icon_path and os.path.exists(icon_path):
-                if not icon_path.endswith('.svg'):
+            if icon_path:
+                if os.name == 'nt' and icon_path.lower().endswith('.exe'):
+                    # For Windows, if we found an exe, extract icon from it
+                    try:
+                        pixmap = self._extract_windows_icon(icon_path)
+                        if pixmap:
+                            return pixmap
+                    except Exception as e:
+                        print(f"Error extracting Windows icon from desktop icon path {icon_path}: {e}")
+                elif not icon_path.endswith('.svg'):
+                    # For Linux or direct icon paths
                     return QPixmap(icon_path)
             
             # Try common icon locations (Linux)
@@ -280,11 +301,14 @@ class AppCard(QFrame):
                 width = bitmap.bmWidth
                 height = bitmap.bmHeight
                 
-                if width <= 0 or height <= 0:
+                if width <= 0 or height <= 0 or width > 256 or height > 256:
                     return None
                 
-                # Get bitmap bits
+                # Get bitmap bits - limit size to prevent overflow
                 bmp_size = width * height * 4  # Assume 32-bit
+                if bmp_size > 1024 * 1024:  # 1MB limit
+                    return None
+                    
                 bmp_data = (ctypes.c_byte * bmp_size)()
                 
                 GetBitmapBits = gdi32.GetBitmapBits
@@ -320,7 +344,18 @@ class AppCard(QFrame):
         return None
     
     def find_desktop_icon(self):
-        """Find icon from .desktop file"""
+        """Find icon from .desktop file (Linux) or Windows shortcuts/registry (Windows)"""
+        try:
+            if os.name == 'nt':  # Windows
+                return self._find_windows_icon()
+            else:  # Linux/Unix
+                return self._find_linux_icon()
+        except Exception as e:
+            print(f"Error finding desktop icon: {e}")
+        return None
+    
+    def _find_linux_icon(self):
+        """Find icon from .desktop file (Linux)"""
         try:
             desktop_dirs = [
                 '/usr/share/applications',
@@ -360,7 +395,116 @@ class AppCard(QFrame):
                     except:
                         continue
         except Exception as e:
-            print(f"Error finding desktop icon: {e}")
+            print(f"Error finding Linux desktop icon: {e}")
+        return None
+    
+    def _find_windows_icon(self):
+        """Find icon for Windows applications"""
+        try:
+            # If it's already an exe file, use it for icon extraction
+            if self.app_path.lower().endswith('.exe') and os.path.exists(self.app_path):
+                return self.app_path
+            
+            # Try to find the exe file if we have a shortcut or other reference
+            exe_path = self._resolve_windows_exe_path()
+            if exe_path and os.path.exists(exe_path):
+                return exe_path
+            
+            # Try common icon locations for the app name
+            app_name = os.path.basename(self.app_path).lower().replace('.exe', '')
+            icon_locations = [
+                f"C:\\Program Files\\{app_name}\\{app_name}.exe",
+                f"C:\\Program Files (x86)\\{app_name}\\{app_name}.exe",
+                f"C:\\Program Files\\{app_name}\\bin\\{app_name}.exe",
+                f"C:\\Program Files (x86)\\{app_name}\\bin\\{app_name}.exe",
+            ]
+            
+            for path in icon_locations:
+                if os.path.exists(path):
+                    return path
+                    
+        except Exception as e:
+            print(f"Error finding Windows icon: {e}")
+        return None
+    
+    def _resolve_windows_exe_path(self):
+        """Try to resolve the actual exe path from various Windows references"""
+        try:
+            # If it's a .lnk file, try to parse it
+            if self.app_path.lower().endswith('.lnk'):
+                return self._parse_lnk_target(self.app_path)
+            
+            # If it's in Start Menu or Desktop, look for the actual exe
+            # This is a simplified approach - in a real implementation you'd use Windows APIs
+            app_name = os.path.basename(self.app_path).lower().replace('.exe', '')
+            
+            # Common locations to search
+            search_paths = [
+                r"C:\Program Files",
+                r"C:\Program Files (x86)",
+                r"C:\Users\Public\Desktop",
+                os.path.expanduser(r"~\Desktop"),
+            ]
+            
+            for base_path in search_paths:
+                if os.path.exists(base_path):
+                    for root, dirs, files in os.walk(base_path):
+                        for file in files:
+                            if file.lower() == f"{app_name}.exe":
+                                return os.path.join(root, file)
+                                
+        except Exception as e:
+            print(f"Error resolving Windows exe path: {e}")
+        return None
+    
+    def _parse_lnk_target(self, lnk_path):
+        """Simple .lnk file parser to extract target path"""
+        try:
+            # Try using win32com if available
+            import pythoncom
+            from win32com.shell import shell
+            
+            shortcut = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink,
+                None,
+                pythoncom.CLSCTX_INPROC_SERVER,
+                shell.IID_IShellLink
+            )
+            
+            persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+            persist_file.Load(lnk_path)
+            
+            target_path = shortcut.GetPath(0)[0]
+            return target_path if target_path and target_path.endswith('.exe') else None
+            
+        except ImportError:
+            # Fallback: basic binary parsing
+            try:
+                with open(lnk_path, 'rb') as f:
+                    data = f.read()
+                
+                data_str = data.decode('latin-1', errors='ignore')
+                
+                # Look for exe paths in the binary data
+                if '.exe' in data_str:
+                    # Find the last .exe occurrence (usually the target)
+                    exe_pos = data_str.rfind('.exe')
+                    if exe_pos != -1:
+                        # Look backwards for path start
+                        start_pos = max(0, exe_pos - 200)  # Reasonable limit
+                        path_segment = data_str[start_pos:exe_pos + 4]
+                        
+                        # Find potential drive letter
+                        for i in range(len(path_segment) - 1, -1, -1):
+                            if path_segment[i] in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' and i + 1 < len(path_segment) and path_segment[i + 1] == ':':
+                                potential_path = path_segment[i:]
+                                if os.path.exists(potential_path):
+                                    return potential_path
+                                break
+                                
+            except Exception as e:
+                print(f"Error parsing lnk file: {e}")
+                
         return None
     
     def find_icon_by_name(self, icon_name):
