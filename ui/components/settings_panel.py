@@ -500,6 +500,5 @@ class SettingsPanel(QWidget):
             return (
                 "Protects critical files (config, password, recovery codes) from deletion/modification during monitoring. "
                 "Files are made immutable (chattr +i) - even root cannot delete them! "
-                "When you stop monitoring, you'll be prompted to authorize file unlocking. "
-                "⚠️  Note: Requires elevated daemon service to protect and unprotect files."
+                "When you stop monitoring, files will be automatically unlocked. "
             )

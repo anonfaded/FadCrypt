@@ -588,19 +588,12 @@ class MainWindowBase(QMainWindow):
         """)
         sidebar_layout.addWidget(security_label)
         
-        # Create Password button - only shown if no password exists
-        self.create_pass_button = QPushButton("Create Password")
-        self.create_pass_button.setFixedWidth(180)
-        self.create_pass_button.setStyleSheet(button_style)
-        self.create_pass_button.clicked.connect(self.on_create_password)
-        sidebar_layout.addWidget(self.create_pass_button)
-        
-        # Change Password button - always visible
-        self.change_pass_button = QPushButton("Change Password")
-        self.change_pass_button.setFixedWidth(180)
-        self.change_pass_button.setStyleSheet(button_style)
-        self.change_pass_button.clicked.connect(self.on_change_password)
-        sidebar_layout.addWidget(self.change_pass_button)
+        # Password button - text and visibility changes based on password existence
+        self.password_button = QPushButton("Create Password")
+        self.password_button.setFixedWidth(180)
+        self.password_button.setStyleSheet(button_style)
+        self.password_button.clicked.connect(self.on_password_button_click)
+        sidebar_layout.addWidget(self.password_button)
         
         sidebar_layout.addSpacing(10)
         
@@ -1667,14 +1660,22 @@ class MainWindowBase(QMainWindow):
         self.app_count_label.setText(f"Applications: {count}")
     
     def update_password_buttons_visibility(self):
-        """Update visibility of Create/Change Password buttons based on password existence"""
+        """Update text and visibility of password button based on password existence"""
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         password_exists = os.path.exists(password_file)
         
-        # Show Create Password only if no password exists
-        self.create_pass_button.setVisible(not password_exists)
-        # Change Password is always visible
-        self.change_pass_button.setVisible(True)
+        if password_exists:
+            self.password_button.setText("Update Password")
+        else:
+            self.password_button.setText("Create Password")
+    
+    def on_password_button_click(self):
+        """Handle password button click - creates or updates based on current state"""
+        password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
+        if os.path.exists(password_file):
+            self.on_change_password()
+        else:
+            self.on_create_password()
     
     def remove_application(self):
         """Remove selected applications from the list"""

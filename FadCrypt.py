@@ -334,9 +334,11 @@ def main():
     
     # Show window after splash closes
     def show_window():
-        window.show()
-        # Re-center after window is fully rendered
-        QTimer.singleShot(100, window.center_on_screen)
+        # In auto-monitor mode, skip showing the UI entirely for silent operation
+        if not window.auto_monitor_mode:
+            window.show()
+            # Re-center after window is fully rendered
+            QTimer.singleShot(100, window.center_on_screen)
         
         # Start file monitor for config protection
         # This monitors config files and auto-restores them if deleted
