@@ -184,6 +184,12 @@ class AppScannerThread(QThread):
             if not any(existing['name'] == app['name'] for existing in apps):
                 apps.append(app)
 
+        # Method 4: Scan common installation directories
+        common_apps = self._scan_windows_common_dirs()
+        for app in common_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                apps.append(app)
+
         # Filter out system utilities and junk apps
         filtered_apps = []
         for app in apps:
@@ -191,6 +197,74 @@ class AppScannerThread(QThread):
                 filtered_apps.append(app)
 
         return sorted(filtered_apps, key=lambda x: x['name'].lower())
+
+    def _scan_windows_common_dirs(self) -> List[Dict[str, str]]:
+        """Scan common Windows installation directories for applications."""
+        apps = []
+        
+        # Common installation directories
+        common_dirs = [
+            r"C:\Program Files",
+            r"C:\Program Files (x86)",
+            r"C:\Program Files\Microsoft Visual Studio",
+            r"C:\Program Files (x86)\Microsoft Visual Studio",
+            r"C:\Users\Public\Desktop",  # Sometimes apps put shortcuts here
+        ]
+        
+        # Common development tools and their typical exe names
+        dev_tools = {
+            'Visual Studio': ['devenv.exe', 'VSCode.exe'],
+            'Visual Studio Code': ['Code.exe'],
+            'JetBrains': ['idea.exe', 'idea64.exe', 'pycharm.exe', 'pycharm64.exe', 'webstorm.exe', 'webstorm64.exe'],
+            'Eclipse': ['eclipse.exe'],
+            'Notepad++': ['notepad++.exe'],
+            'Sublime Text': ['sublime_text.exe'],
+            'Atom': ['atom.exe'],
+            'Brackets': ['Brackets.exe'],
+        }
+        
+        self.scan_progress.emit("Scanning common directories...")
+        
+        for base_dir in common_dirs:
+            if not os.path.exists(base_dir):
+                continue
+                
+            try:
+                # Look for development tools specifically
+                for tool_category, exe_names in dev_tools.items():
+                    for root, dirs, files in os.walk(base_dir):
+                        for exe_name in exe_names:
+                            if exe_name in files:
+                                exe_path = os.path.join(root, exe_name)
+                                if os.path.exists(exe_path):
+                                    # Create a reasonable display name
+                                    if 'Visual Studio' in tool_category and 'devenv' in exe_name:
+                                        display_name = 'Visual Studio'
+                                    elif 'Code' in exe_name:
+                                        display_name = 'Visual Studio Code'
+                                    else:
+                                        display_name = tool_category
+                                    
+                                    app_info = {
+                                        'name': display_name,
+                                        'path': exe_path,
+                                        'icon': exe_path,
+                                        'category': 'Development',
+                                        'desktop_file': exe_path
+                                    }
+                                    
+                                    # Avoid duplicates
+                                    if not any(app['name'] == app_info['name'] for app in apps):
+                                        apps.append(app_info)
+                                        self.scan_progress.emit(f"Found: {display_name}")
+                                        break  # Found this tool, move to next category
+                        if any(app['name'] == tool_category for app in apps):
+                            break  # Already found this tool category
+                            
+            except (PermissionError, OSError) as e:
+                print(f"[Scanner] Error scanning {base_dir}: {e}")
+        
+        return apps
 
     def _scan_windows_start_menu(self) -> List[Dict[str, str]]:
         """Scan Windows Start Menu for application shortcuts."""
@@ -711,70 +785,186 @@ class AppCard(QFrame):
     def load_app_icon(self) -> Optional[QPixmap]:
         """Load application icon from system."""
         icon_name = self.app_data.get('icon', '')
+        app_name = self.app_data.get('name', 'Unknown')
+        
         if not icon_name:
+            print(f"[IconLoader] No icon name for app: {app_name}")
             return None
+        
+        print(f"[IconLoader] Loading icon for {app_name} from: {icon_name}")
         
         # Windows: Try to extract icon from exe file
         if sys.platform.startswith('win') and icon_name.endswith('.exe'):
             try:
-                # Try to use Windows API to extract icon
-                import ctypes
-                from ctypes import wintypes
+                print(f"[IconLoader] Attempting to load Windows exe icon: {icon_name}")
                 
-                # Load shell32.dll
-                shell32 = ctypes.windll.shell32
+                # Method 1: Try to find associated icon file first (fastest)
+                exe_dir = os.path.dirname(icon_name)
+                exe_basename = os.path.splitext(os.path.basename(icon_name))[0]
                 
-                # SHGetFileInfo function
-                SHGetFileInfo = shell32.SHGetFileInfoW
-                SHGetFileInfo.argtypes = [
-                    wintypes.LPWSTR,  # pszPath
-                    wintypes.DWORD,   # dwFileAttributes
-                    ctypes.POINTER(ctypes.c_void_p),  # psfi
-                    wintypes.UINT,    # cbFileInfo
-                    wintypes.UINT     # uFlags
+                # Common icon file patterns
+                icon_candidates = [
+                    os.path.join(exe_dir, f"{exe_basename}.ico"),
+                    os.path.join(exe_dir, "icon.ico"),
+                    os.path.join(exe_dir, f"{exe_basename}.png"),
+                    os.path.join(exe_dir, "icon.png")
                 ]
-                SHGetFileInfo.restype = wintypes.DWORD
                 
-                # SHFILEINFO structure
-                class SHFILEINFO(ctypes.Structure):
-                    _fields_ = [
-                        ('hIcon', wintypes.HICON),
-                        ('iIcon', ctypes.c_int),
-                        ('dwAttributes', wintypes.DWORD),
-                        ('szDisplayName', wintypes.WCHAR * 260),
-                        ('szTypeName', wintypes.WCHAR * 80),
-                    ]
+                for icon_path in icon_candidates:
+                    if os.path.exists(icon_path):
+                        pixmap = QPixmap(icon_path)
+                        if not pixmap.isNull():
+                            print(f"[IconLoader] ✅ Found associated icon file: {icon_path} for {app_name}")
+                            return pixmap
                 
-                # Get icon
-                shfi = SHFILEINFO()
-                flags = 0x100  # SHGFI_ICON
-                result = SHGetFileInfo(icon_name, 0, ctypes.byref(shfi), ctypes.sizeof(shfi), flags)
-                
-                if result and shfi.hIcon:
-                    # Convert HICON to QPixmap
-                    # This is complex, so for now return None and use emoji fallback
-                    # TODO: Implement proper HICON to QPixmap conversion
-                    pass
+                # Method 2: Extract icon from exe using Windows API
+                try:
+                    import ctypes
+                    from ctypes import wintypes
                     
-            except Exception:
-                pass
+                    # Load required DLLs
+                    user32 = ctypes.windll.user32
+                    shell32 = ctypes.windll.shell32
+                    
+                    # SHGetFileInfo function (more reliable than ExtractIconEx)
+                    SHGetFileInfoW = shell32.SHGetFileInfoW
+                    SHGetFileInfoW.argtypes = [
+                        wintypes.LPCWSTR,  # pszPath
+                        wintypes.DWORD,    # dwFileAttributes
+                        ctypes.c_void_p,   # psfi
+                        ctypes.c_uint,     # cbFileInfo
+                        ctypes.c_uint      # uFlags
+                    ]
+                    SHGetFileInfoW.restype = wintypes.DWORD
+                    
+                    # SHFILEINFO structure
+                    class SHFILEINFO(ctypes.Structure):
+                        _fields_ = [
+                            ('hIcon', wintypes.HICON),
+                            ('iIcon', ctypes.c_int),
+                            ('dwAttributes', wintypes.DWORD),
+                            ('szDisplayName', wintypes.WCHAR * 260),
+                            ('szTypeName', wintypes.WCHAR * 80),
+                        ]
+                    
+                    # Flags for SHGetFileInfo
+                    SHGFI_ICON = 0x000000100
+                    SHGFI_LARGEICON = 0x000000000
+                    
+                    # Get the file info with icon
+                    shfi = SHFILEINFO()
+                    flags = SHGFI_ICON | SHGFI_LARGEICON
+                    
+                    result = SHGetFileInfoW(icon_name, 0, ctypes.byref(shfi), ctypes.sizeof(SHFILEINFO), flags)
+                    
+                    if result and shfi.hIcon:
+                        print(f"[IconLoader] SHGetFileInfo succeeded for: {app_name}")
+                        
+                        # Convert HICON to QPixmap
+                        try:
+                            # Create QImage from HICON
+                            # Get icon dimensions
+                            class ICONINFO(ctypes.Structure):
+                                _fields_ = [
+                                    ('fIcon', wintypes.BOOL),
+                                    ('xHotspot', wintypes.DWORD),
+                                    ('yHotspot', wintypes.DWORD),
+                                    ('hbmMask', wintypes.HBITMAP),
+                                    ('hbmColor', wintypes.HBITMAP),
+                                ]
+                            
+                            GetIconInfo = user32.GetIconInfo
+                            GetIconInfo.argtypes = [wintypes.HICON, ctypes.POINTER(ICONINFO)]
+                            GetIconInfo.restype = wintypes.BOOL
+                            
+                            icon_info = ICONINFO()
+                            if GetIconInfo(shfi.hIcon, ctypes.byref(icon_info)):
+                                # Get bitmap info for color bitmap
+                                class BITMAP(ctypes.Structure):
+                                    _fields_ = [
+                                        ('bmType', wintypes.LONG),
+                                        ('bmWidth', wintypes.LONG),
+                                        ('bmHeight', wintypes.LONG),
+                                        ('bmWidthBytes', wintypes.LONG),
+                                        ('bmPlanes', wintypes.WORD),
+                                        ('bmBitsPixel', wintypes.WORD),
+                                        ('bmBits', wintypes.LPVOID),
+                                    ]
+                                
+                                GetObjectW = ctypes.windll.gdi32.GetObjectW
+                                GetObjectW.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.POINTER(BITMAP)]
+                                GetObjectW.restype = ctypes.c_int
+                                
+                                bitmap = BITMAP()
+                                if GetObjectW(icon_info.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)):
+                                    # Create QImage from bitmap data
+                                    width = bitmap.bmWidth
+                                    height = bitmap.bmHeight
+                                    
+                                    # Get bitmap bits
+                                    GetBitmapBits = ctypes.windll.gdi32.GetBitmapBits
+                                    GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, wintypes.LPVOID]
+                                    GetBitmapBits.restype = wintypes.LONG
+                                    
+                                    # Allocate buffer for bitmap data
+                                    buffer_size = bitmap.bmWidthBytes * bitmap.bmHeight
+                                    bitmap_data = ctypes.create_string_buffer(buffer_size)
+                                    
+                                    if GetBitmapBits(icon_info.hbmColor, buffer_size, bitmap_data):
+                                        # Create QImage from BGRA data (Windows bitmaps are often BGRA)
+                                        from PyQt6.QtGui import QImage
+                                        image = QImage(bitmap_data.raw, width, height, bitmap.bmWidthBytes, QImage.Format.Format_ARGB32)
+                                        
+                                        # Convert to pixmap
+                                        pixmap = QPixmap.fromImage(image)
+                                        if not pixmap.isNull():
+                                            print(f"[IconLoader] ✅ Successfully converted HICON to QPixmap for: {app_name}")
+                                            # Clean up
+                                            user32.DestroyIcon(shfi.hIcon)
+                                            return pixmap
+                            
+                        except Exception as e:
+                            print(f"[IconLoader] Error converting HICON for {app_name}: {e}")
+                            
+                        # Clean up
+                        user32.DestroyIcon(shfi.hIcon)
+                        
+                except Exception as e:
+                    print(f"[IconLoader] Windows API method failed for {app_name}: {e}")
+                    
+                # Method 3: Try QIcon as fallback (sometimes works)
+                try:
+                    qicon = QIcon(icon_name)
+                    if not qicon.isNull():
+                        pixmap = qicon.pixmap(48, 48)
+                        if not pixmap.isNull():
+                            print(f"[IconLoader] ✅ QIcon fallback succeeded for: {app_name}")
+                            return pixmap
+                except Exception as e:
+                    print(f"[IconLoader] QIcon fallback failed for {app_name}: {e}")
+                    
+            except Exception as e:
+                print(f"[IconLoader] Error loading Windows icon for {app_name}: {e}")
         
         # Linux: Try common icon paths
-        icon_paths = [
-            f"/usr/share/pixmaps/{icon_name}.png",
-            f"/usr/share/pixmaps/{icon_name}.svg",
-            f"/usr/share/pixmaps/{icon_name}.xpm",
-            f"/usr/share/icons/hicolor/48x48/apps/{icon_name}.png",
-            f"/usr/share/icons/hicolor/scalable/apps/{icon_name}.svg",
-            icon_name if icon_name.startswith('/') else None
-        ]
+        elif sys.platform.startswith('linux'):
+            icon_paths = [
+                f"/usr/share/pixmaps/{icon_name}.png",
+                f"/usr/share/pixmaps/{icon_name}.svg",
+                f"/usr/share/pixmaps/{icon_name}.xpm",
+                f"/usr/share/icons/hicolor/48x48/apps/{icon_name}.png",
+                f"/usr/share/icons/hicolor/scalable/apps/{icon_name}.svg",
+                icon_name if icon_name.startswith('/') else None
+            ]
+            
+            for path in icon_paths:
+                if path and os.path.exists(path):
+                    pixmap = QPixmap(path)
+                    if not pixmap.isNull():
+                        print(f"[IconLoader] ✅ Loaded Linux icon from: {path} for {app_name}")
+                        return pixmap
         
-        for path in icon_paths:
-            if path and os.path.exists(path):
-                pixmap = QPixmap(path)
-                if not pixmap.isNull():
-                    return pixmap
-        
+        print(f"[IconLoader] ❌ No icon found for app: {app_name} (tried: {icon_name})")
         return None
     
     def _on_checkbox_changed(self, state):
@@ -908,9 +1098,18 @@ class AppScannerDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
         
-        # Status label
-        self.status_label = QLabel("Scanning system...")
-        self.status_label.setStyleSheet("color: #888888;")
+        # Status label - make it more prominent for live updates
+        self.status_label = QLabel("🔍 Starting scan...")
+        self.status_label.setStyleSheet("""
+            color: #3b82f6;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 8px;
+            background-color: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        """)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
         
         # Search bar
@@ -1020,31 +1219,52 @@ class AppScannerDialog(QDialog):
         # Create loading overlay that covers the scroll area
         self.loading_overlay = QWidget(scroll)
         overlay_layout = QVBoxLayout(self.loading_overlay)
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         loading_container = QWidget()
         loading_container.setStyleSheet("""
             QWidget {
-                background-color: rgba(43, 45, 58, 0.9);
-                border-radius: 10px;
-                padding: 20px;
+                background-color: transparent;
+                border: none;
+                padding: 10px;
             }
         """)
         loading_inner_layout = QVBoxLayout(loading_container)
         loading_inner_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        loading_inner_layout.setSpacing(8)
+        
+        # Loading spinner animation (simple text-based for now)
+        loading_spinner = QLabel("🔄")
+        loading_spinner.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                color: #3b82f6;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_spinner)
         
         loading_label = QLabel("🔍 Scanning for applications...")
         loading_label.setStyleSheet("""
             QLabel {
                 color: #e5e7eb;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
             }
         """)
         loading_inner_layout.addWidget(loading_label)
         
+        loading_subtitle = QLabel("This may take a few moments...")
+        loading_subtitle.setStyleSheet("""
+            QLabel {
+                color: #9ca3af;
+                font-size: 12px;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_subtitle)
+        
         overlay_layout.addWidget(loading_container, alignment=Qt.AlignmentFlag.AlignCenter)
         overlay_layout.setContentsMargins(0, 0, 0, 0)
-        self.loading_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.5);")
+        self.loading_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.3);")
         self.loading_overlay.setVisible(True)  # Show initially
         
         layout.addWidget(scroll, stretch=1)

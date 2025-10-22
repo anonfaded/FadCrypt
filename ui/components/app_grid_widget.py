@@ -143,13 +143,22 @@ class AppCard(QFrame):
     def load_app_icon(self):
         """Load icon for the application"""
         try:
-            # Try to find icon from .desktop file
+            # Windows: Try to extract icon from exe file
+            if os.name == 'nt' and self.app_path.lower().endswith('.exe'):
+                try:
+                    pixmap = self._extract_windows_icon(self.app_path)
+                    if pixmap:
+                        return pixmap
+                except Exception as e:
+                    print(f"Error extracting Windows icon for {self.app_name}: {e}")
+            
+            # Try to find icon from .desktop file (Linux)
             icon_path = self.find_desktop_icon()
             if icon_path and os.path.exists(icon_path):
                 if not icon_path.endswith('.svg'):
                     return QPixmap(icon_path)
             
-            # Try common icon locations
+            # Try common icon locations (Linux)
             app_name = os.path.basename(self.app_path).lower()
             icon_locations = [
                 f'/usr/share/pixmaps/{app_name}.png',
@@ -162,6 +171,151 @@ class AppCard(QFrame):
                     return QPixmap(path)
         except Exception as e:
             print(f"Error loading icon for {self.app_name}: {e}")
+        
+        return None
+    
+    def _extract_windows_icon(self, exe_path: str):
+        """Extract icon from Windows exe file using Windows API."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # Windows API constants
+            SHGFI_ICON = 0x100
+            SHGFI_LARGEICON = 0x0
+            
+            # Load required DLLs
+            user32 = ctypes.windll.user32
+            shell32 = ctypes.windll.shell32
+            gdi32 = ctypes.windll.gdi32
+            
+            # SHFILEINFO structure
+            class SHFILEINFO(ctypes.Structure):
+                _fields_ = [
+                    ('hIcon', wintypes.HICON),
+                    ('iIcon', ctypes.c_int),
+                    ('dwAttributes', wintypes.DWORD),
+                    ('szDisplayName', wintypes.WCHAR * 260),
+                    ('szTypeName', wintypes.WCHAR * 80),
+                ]
+            
+            # SHGetFileInfo function
+            SHGetFileInfo = shell32.SHGetFileInfoW
+            SHGetFileInfo.argtypes = [
+                wintypes.LPWSTR,  # pszPath
+                wintypes.DWORD,   # dwFileAttributes
+                ctypes.POINTER(SHFILEINFO),  # psfi
+                wintypes.UINT,    # cbFileInfo
+                wintypes.UINT     # uFlags
+            ]
+            SHGetFileInfo.restype = wintypes.DWORD
+            
+            # Get the icon
+            shfi = SHFILEINFO()
+            flags = SHGFI_ICON | SHGFI_LARGEICON
+            result = SHGetFileInfo(exe_path, 0, ctypes.byref(shfi), ctypes.sizeof(shfi), flags)
+            
+            if result and shfi.hIcon:
+                try:
+                    # Convert HICON to QPixmap
+                    return self._hicon_to_qpixmap(shfi.hIcon)
+                finally:
+                    # Clean up the icon
+                    user32.DestroyIcon(shfi.hIcon)
+                    
+        except Exception as e:
+            print(f"Error in _extract_windows_icon: {e}")
+        
+        return None
+    
+    def _hicon_to_qpixmap(self, hicon):
+        """Convert Windows HICON to QPixmap."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            user32 = ctypes.windll.user32
+            gdi32 = ctypes.windll.gdi32
+            
+            # Get icon info
+            class ICONINFO(ctypes.Structure):
+                _fields_ = [
+                    ('fIcon', wintypes.BOOL),
+                    ('xHotspot', wintypes.DWORD),
+                    ('yHotspot', wintypes.DWORD),
+                    ('hbmMask', wintypes.HBITMAP),
+                    ('hbmColor', wintypes.HBITMAP),
+                ]
+            
+            GetIconInfo = user32.GetIconInfo
+            GetIconInfo.argtypes = [wintypes.HICON, ctypes.POINTER(ICONINFO)]
+            GetIconInfo.restype = wintypes.BOOL
+            
+            iconinfo = ICONINFO()
+            if not GetIconInfo(hicon, ctypes.byref(iconinfo)):
+                return None
+            
+            try:
+                # Get bitmap info
+                class BITMAP(ctypes.Structure):
+                    _fields_ = [
+                        ('bmType', wintypes.LONG),
+                        ('bmWidth', wintypes.LONG),
+                        ('bmHeight', wintypes.LONG),
+                        ('bmWidthBytes', wintypes.LONG),
+                        ('bmPlanes', wintypes.WORD),
+                        ('bmBitsPixel', wintypes.WORD),
+                        ('bmBits', wintypes.LPVOID),
+                    ]
+                
+                GetObject = gdi32.GetObjectW
+                GetObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.POINTER(BITMAP)]
+                GetObject.restype = ctypes.c_int
+                
+                bitmap = BITMAP()
+                if not GetObject(iconinfo.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)):
+                    return None
+                
+                # Create QImage from bitmap data
+                width = bitmap.bmWidth
+                height = bitmap.bmHeight
+                
+                if width <= 0 or height <= 0:
+                    return None
+                
+                # Get bitmap bits
+                bmp_size = width * height * 4  # Assume 32-bit
+                bmp_data = (ctypes.c_byte * bmp_size)()
+                
+                GetBitmapBits = gdi32.GetBitmapBits
+                GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, ctypes.POINTER(ctypes.c_byte)]
+                GetBitmapBits.restype = wintypes.LONG
+                
+                bits_got = GetBitmapBits(iconinfo.hbmColor, bmp_size, bmp_data)
+                if bits_got <= 0:
+                    return None
+                
+                # Create QImage from BGRA data (Windows bitmaps are often BGRA)
+                from PyQt6.QtGui import QImage
+                image = QImage(bmp_data, width, height, width * 4, QImage.Format.Format_ARGB32)
+                
+                # Convert BGRA to RGBA
+                image = image.convertToFormat(QImage.Format.Format_RGBA8888)
+                
+                # Create QPixmap from QImage
+                pixmap = QPixmap.fromImage(image)
+                
+                return pixmap
+                
+            finally:
+                # Clean up bitmaps
+                if iconinfo.hbmMask:
+                    gdi32.DeleteObject(iconinfo.hbmMask)
+                if iconinfo.hbmColor:
+                    gdi32.DeleteObject(iconinfo.hbmColor)
+                    
+        except Exception as e:
+            print(f"Error in _hicon_to_qpixmap: {e}")
         
         return None
     
@@ -586,8 +740,16 @@ class AppGridWidget(QWidget):
         file_dir = os.path.dirname(app_path)
         
         try:
-            # Try xdg-open first (works on most Linux DEs)
-            subprocess.Popen(['xdg-open', file_dir])
+            import platform
+            if platform.system() == "Windows":
+                # Windows: open folder and select file
+                if os.path.isfile(app_path):
+                    subprocess.Popen(['explorer', '/select,', app_path])
+                else:
+                    subprocess.Popen(['explorer', file_dir])
+            else:
+                # Try xdg-open first (works on most Linux DEs)
+                subprocess.Popen(['xdg-open', file_dir])
         except:
             try:
                 # Fallback to nautilus (GNOME)
