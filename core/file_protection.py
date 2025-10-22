@@ -10,7 +10,7 @@ Platform-specific implementations:
 import os
 import sys
 import stat
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 # Platform detection
 IS_WINDOWS = sys.platform == 'win32'
@@ -281,20 +281,79 @@ class FileProtectionManager:
         """
         Remove protection from file on Windows.
         
-        Tries elevated service first (seamless, no UAC), falls back to direct API.
-        Restores original attributes or sets to NORMAL.
+        Uses `attrib` command + `icacls` to remove both file attributes and NTFS ACLs.
+        Falls back to SetFileAttributesW if attrib is unavailable.
         """
-        # Try elevated service first (seamless, no UAC prompt)
+        import subprocess
+        
+        filename = os.path.basename(file_path)
+        
+        # First, use Windows `attrib` command to remove HIDDEN, SYSTEM, READONLY attributes
+        try:
+            # attrib -h -s -r <file>  removes HIDDEN, SYSTEM, READONLY
+            result = subprocess.run(
+                ['attrib', '-h', '-s', '-r', file_path],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                print(f"[FileProtection] Windows: Used `attrib` command to unprotect {filename}")
+            else:
+                print(f"[FileProtection] `attrib` command failed: {result.stderr}")
+        except Exception as e:
+            print(f"[FileProtection] `attrib` command not available: {e}")
+        
+        # Second, fix NTFS ACLs - remove DENY rules that prevent access
+        # Grant full permissions to current user so file can be read/written
+        try:
+            # Reset file permissions - grant full access to current user
+            # icacls <file> /reset - Reset to inherited permissions
+            result = subprocess.run(
+                ['icacls', file_path, '/reset'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                print(f"[FileProtection] Windows: Fixed NTFS ACLs on {filename} (reset to inherited)")
+            else:
+                print(f"[FileProtection] `icacls /reset` failed: {result.stderr}, trying /grant...")
+                
+                # Fallback: Grant permissions to current user
+                # Get current user (DOMAIN\USER format)
+                try:
+                    import getpass
+                    username = f"{os.getenv('USERDOMAIN')}\\{getpass.getuser()}"
+                    result2 = subprocess.run(
+                        ['icacls', file_path, f'/grant', f'{username}:(F)'],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    
+                    if result2.returncode == 0:
+                        print(f"[FileProtection] Windows: Granted full permissions to {username}")
+                    else:
+                        print(f"[FileProtection] `icacls /grant` also failed: {result2.stderr}")
+                except Exception as e2:
+                    print(f"[FileProtection] Could not grant permissions: {e2}")
+        except Exception as e:
+            print(f"[FileProtection] `icacls` command not available: {e}")
+        
+        # Try elevated service (seamless, no UAC prompt)
         try:
             from core.windows.elevated_service_client import get_windows_elevated_client
             client = get_windows_elevated_client()
             if client.is_available():
                 success, msg = client.unprotect_files([file_path])
                 if success:
-                    print(f"[FileProtection] Service: Unprotected {os.path.basename(file_path)} (no UAC!)")
+                    print(f"[FileProtection] Service: Unprotected {filename} (no UAC!)")
                     return True, None
                 else:
-                    print(f"[FileProtection] Service unprotect failed: {msg}, trying direct method...")
+                    print(f"[FileProtection] Service unprotect failed: {msg}, using direct method...")
         except Exception as e:
             logger.debug(f"Service not available: {e}")
         
@@ -317,7 +376,7 @@ class FileProtectionManager:
                 error_code = windll.kernel32.GetLastError()
                 return False, f"SetFileAttributesW failed with error code: {error_code}"
             
-            print(f"[FileProtection] Windows: Restored attributes on {os.path.basename(file_path)}")
+            print(f"[FileProtection] Windows: Restored attributes on {filename}")
             return True, None
             
         except Exception as e:
@@ -591,25 +650,40 @@ class FileProtectionManager:
             elif IS_WINDOWS:
                 # On Windows, we need to temporarily remove HIDDEN + SYSTEM + READONLY attributes
                 if WINDOWS_AVAILABLE:
-                    # Get current attributes
-                    attrs = windll.kernel32.GetFileAttributesW(file_path)
+                    import time
                     
-                    # Check if file has any protection attributes
-                    has_protection = bool(attrs & (self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM))
+                    # Retry up to 5 times with increasing delay to handle file locks
+                    for attempt in range(5):
+                        try:
+                            # Get current attributes
+                            attrs = windll.kernel32.GetFileAttributesW(file_path)
+                            
+                            # Check if file has any protection attributes
+                            has_protection = bool(attrs & (self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM))
+                            
+                            if has_protection:
+                                # Remove only the protection attributes that are actually set
+                                new_attrs = attrs & ~(self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM)
+                                result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
+                                if result == 0:
+                                    error_code = windll.kernel32.GetLastError()
+                                    if attempt < 4:  # Don't sleep on last attempt
+                                        time.sleep(0.2 * (attempt + 1))  # Increasing delay: 0.2s, 0.4s, 0.6s, 0.8s
+                                        continue
+                                    return False, f"Failed to remove protection attributes: {error_code}"
+                                
+                                print(f"[FileProtection] ✅ Removed protection attributes from {filename}")
+                                return True, None
+                            else:
+                                print(f"[FileProtection] ℹ️  {filename} not protected, no unlock needed")
+                                return True, None
+                        except Exception as e:
+                            if attempt < 4:
+                                time.sleep(0.2 * (attempt + 1))
+                                continue
+                            return False, f"Exception unlocking file: {e}"
                     
-                    if has_protection:
-                        # Remove all protection attributes temporarily (set to NORMAL)
-                        new_attrs = attrs & ~(self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM)
-                        result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
-                        if result == 0:
-                            error_code = windll.kernel32.GetLastError()
-                            return False, f"Failed to remove protection attributes: {error_code}"
-                        
-                        print(f"[FileProtection] ✅ Removed HIDDEN+SYSTEM+READONLY from {filename}")
-                        return True, None
-                    else:
-                        print(f"[FileProtection] ℹ️  {filename} not protected, no unlock needed")
-                        return True, None
+                    return False, "Failed to unlock file after retries"
                 else:
                     return False, "Windows ctypes not available"
             else:
@@ -649,18 +723,33 @@ class FileProtectionManager:
             elif IS_WINDOWS:
                 # On Windows, restore HIDDEN + SYSTEM + READONLY attributes
                 if WINDOWS_AVAILABLE:
-                    # Get current attributes
-                    attrs = windll.kernel32.GetFileAttributesW(file_path)
+                    import time
                     
-                    # Add all protection attributes
-                    new_attrs = attrs | self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM
-                    result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
-                    if result == 0:
-                        error_code = windll.kernel32.GetLastError()
-                        return False, f"Failed to set protection attributes: {error_code}"
+                    # Retry up to 5 times with increasing delay to handle file locks
+                    for attempt in range(5):
+                        try:
+                            # Get current attributes
+                            attrs = windll.kernel32.GetFileAttributesW(file_path)
+                            
+                            # Add all protection attributes
+                            new_attrs = attrs | self.FILE_ATTRIBUTE_READONLY | self.FILE_ATTRIBUTE_HIDDEN | self.FILE_ATTRIBUTE_SYSTEM
+                            result = windll.kernel32.SetFileAttributesW(file_path, new_attrs)
+                            if result == 0:
+                                error_code = windll.kernel32.GetLastError()
+                                if attempt < 4:  # Don't sleep on last attempt
+                                    time.sleep(0.2 * (attempt + 1))  # Increasing delay: 0.2s, 0.4s, 0.6s, 0.8s
+                                    continue
+                                return False, f"Failed to set protection attributes: {error_code}"
+                            
+                            print(f"[FileProtection] ✅ Re-applied protection attributes to {filename}")
+                            return True, None
+                        except Exception as e:
+                            if attempt < 4:
+                                time.sleep(0.2 * (attempt + 1))
+                                continue
+                            return False, f"Exception relocking file: {e}"
                     
-                    print(f"[FileProtection] ✅ Re-applied HIDDEN+SYSTEM+READONLY to {filename}")
-                    return True, None
+                    return False, "Failed to relock file after retries"
                 else:
                     return False, "Windows ctypes not available"
             else:
@@ -727,6 +816,64 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
     
     print(f"[SafeWrite] 🔒 Safe write completed successfully for {filename}")
     return True, None
+
+
+def safe_read_from_protected_file(file_path: str, mode: str = 'r') -> Tuple[bool, Union[str, None]]:
+    """
+    Safely read from a protected file by temporarily unlocking it.
+    
+    This function:
+    1. Temporarily removes protection (immutable/read-only) if file exists
+    2. Reads the content
+    3. Re-applies protection
+    4. Logs all operations
+    
+    Args:
+        file_path: Path to the file to read
+        mode: File mode ('r' for text, 'rb' for binary)
+    
+    Returns:
+        Tuple of (success: bool, content_or_error: Union[str, None])
+        On success: (True, file_content)
+        On failure: (False, error_message)
+    """
+    manager = get_file_protection_manager()
+    filename = os.path.basename(file_path)
+    
+    print(f"[SafeRead] 🔓 Starting safe read from protected file: {filename}")
+    
+    if not os.path.exists(file_path):
+        error_msg = f"File does not exist: {filename}"
+        print(f"[SafeRead] ❌ {error_msg}")
+        return False, error_msg
+    
+    # Step 1: Temporarily unlock file
+    unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
+    if not unlock_success:
+        error_msg = f"Failed to unlock {filename}: {unlock_error}"
+        print(f"[SafeRead] ❌ {error_msg}")
+        return False, error_msg
+    
+    # Step 2: Read content
+    try:
+        print(f"[SafeRead] 📖 Reading content from {filename}...")
+        with open(file_path, mode) as f:
+            content = f.read()
+        print(f"[SafeRead] ✅ Successfully read from {filename}")
+    except Exception as e:
+        error_msg = f"Failed to read from {filename}: {e}"
+        print(f"[SafeRead] ❌ {error_msg}")
+        return False, error_msg
+    
+    # Step 3: Re-lock file
+    relock_success, relock_error = manager.relock_file(file_path)
+    if not relock_success:
+        error_msg = f"Failed to re-protect {filename}: {relock_error}"
+        print(f"[SafeRead] ❌ {error_msg}")
+        return False, error_msg
+    
+    print(f"[SafeRead] 🔒 Safe read completed successfully for {filename}")
+    return True, content
 
 
 # Singleton instance

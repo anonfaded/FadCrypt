@@ -162,6 +162,89 @@ class MainWindowBase(QMainWindow):
             self.file_lock_manager.set_password_callback(self._handle_file_access_permission)
             print("✅ Fanotify password callback set (Linux)")
         
+        # Ensure config files are NOT protected (they need UI access)
+        # Fix corrupted/protected config files from previous app versions
+        from core.file_protection import get_file_protection_manager
+        import ctypes
+        file_protection = get_file_protection_manager()
+        
+        FILE_ATTRIBUTE_READONLY = 0x00000001
+        FILE_ATTRIBUTE_HIDDEN = 0x00000002
+        FILE_ATTRIBUTE_SYSTEM = 0x00000004
+        
+        config_files_to_unprotect = [
+            os.path.join(fadcrypt_folder, "apps_config.json"),
+            os.path.join(fadcrypt_folder, "monitoring_state.json"),
+        ]
+        
+        for config_file in config_files_to_unprotect:
+            if os.path.exists(config_file):
+                # Check if file is protected (HIDDEN+SYSTEM+READONLY)
+                try:
+                    attrs = ctypes.windll.kernel32.GetFileAttributesW(config_file)
+                    is_protected = bool(attrs & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+                    
+                    if is_protected:
+                        print(f"⚠️  {os.path.basename(config_file)} is protected (attrs={attrs:08x})")
+                        
+                        # Try to unprotect it
+                        if hasattr(file_protection, 'unprotect_file'):
+                            success, error = file_protection.unprotect_file(config_file)
+                            if success:
+                                print(f"✅ Unprotected: {os.path.basename(config_file)}")
+                            else:
+                                # Unprotecting failed - need to force delete and recreate
+                                print(f"❌ Unprotect failed ({error}), force-recreating file...")
+                                
+                                # Try to read current content first
+                                content = None
+                                try:
+                                    with open(config_file, 'r') as f:
+                                        content = f.read()
+                                    print(f"📖 Saved content from protected file ({len(content)} bytes)")
+                                except Exception as e:
+                                    print(f"⚠️  Could not read protected file: {e}")
+                                
+                                # Force remove the protected file (run as admin via elevated service if needed)
+                                try:
+                                    # First try direct removal (may fail if file is truly locked)
+                                    os.remove(config_file)
+                                    print(f"🗑️  Deleted protected file: {os.path.basename(config_file)}")
+                                except PermissionError:
+                                    print(f"❌ Direct deletion failed (permissions), trying elevated removal...")
+                                    # Try via elevated service
+                                    from core.windows.elevated_service_client import get_windows_elevated_client
+                                    try:
+                                        client = get_windows_elevated_client()
+                                        if client.is_available():
+                                            success, msg = client.unprotect_files([config_file])
+                                            if success:
+                                                try:
+                                                    os.remove(config_file)
+                                                    print(f"✅ Deleted via elevated removal: {os.path.basename(config_file)}")
+                                                except Exception as e:
+                                                    print(f"⚠️  Still can't delete after elevated unprotect: {e}")
+                                        else:
+                                            print(f"⚠️  Elevated service not available")
+                                    except Exception as e:
+                                        print(f"⚠️  Elevated removal failed: {e}")
+                                
+                                # Recreate the file if we have content
+                                if os.path.exists(config_file):
+                                    print(f"ℹ️  Protected file still exists, will retry on next startup")
+                                elif content is not None:
+                                    try:
+                                        with open(config_file, 'w') as f:
+                                            f.write(content)
+                                        print(f"✅ Recreated: {os.path.basename(config_file)}")
+                                    except Exception as e:
+                                        print(f"❌ Failed to recreate: {e}")
+                    else:
+                        print(f"✅ Config file is unprotected: {os.path.basename(config_file)}")
+                        
+                except Exception as e:
+                    print(f"⚠️  Error checking protection status: {e}")
+        
         # Log important paths at startup
         print("\n📁 FadCrypt File Locations:")
         print(f"   Main Config Folder: {fadcrypt_folder}")
@@ -2216,17 +2299,25 @@ class MainWindowBase(QMainWindow):
         
         if os.path.exists(config_file):
             try:
-                with open(config_file, 'r') as f:
-                    config_data = json.load(f)
+                # Use safe read that handles protected files
+                from core.file_protection import safe_read_from_protected_file
+                success, result = safe_read_from_protected_file(config_file, 'r')
                 
-                # Display raw JSON with proper formatting
-                raw_json = json.dumps(config_data, indent=4)
-                self.config_text.setPlainText(raw_json)
-                
-                # Count items
-                app_count = len(config_data.get('applications', []))
-                locked_count = len(config_data.get('locked_files_and_folders', []))
-                print(f"[Config Display] Updated with {app_count} apps and {locked_count} locked items")
+                if success:
+                    config_data = json.loads(result)
+                    
+                    # Display raw JSON with proper formatting
+                    raw_json = json.dumps(config_data, indent=4)
+                    self.config_text.setPlainText(raw_json)
+                    
+                    # Count items
+                    app_count = len(config_data.get('applications', []))
+                    locked_count = len(config_data.get('locked_files_and_folders', []))
+                    print(f"[Config Display] Updated with {app_count} apps and {locked_count} locked items")
+                else:
+                    error_msg = f"Error loading config: {result}"
+                    self.config_text.setPlainText(error_msg)
+                    print(f"[Config Display] {error_msg}")
             except Exception as e:
                 error_msg = f"Error loading config: {e}"
                 self.config_text.setPlainText(error_msg)
@@ -2244,34 +2335,40 @@ class MainWindowBase(QMainWindow):
             return
         
         try:
-            with open(config_file, 'r') as f:
-                config_data = json.load(f)
+            # Use safe read that handles protected files
+            from core.file_protection import safe_read_from_protected_file
+            success, result = safe_read_from_protected_file(config_file, 'r')
             
-            # Clear current grid
-            self.app_list_widget.apps_data.clear()
-            
-            # Load apps from unified config format with consistent ISO timestamps
-            from datetime import datetime
-            apps_list = config_data.get('applications', [])
-            for app in apps_list:
-                # Always ensure added_at has a value (not null)
-                added_at = app.get('added_at')
-                if not added_at:
-                    added_at = datetime.now().isoformat()
-                    
-                self.app_list_widget.add_app(
-                    app['name'],
-                    app['path'],
-                    unlock_count=app.get('unlock_count', 0),
-                    added_at=added_at
-                )
-            
-            self.update_app_count()
-            print(f"Applications config loaded: {len(apps_list)} apps")
-            
-            # Update config display to show the loaded apps (if config tab has been created)
-            if hasattr(self, 'config_text'):
-                self.update_config_display()
+            if success and result is not None:
+                config_data = json.loads(result)
+                
+                # Clear current grid
+                self.app_list_widget.apps_data.clear()
+                
+                # Load apps from unified config format with consistent ISO timestamps
+                from datetime import datetime
+                apps_list = config_data.get('applications', [])
+                for app in apps_list:
+                    # Always ensure added_at has a value (not null)
+                    added_at = app.get('added_at')
+                    if not added_at:
+                        added_at = datetime.now().isoformat()
+                        
+                    self.app_list_widget.add_app(
+                        app['name'],
+                        app['path'],
+                        unlock_count=app.get('unlock_count', 0),
+                        added_at=added_at
+                    )
+                
+                self.update_app_count()
+                print(f"Applications config loaded: {len(apps_list)} apps")
+                
+                # Update config display to show the loaded apps (if config tab has been created)
+                if hasattr(self, 'config_text'):
+                    self.update_config_display()
+            else:
+                print(f"Error loading applications config: {result}")
         except Exception as e:
             print(f"Error loading applications config: {e}")
         
@@ -2441,11 +2538,13 @@ class MainWindowBase(QMainWindow):
             
             # List of critical files to protect - these need to be writable by FadCrypt
             # but should be protected from external tampering
+            # NOTE: Only protect truly immutable files (password, recovery codes)
+            # Config files (apps_config.json, monitoring_state.json) need UI access
             critical_files = [
                 os.path.join(fadcrypt_folder, "recovery_codes.json"),
                 os.path.join(fadcrypt_folder, "encrypted_password.bin"),
-                os.path.join(fadcrypt_folder, "apps_config.json"),
-                os.path.join(fadcrypt_folder, "monitoring_state.json"),
+                # apps_config.json and monitoring_state.json are NOT protected
+                # They need to be readable/writable by the UI
             ]
             
             # Filter to only existing files

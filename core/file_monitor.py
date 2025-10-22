@@ -4,6 +4,7 @@ Monitors critical configuration files and automatically restores them if deleted
 """
 
 import os
+import sys
 import shutil
 import threading
 import time
@@ -50,15 +51,48 @@ class ConfigFileMonitor:
         """
         Get default files to monitor.
         
+        On Windows, skips files that are currently protected (Windows will hold exclusive lock).
+        On Linux, returns all files.
+        
         Returns:
             List of file paths to monitor
         """
         config_folder = self.get_config_folder()
-        return [
+        all_files = [
             os.path.join(config_folder, 'apps_config.json'),
             os.path.join(config_folder, 'encrypted_password.bin'),
             os.path.join(config_folder, 'settings.json')
         ]
+        
+        # On Windows, filter out protected files that will cause file handle conflicts
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                FILE_ATTRIBUTE_HIDDEN = 0x00000002
+                FILE_ATTRIBUTE_SYSTEM = 0x00000004
+                FILE_ATTRIBUTE_READONLY = 0x00000001
+                
+                filtered_files = []
+                for file_path in all_files:
+                    if os.path.exists(file_path):
+                        attrs = ctypes.windll.kernel32.GetFileAttributesW(file_path)
+                        if attrs != -1:
+                            is_protected = bool(attrs & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+                            if not is_protected:
+                                filtered_files.append(file_path)
+                            else:
+                                print(f"[FILE MONITOR] Skipping protected file from watchdog monitor: {os.path.basename(file_path)}")
+                        else:
+                            filtered_files.append(file_path)
+                    else:
+                        filtered_files.append(file_path)
+                return filtered_files
+            except:
+                # Fall back to all files if protection check fails
+                return all_files
+        else:
+            # On Linux, return all files (protection is via immutable flag, not file handles)
+            return all_files
     
     def start_monitoring(self):
         """Start monitoring configuration files."""
@@ -121,6 +155,23 @@ class ConfigFileMonitor:
             if os.path.exists(file_path):
                 backup_path = os.path.join(backup_folder, os.path.basename(file_path))
                 try:
+                    # Skip backup if file is protected (will retry on next modification)
+                    # This avoids holding a handle to protected files
+                    if sys.platform == 'win32':
+                        try:
+                            import ctypes
+                            attrs = ctypes.windll.kernel32.GetFileAttributesW(file_path)
+                            if attrs != -1:
+                                FILE_ATTRIBUTE_HIDDEN = 0x00000002
+                                FILE_ATTRIBUTE_SYSTEM = 0x00000004
+                                FILE_ATTRIBUTE_READONLY = 0x00000001
+                                is_protected = bool(attrs & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
+                                if is_protected:
+                                    print(f"[FILE MONITOR] ⏭️  Skipping backup of protected file: {os.path.basename(file_path)} (will retry on modification)")
+                                    continue
+                        except:
+                            pass  # Fall through to normal backup
+                    
                     shutil.copy(file_path, backup_path)
                     # Ensure backup file is writable
                     os.chmod(backup_path, 0o644)
