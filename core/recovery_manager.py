@@ -190,7 +190,7 @@ class RecoveryCodeManager:
             
             # Save to file (plain JSON, no encryption needed)
             # The hashes are useless without the actual codes
-            with open(self.recovery_codes_file, 'w') as f:
+            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
                 json.dump(recovery_data, f, indent=2)
             
             print(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
@@ -230,7 +230,7 @@ class RecoveryCodeManager:
                 return False, "Invalid recovery code format"
             
             # Load recovery data (plain JSON)
-            with open(self.recovery_codes_file, 'r') as f:
+            with open(self.recovery_codes_file, 'r', encoding='utf-8') as f:
                 recovery_data = json.load(f)
             
             # Verify code against stored hashes
@@ -288,7 +288,7 @@ class RecoveryCodeManager:
             normalized_input = code.upper().replace('-', '').replace(' ', '')
             
             # Load current data
-            with open(self.recovery_codes_file, 'r') as f:
+            with open(self.recovery_codes_file, 'r', encoding='utf-8') as f:
                 recovery_data = json.load(f)
             
             # Find and mark code as used
@@ -316,7 +316,7 @@ class RecoveryCodeManager:
                 return False, "Recovery code not found"
             
             # Save updated data
-            with open(self.recovery_codes_file, 'w') as f:
+            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
                 json.dump(recovery_data, f, indent=2)
             
             print("[RecoveryCodeManager] Recovery code marked as used")
@@ -369,7 +369,7 @@ class RecoveryCodeManager:
                 return False, None
             
             # Load plain JSON
-            with open(self.recovery_codes_file, 'r') as f:
+            with open(self.recovery_codes_file, 'r', encoding='utf-8') as f:
                 recovery_data = json.load(f)
             
             # Count unused codes
@@ -402,7 +402,7 @@ class RecoveryCodeManager:
                 return False, None
             
             # Load plain JSON
-            with open(self.recovery_codes_file, 'r') as f:
+            with open(self.recovery_codes_file, 'r', encoding='utf-8') as f:
                 recovery_data = json.load(f)
             
             # Return metadata only
