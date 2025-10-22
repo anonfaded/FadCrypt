@@ -2525,9 +2525,9 @@ class MainWindowBase(QMainWindow):
                 details=f"Locked {success} items"
                 )
                 
-                # Lock FadCrypt's own config files
-                print("🔒 Protecting FadCrypt config files...")
-                self.file_lock_manager.lock_fadcrypt_configs()
+            # Lock FadCrypt's own config files
+            print("🔒 Protecting FadCrypt config files...")
+            self.file_lock_manager.lock_fadcrypt_configs()
         
         # Update UI button state
         self.update_monitoring_button_state(True)
