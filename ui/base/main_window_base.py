@@ -2667,12 +2667,17 @@ class MainWindowBase(QMainWindow):
     def save_monitoring_state(self):
         """Save monitoring state to JSON file"""
         import json
+        from core.file_protection import safe_write_to_protected_file
+        
         state_file = os.path.join(self.get_fadcrypt_folder(), 'monitoring_state.json')
         
-        # monitoring_state.json is now daemon-protected, no need for permission unlocking
         try:
-            with open(state_file, 'w') as f:
-                json.dump(self.monitoring_state, f, indent=4)
+            # Include monitoring_active flag
+            self.monitoring_state['monitoring_active'] = self.monitoring_active
+            content = json.dumps(self.monitoring_state, indent=4)
+            success, error = safe_write_to_protected_file(state_file, content)
+            if not success:
+                print(f"Error saving monitoring state: {error}")
         except Exception as e:
             print(f"Error saving monitoring state: {e}")
     
@@ -3589,14 +3594,9 @@ class MainWindowBase(QMainWindow):
     def save_locked_files_config(self):
         """Save locked files to unified config file"""
         from datetime import datetime
+        from core.file_protection import safe_write_to_protected_file
         
         config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
-        
-        # Temporarily unlock config file for writing
-        should_relock = False
-        if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-            self.file_lock_manager.temporarily_unlock_config('apps_config.json')
-            should_relock = True
         
         try:
             # Load existing config to preserve applications
@@ -3625,18 +3625,18 @@ class MainWindowBase(QMainWindow):
                 'locked_files_and_folders': locked_items
             }
             
-            with open(config_file, 'w') as f:
-                json.dump(unified_config, f, indent=4)
-            print(f"Protected files config saved: {len(locked_items)} items (preserved {len(unified_config.get('applications', []))} apps)")
+            content = json.dumps(unified_config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
             
-            # Update config tab display
-            self.update_config_display()
+            if success:
+                print(f"Protected files config saved: {len(locked_items)} items (preserved {len(unified_config.get('applications', []))} apps)")
+                
+                # Update config tab display
+                self.update_config_display()
+            else:
+                print(f"Error saving locked files config: {error}")
         except Exception as e:
             print(f"Error saving locked files config: {e}")
-        finally:
-            # Always re-lock after writing
-            if should_relock and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                self.file_lock_manager.relock_config('apps_config.json')
     
     def open_stats_window(self):
         """Open the enhanced statistics dashboard window - requires password if monitoring active"""

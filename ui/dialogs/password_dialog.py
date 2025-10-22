@@ -1,10 +1,11 @@
 """Password Dialog for FadCrypt"""
 
+import os
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QFrame, QProgressBar, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QIcon
 
 
 class PasswordDialog(QDialog):
@@ -25,6 +26,12 @@ class PasswordDialog(QDialog):
         self.has_recovery_codes = has_recovery_codes
         
         self.setWindowTitle(title)
+        
+        # Set window icon
+        icon_path = self.resource_path('img/icon.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         self.init_ui(title, prompt)
         
     def init_ui(self, title, prompt):

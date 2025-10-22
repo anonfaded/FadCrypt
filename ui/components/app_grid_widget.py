@@ -145,10 +145,10 @@ class AppCard(QFrame):
         try:
             # Windows: Try to extract icon from exe file
             if os.name == 'nt':
-                # First try direct extraction if it's an exe
-                if self.app_path.lower().endswith('.exe'):
+                # If it's an exe file, try to extract icon
+                if self.app_path.lower().endswith('.exe') and os.path.exists(self.app_path):
                     try:
-                        pixmap = self._extract_windows_icon(self.app_path)
+                        pixmap = self._extract_windows_icon_simple(self.app_path)
                         if pixmap:
                             return pixmap
                     except Exception as e:
@@ -158,7 +158,7 @@ class AppCard(QFrame):
                 exe_path = self._find_windows_icon()
                 if exe_path and exe_path.lower().endswith('.exe'):
                     try:
-                        pixmap = self._extract_windows_icon(exe_path)
+                        pixmap = self._extract_windows_icon_simple(exe_path)
                         if pixmap:
                             return pixmap
                     except Exception as e:
@@ -170,7 +170,7 @@ class AppCard(QFrame):
                 if os.name == 'nt' and icon_path.lower().endswith('.exe'):
                     # For Windows, if we found an exe, extract icon from it
                     try:
-                        pixmap = self._extract_windows_icon(icon_path)
+                        pixmap = self._extract_windows_icon_simple(icon_path)
                         if pixmap:
                             return pixmap
                     except Exception as e:
@@ -195,7 +195,7 @@ class AppCard(QFrame):
         
         return None
     
-    def _extract_windows_icon(self, exe_path: str):
+    def _extract_windows_icon_simple(self, exe_path: str):
         """Extract icon from Windows exe file using Windows API."""
         try:
             import ctypes
@@ -213,7 +213,7 @@ class AppCard(QFrame):
             # SHFILEINFO structure
             class SHFILEINFO(ctypes.Structure):
                 _fields_ = [
-                    ('hIcon', wintypes.HICON),
+                    ('hIcon', ctypes.c_void_p),  # HICON is a handle (pointer)
                     ('iIcon', ctypes.c_int),
                     ('dwAttributes', wintypes.DWORD),
                     ('szDisplayName', wintypes.WCHAR * 260),
@@ -245,7 +245,7 @@ class AppCard(QFrame):
                     user32.DestroyIcon(shfi.hIcon)
                     
         except Exception as e:
-            print(f"Error in _extract_windows_icon: {e}")
+            print(f"Error in _extract_windows_icon_simple: {e}")
         
         return None
     
@@ -269,7 +269,7 @@ class AppCard(QFrame):
                 ]
             
             GetIconInfo = user32.GetIconInfo
-            GetIconInfo.argtypes = [wintypes.HICON, ctypes.POINTER(ICONINFO)]
+            GetIconInfo.argtypes = [ctypes.c_void_p, ctypes.POINTER(ICONINFO)]
             GetIconInfo.restype = wintypes.BOOL
             
             iconinfo = ICONINFO()
@@ -305,14 +305,14 @@ class AppCard(QFrame):
                     return None
                 
                 # Get bitmap bits - limit size to prevent overflow
-                bmp_size = width * height * 4  # Assume 32-bit
+                bmp_size = bitmap.bmWidthBytes * bitmap.bmHeight
                 if bmp_size > 1024 * 1024:  # 1MB limit
                     return None
                     
-                bmp_data = (ctypes.c_byte * bmp_size)()
+                bmp_data = ctypes.create_string_buffer(bmp_size)
                 
                 GetBitmapBits = gdi32.GetBitmapBits
-                GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, ctypes.POINTER(ctypes.c_byte)]
+                GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, wintypes.LPVOID]
                 GetBitmapBits.restype = wintypes.LONG
                 
                 bits_got = GetBitmapBits(iconinfo.hbmColor, bmp_size, bmp_data)
@@ -321,7 +321,7 @@ class AppCard(QFrame):
                 
                 # Create QImage from BGRA data (Windows bitmaps are often BGRA)
                 from PyQt6.QtGui import QImage
-                image = QImage(bmp_data, width, height, width * 4, QImage.Format.Format_ARGB32)
+                image = QImage(bmp_data.raw, width, height, bitmap.bmWidthBytes, QImage.Format.Format_ARGB32)
                 
                 # Convert BGRA to RGBA
                 image = image.convertToFormat(QImage.Format.Format_RGBA8888)

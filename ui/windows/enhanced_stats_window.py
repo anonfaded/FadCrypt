@@ -1,11 +1,12 @@
 """Enhanced Statistics Window - Beautiful dashboard with pie/line charts and duration metrics"""
 
+import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QScrollArea, QGridLayout, QFrame, QTabWidget
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QRect, QPoint
-from PyQt6.QtGui import QFont, QColor, QPainter, QBrush, QPen
+from PyQt6.QtGui import QFont, QColor, QPainter, QBrush, QPen, QIcon
 from PyQt6.QtCore import QSize
 import pyqtgraph as pg
 import json
@@ -300,6 +301,11 @@ class EnhancedStatsWindow(QWidget):
         pg.setConfigOption('antialias', True)
         
         self.init_ui()
+        
+        # Set window icon
+        icon_path = self.resource_path('img/icon.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Auto-refresh timer - only when window is visible
         self.refresh_timer = QTimer()

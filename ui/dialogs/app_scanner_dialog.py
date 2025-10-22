@@ -1034,6 +1034,13 @@ class AppScannerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Scan for Applications")
+        
+        # Set window icon
+        if parent and hasattr(parent, 'resource_path'):
+            icon_path = parent.resource_path('img/icon.png')
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        
         self.setModal(True)
         # Use a reasonable default minimum size (restore original)
         self.setMinimumSize(800, 600)
