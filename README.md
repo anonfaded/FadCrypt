@@ -15,7 +15,7 @@
 
 # FadCrypt
 
-**Advanced and elegant Windows app encryption – powerful, customizable, open-source, and completely free!**
+**Advanced and elegant cross-platform app encryption – powerful, customizable, open-source, and completely free!**
 
 [![GitHub all releases](https://img.shields.io/github/downloads/anonfaded/FadCrypt/total?label=Downloads&logo=github)](https://github.com/anonfaded/FadCrypt/releases/)
 
@@ -94,11 +94,17 @@
 
    If detected as deleted, they are automatically recovered and restored.
 
-2. **Monitoring Mode:** Press "Start Monitoring" to set FadCrypt as a startup app. It will automatically activate every time your PC starts, and will persistently run unless you press "Stop Monitoring."
+2. **Elevated Daemon Service (Linux):** FadCrypt uses a systemd service that runs with root privileges to handle file protection operations seamlessly:
 
-3. **Security Features:** FadCrypt can't be stopped without the correct password. The app also disables Control Panel, Registry Editor, Task Manager, and msconfig (Windows) or terminal emulators and system monitors (Linux) to prevent tampering.
+   - **Daemon Operations:** The daemon (`fadcrypt-elevated.service`) provides root-level file operations via Unix socket communication
+   - **Capabilities:** File immutability (chattr +i/-i), permission changes, backup restoration, and kernel-level file monitoring (fanotify)
+   - **Automatic Setup:** The daemon is installed and started automatically when you install the .deb package
 
-4. **Mutex Protection:** FadCrypt uses mutual exclusion to ensure only one instance runs at a time, blocking new instances until the current one is closed with the password. This prevents bypass attempts.
+3. **Monitoring Mode:** Press "Start Monitoring" to set FadCrypt as a startup app. It will automatically activate every time your PC starts, and will persistently run unless you press "Stop Monitoring."
+
+4. **Security Features:** When monitoring is active, FadCrypt can't be stopped without the correct password. Optionally, users can enable system tool disabling to prevent tampering (Control Panel, Registry Editor, Task Manager, msconfig on Windows; terminal emulators and system monitors on Linux). Recovery codes provide a secure backup method to reset forgotten passwords.
+
+5. **Mutex Protection:** FadCrypt uses mutual exclusion to ensure only one instance runs at a time, blocking new instances until the current one is closed with the password. This prevents bypass attempts.
 
 **Note:** The password recovery feature is not available yet.
 
@@ -120,23 +126,32 @@ Download the latest `windows setup installer` file directly from the [releases p
 
 **Security (Windows & Linux):**
 
-- **System Tools Disabled During Monitoring:**
+- **Optional System Tools Disabled (User Configurable):**
   - **Windows:** Task Manager, Registry Editor, Command Prompt, Control Panel, msconfig
   - **Linux:** Terminal emulators (gnome-terminal, konsole, xterm), system monitors (htop, top, gnome-system-monitor)
 - **Encrypted Storage:** All passwords and configuration data encrypted using industry-standard cryptography.
 - **File Immutability & Elevation:**
   - **Windows:** Task Scheduler-based privilege elevation with persistent session authorization (equivalent to PolicyKit)
-  - **Linux:** PolicyKit with persistent authorization for seamless file protection via chattr
+  - **Linux:** Root daemon service with Unix socket communication for seamless elevated operations
 - **Single Instance Enforcement:** Only one FadCrypt instance can run at a time to prevent bypass attempts.
 - **Professional Authorization (Both Platforms):**
   - **Windows:** Single UAC prompt cached per session via Task Scheduler
-  - **Linux:** Single authentication cached per session via PolicyKit (allow_active=yes)
+  - **Linux:** Automatic root daemon service (no authentication required)
 
 **Extras:**
 
 - **Snake Game:** Classic arcade Snake game available on home tab for entertainment.
 - **System Tray Integration:** Quick access from system tray with minimize/restore functionality.
 - **Auto-Recovery:** Crashes are detected and monitored files are recovered automatically on next startup.
+
+**Daemon Architecture (Linux):**
+
+FadCrypt uses a client-daemon architecture for maximum security:
+
+- **Root Daemon:** `fadcrypt-elevated.service` runs as systemd service with full root privileges
+- **Unix Socket Communication:** Secure IPC between GUI and daemon
+- **Capabilities:** File protection (chattr), permissions (chmod), backup restoration, kernel monitoring (fanotify)
+- **Installation:** Automatically configured with .deb package
 
 **Implemented Features:**
 
@@ -152,7 +167,7 @@ Download the latest `windows setup installer` file directly from the [releases p
 ✅ Critical files protected from tampering
 ✅ Password-secured monitoring control
 ✅ Windows: Task Scheduler-based privilege elevation (UAC caching)
-✅ Linux: PolicyKit persistent authorization (polkit integration)
+✅ Linux: Root daemon service with Unix socket communication (systemd)
 ✅ Cross-platform (Windows + Linux)
 
 ## Featured On
@@ -221,6 +236,20 @@ For Linux:
 ```bash
 python3 -m PyInstaller FadCrypt_Linux.spec
 ```
+
+**Linux .deb Package Installation:**
+
+For the best Linux experience, use the pre-built .deb package:
+
+```bash
+# Download from releases and install
+sudo dpkg -i fadcrypt_X.X.X_amd64.deb
+
+# Daemon service installs and starts automatically
+# No additional configuration needed
+```
+
+Includes: Main application, elevated daemon service, desktop integration, automatic cleanup.
 
 # Reset Password
 
