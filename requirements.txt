@@ -10,7 +10,3 @@ requests
 PyQt6
 PyQtGraph
 numpy>=1.20.0  # Required by PyQtGraph for charts
-
-# Legacy Tkinter dependencies (will be deprecated after migration)
-tkinterdnd2
-ttkbootstrap
