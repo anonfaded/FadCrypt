@@ -294,6 +294,10 @@ class MainWindowBase(QMainWindow):
         # Connect cleanup button to cleanup handler
         self.settings_panel.on_cleanup_clicked = self.cleanup_before_uninstall
         
+        # Connect context menu refresh button (Windows only)
+        if hasattr(self.settings_panel, 'on_refresh_context_menu'):
+            self.settings_panel.on_refresh_context_menu = self.refresh_context_menu
+        
         # Center window after everything is initialized
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, self.center_on_screen)
@@ -3356,6 +3360,17 @@ class MainWindowBase(QMainWindow):
                     print(f"❌ Error removing from autostart: {e}", flush=True)
             else:
                 print("ℹ️  No autostart entry to remove", flush=True)
+            
+            # Remove context menu entries (Windows only)
+            if hasattr(self, 'cleanup_context_menu'):
+                try:
+                    print("🗑️  Removing context menu entries...", flush=True)
+                    self.cleanup_context_menu()
+                    print("✅ Context menu entries removed", flush=True)
+                except Exception as e:
+                    print(f"❌ Error removing context menu: {e}", flush=True)
+            else:
+                print("ℹ️  No context menu entries to remove", flush=True)
             
             print("="*60, flush=True)
             print("✅ CLEANUP COMPLETED SUCCESSFULLY!", flush=True)

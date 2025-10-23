@@ -325,6 +325,39 @@ class SettingsPanel(QWidget):
         
         bottom_frame.addSpacing(20)
         
+        # Context Menu Refresh (Windows only)
+        if self.platform_name == "Windows":
+            context_menu_title = QLabel("🖱️ Context Menu")
+            context_menu_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+            bottom_frame.addWidget(context_menu_title)
+            
+            context_menu_info = QLabel(
+                "Refresh Windows Explorer context menu entries for Lock/Unlock options.\n"
+                "Use this if right-click options are missing or not working."
+            )
+            context_menu_info.setStyleSheet("color: #888888;")
+            context_menu_info.setWordWrap(True)
+            bottom_frame.addWidget(context_menu_info)
+            
+            context_menu_button = QPushButton("Refresh Context Menu")
+            context_menu_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #1976d2;
+                    color: white;
+                    font-weight: bold;
+                    padding: 8px 20px;
+                    border-radius: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #1565c0;
+                }
+            """)
+            context_menu_button.clicked.connect(lambda: self.on_refresh_context_menu())
+            context_menu_button.setMaximumWidth(200)
+            bottom_frame.addWidget(context_menu_button)
+            
+            bottom_frame.addSpacing(20)
+        
         cleanup_title = QLabel("🔧 Uninstall Cleanup")
         cleanup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         bottom_frame.addWidget(cleanup_title)
@@ -409,6 +442,11 @@ class SettingsPanel(QWidget):
         
     def on_generate_recovery_codes(self):
         """Handle recovery codes button click"""
+        # To be implemented by main window
+        pass
+    
+    def on_refresh_context_menu(self):
+        """Handle context menu refresh button click"""
         # To be implemented by main window
         pass
     

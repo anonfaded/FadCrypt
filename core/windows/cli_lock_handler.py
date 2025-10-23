@@ -11,7 +11,15 @@ import os
 import logging
 from typing import Optional
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+# Set up logging to both console and file
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stderr),  # Console output
+        logging.FileHandler(os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cli_debug.log'), mode='a')  # File output
+    ]
+)
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +46,7 @@ def get_password_manager():
 def show_password_dialog(operation: str) -> Optional[str]:
     """Show password dialog and return entered password"""
     try:
+        logger.info(f"Creating password dialog for {operation}")
         from PyQt6.QtWidgets import QApplication
         from ui.dialogs.password_dialog import PasswordDialog
         
@@ -51,11 +60,16 @@ def show_password_dialog(operation: str) -> Optional[str]:
                 base_path = os.path.abspath(".")
             return os.path.join(base_path, relative_path)
         
+        logger.info("Creating QApplication instance")
         # Create Qt application if needed
         app = QApplication.instance()
         if app is None:
             app = QApplication(sys.argv)
+            logger.info("Created new QApplication")
+        else:
+            logger.info("Using existing QApplication")
         
+        logger.info("Creating PasswordDialog")
         dialog = PasswordDialog(
             title="FadCrypt",
             prompt=f"Enter your password to {operation.lower()} this file",
@@ -65,32 +79,43 @@ def show_password_dialog(operation: str) -> Optional[str]:
             show_forgot_password=False
         )
         
+        logger.info("Showing password dialog")
         result = dialog.exec()
-        if result == 1:  # QDialog.Accepted
-            return dialog.password_value
+        logger.info(f"Dialog result: {result}")
         
-        return None
-    
+        if result == 1:  # QDialog.Accepted
+            logger.info("Password accepted")
+            return dialog.password_value
+        else:
+            logger.info("Password dialog cancelled")
+            return None
+        
     except Exception as e:
         logger.error(f"Dialog error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
 
 def lock_file_with_password(file_path: str) -> bool:
     """Lock file after password verification using existing PasswordManager"""
     try:
+        logger.info(f"Starting lock operation for: {file_path}")
+        
         # Show password dialog
         password = show_password_dialog("LOCK")
         if not password:
             logger.warning("Lock cancelled by user")
             return False
         
+        logger.info("Password entered, verifying...")
         # Use same password verification as GUI
         password_manager = get_password_manager()
         if not password_manager.verify_password(password):
             logger.error("Incorrect password")
             return False
         
+        logger.info("Password verified, locking file...")
         # Lock the file using ACL
         from core.windows.acl_locker import ACLFileLocker
         locker = ACLFileLocker()
@@ -99,11 +124,13 @@ def lock_file_with_password(file_path: str) -> bool:
             logger.info(f"File locked: {file_path}")
             return True
         else:
-            logger.error(f"Failed to lock file")
+            logger.error(f"Failed to lock file: {file_path}")
             return False
     
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Lock error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 

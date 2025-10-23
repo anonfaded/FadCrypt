@@ -3,6 +3,7 @@ Windows Shell Context Menu Integration for FadCrypt
 
 Registers FadCrypt as context menu options for right-click on files/folders.
 Uses Windows Registry with direct commands (not submenus - Win 11 limitation).
+Supports both script execution (development) and packaged app execution (production).
 """
 
 import os
@@ -11,42 +12,72 @@ import winreg
 import subprocess
 import logging
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class ContextMenuManager:
     """Manage Windows shell context menu registration"""
-    
+
     REGISTRY_BASE = r"Software\Classes"
     # Direct commands for files and folders - no submenus on Windows 11
     FILE_LOCK_KEY = r"*\shell\FadCryptLock"
     FILE_UNLOCK_KEY = r"*\shell\FadCryptUnlock"
     FOLDER_LOCK_KEY = r"Directory\shell\FadCryptLock"
     FOLDER_UNLOCK_KEY = r"Directory\shell\FadCryptUnlock"
-    
-    def __init__(self, exe_path: str = None, fadcrypt_folder: str = None):
+
+    def __init__(self, exe_path: Optional[str] = None, fadcrypt_folder: Optional[str] = None, is_packaged: Optional[bool] = None):
         """
         Args:
-            exe_path: Path to FadCrypt executable (usually from PyInstaller)
-            fadcrypt_folder: Path to FadCrypt installation folder (for batch files)
+            exe_path: Path to FadCrypt executable/script
+            fadcrypt_folder: Path to FadCrypt installation folder
+            is_packaged: Whether running from PyInstaller bundle
         """
-        if exe_path is None:
-            # Detect if running from PyInstaller bundle
-            if hasattr(sys, '_MEIPASS'):
-                exe_path = os.path.join(sys._MEIPASS, 'FadCrypt.exe')
+        if is_packaged is None:
+            is_packaged = hasattr(sys, '_MEIPASS')
+
+        if is_packaged:
+            # Running from PyInstaller bundle
+            if exe_path is None:
+                exe_path = os.path.join(sys._MEIPASS, 'fadcrypt.exe')
+            if fadcrypt_folder is None:
                 fadcrypt_folder = sys._MEIPASS
-            else:
-                exe_path = sys.executable
+        else:
+            # Running from source/script
+            if exe_path is None:
+                # Use the script path, not the python executable
+                import __main__
+                if hasattr(__main__, '__file__'):
+                    exe_path = os.path.abspath(__main__.__file__)
+                else:
+                    exe_path = os.path.join(os.getcwd(), 'FadCrypt.py')
+            if fadcrypt_folder is None:
                 # When running from source, use the script directory
                 import __main__
-                fadcrypt_folder = os.path.dirname(os.path.abspath(__main__.__file__)) if hasattr(__main__, '__file__') else os.getcwd()
-        
-        if fadcrypt_folder is None:
-            fadcrypt_folder = os.path.dirname(exe_path)
-        
+                if hasattr(__main__, '__file__'):
+                    script_dir = os.path.dirname(os.path.abspath(__main__.__file__))
+                else:
+                    script_dir = os.getcwd()
+                fadcrypt_folder = script_dir
+
         self.exe_path = exe_path
         self.fadcrypt_folder = fadcrypt_folder
+        self.is_packaged = is_packaged
+        self.batch_files_dir = os.path.join(fadcrypt_folder, 'core', 'windows')
+    
+    def is_context_menu_registered(self) -> bool:
+        """Check if FadCrypt context menu entries are already registered"""
+        try:
+            # Check if at least one key exists
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
+                          f"{self.REGISTRY_BASE}\\{self.FILE_LOCK_KEY}", 
+                          0, winreg.KEY_READ)
+            return True
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
     
     def register_context_menu(self) -> bool:
         """Register Lock/Unlock options in context menu - direct commands (no submenus)"""
@@ -63,65 +94,133 @@ class ContextMenuManager:
             logger.error(f"Failed to register context menu: {e}")
             return False
     
+    def register_context_menu_if_needed(self) -> tuple[bool, bool]:
+        """
+        Register context menu only if not already registered.
+        
+        Returns:
+            tuple: (success: bool, was_already_registered: bool)
+        """
+        if self.is_context_menu_registered():
+            logger.info("Context menu already registered, skipping registration")
+            return True, True
+        
+        success = self.register_context_menu()
+        return success, False
+    
+    def force_register_context_menu(self) -> bool:
+        """
+        Force re-register context menu entries, even if already registered.
+        Useful for updating paths or fixing corrupted entries.
+        """
+        logger.info("Force re-registering context menu...")
+        # First unregister, then register
+        self.unregister_context_menu()
+        return self.register_context_menu()
+    
     def _register_file_lock(self):
         """Register Lock for files"""
-        key_path = f"{self.REGISTRY_BASE}\\{self.FILE_LOCK_KEY}"
-        
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
-            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
-        
-        # Use batch file wrapper to avoid "open with" dialog
-        cmd_key = f"{key_path}\\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
-            batch_file = os.path.join(self.fadcrypt_folder, 'FadCryptLock.bat')
-            cmd = f'"{batch_file}" "%%1"'
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+        try:
+            key_path = f"{self.REGISTRY_BASE}\\{self.FILE_LOCK_KEY}"
+            
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
+            
+            # Use PowerShell to run silently without console window
+            cmd_key = f"{key_path}\\command"
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
+                if self.is_packaged:
+                    # Packaged app execution
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                else:
+                    # Script execution - use pythonw
+                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+            
+            logger.debug(f"Registered file lock context menu: {key_path}")
+        except Exception as e:
+            logger.error(f"Failed to register file lock: {e}")
+            raise
     
     def _register_file_unlock(self):
         """Register Unlock for files"""
-        key_path = f"{self.REGISTRY_BASE}\\{self.FILE_UNLOCK_KEY}"
-        
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
-            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
-        
-        # Use batch file wrapper to avoid "open with" dialog
-        cmd_key = f"{key_path}\\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
-            batch_file = os.path.join(self.fadcrypt_folder, 'FadCryptUnlock.bat')
-            cmd = f'"{batch_file}" "%%1"'
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+        try:
+            key_path = f"{self.REGISTRY_BASE}\\{self.FILE_UNLOCK_KEY}"
+            
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
+            
+            # Use PowerShell to run silently without console window
+            cmd_key = f"{key_path}\\command"
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
+                if self.is_packaged:
+                    # Packaged app execution
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                else:
+                    # Script execution - use pythonw
+                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+            
+            logger.debug(f"Registered file unlock context menu: {key_path}")
+        except Exception as e:
+            logger.error(f"Failed to register file unlock: {e}")
+            raise
     
     def _register_folder_lock(self):
         """Register Lock for folders"""
-        key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_LOCK_KEY}"
-        
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
-            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
-        
-        # Use batch file wrapper
-        cmd_key = f"{key_path}\\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
-            batch_file = os.path.join(self.fadcrypt_folder, 'FadCryptLock.bat')
-            cmd = f'"{batch_file}" "%%1"'
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+        try:
+            key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_LOCK_KEY}"
+            
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
+            
+            # Use PowerShell to run silently without console window
+            cmd_key = f"{key_path}\\command"
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
+                if self.is_packaged:
+                    # Packaged app execution
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                else:
+                    # Script execution - use pythonw
+                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+            
+            logger.debug(f"Registered folder lock context menu: {key_path}")
+        except Exception as e:
+            logger.error(f"Failed to register folder lock: {e}")
+            raise
     
     def _register_folder_unlock(self):
         """Register Unlock for folders"""
-        key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_UNLOCK_KEY}"
-        
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
-            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
-        
-        # Use batch file wrapper
-        cmd_key = f"{key_path}\\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
-            batch_file = os.path.join(self.fadcrypt_folder, 'FadCryptUnlock.bat')
-            cmd = f'"{batch_file}" "%%1"'
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+        try:
+            key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_UNLOCK_KEY}"
+            
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
+            
+            # Use PowerShell to run silently without console window
+            cmd_key = f"{key_path}\\command"
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
+                if self.is_packaged:
+                    # Packaged app execution
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                else:
+                    # Script execution - use pythonw
+                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
+            
+            logger.debug(f"Registered folder unlock context menu: {key_path}")
+        except Exception as e:
+            logger.error(f"Failed to register folder unlock: {e}")
+            raise
     
     def unregister_context_menu(self) -> bool:
         """Remove context menu entries"""
@@ -133,16 +232,19 @@ class ContextMenuManager:
                 f"{self.REGISTRY_BASE}\\{self.FOLDER_UNLOCK_KEY}"
             ]
             
+            removed_count = 0
             for key_path in keys_to_remove:
                 try:
                     self._delete_key(winreg.HKEY_CURRENT_USER, key_path)
-                except:
-                    pass
+                    removed_count += 1
+                    logger.info(f"Removed registry key: {key_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove key {key_path}: {e}")
             
-            logger.info("Context menu unregistered")
-            return True
+            logger.info(f"Context menu cleanup completed: {removed_count}/{len(keys_to_remove)} keys removed")
+            return removed_count > 0
         except Exception as e:
-            logger.error(f"Failed to unregister: {e}")
+            logger.error(f"Failed to unregister context menu: {e}")
             return False
     
     def _delete_key(self, hive, path):

@@ -18,36 +18,52 @@ if platform.system() == "Windows" and '--lock' not in sys.argv and '--unlock' no
         from core.windows.shell_extension import ContextMenuManager
         import subprocess
         manager = ContextMenuManager()
-        if manager.register_context_menu():
-            # Restart explorer to apply registry changes
+        success, already_registered = manager.register_context_menu_if_needed()
+        
+        if success and not already_registered:
+            # Only restart explorer if we actually registered something new
+            print("[CONTEXT MENU] New registration detected, restarting Explorer...", flush=True)
             try:
-                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], stderr=subprocess.DEVNULL, timeout=5)
+                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                             stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.Popen('explorer.exe')
-            except:
-                pass  # Explorer restart failed, but context menu is registered
+                print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
+            except Exception as e:
+                print(f"[CONTEXT MENU] Warning: Could not restart Explorer: {e}", flush=True)
+        elif success and already_registered:
+            print("[CONTEXT MENU] Already registered, skipping Explorer restart", flush=True)
+        else:
+            print("[CONTEXT MENU] Registration failed", flush=True)
     except Exception as e:
-        pass  # Silent fail if registration doesn't work
+        print(f"[CONTEXT MENU] Error during registration: {e}", flush=True)
 
 # Handle --lock and --unlock from context menu
 if '--lock' in sys.argv or '--unlock' in sys.argv:
+    print(f"[CLI] Processing CLI arguments: {sys.argv}", flush=True)
     try:
         if '--lock' in sys.argv:
             idx = sys.argv.index('--lock')
             if idx + 1 < len(sys.argv):
                 path = sys.argv[idx + 1]
+                print(f"[CLI] Locking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import lock_file_with_password
                 success = lock_file_with_password(path)
+                print(f"[CLI] Lock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
         
         elif '--unlock' in sys.argv:
             idx = sys.argv.index('--unlock')
             if idx + 1 < len(sys.argv):
                 path = sys.argv[idx + 1]
+                print(f"[CLI] Unlocking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import unlock_file_with_password
                 success = unlock_file_with_password(path)
+                print(f"[CLI] Unlock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[CLI] Error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if '--cleanup' in sys.argv:
@@ -174,7 +190,7 @@ if '--cleanup' in sys.argv:
                     print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
         
         elif system == "Windows":
-            print("[CLEANUP] Windows cleanup - restoring system tools...", flush=True)
+            print("[CLEANUP] Windows cleanup - restoring system tools and cleaning registry...", flush=True)
             import winreg
             
             # Registry keys that FadCrypt may have disabled
@@ -197,6 +213,18 @@ if '--cleanup' in sys.argv:
                     pass  # Key doesn't exist
                 except Exception as e:
                     print(f"[CLEANUP] Warning: Could not restore {value_name}: {e}", flush=True)
+            
+            # Remove FadCrypt context menu entries
+            print("[CLEANUP] Removing FadCrypt context menu entries...", flush=True)
+            try:
+                from core.windows.shell_extension import ContextMenuManager
+                manager = ContextMenuManager()
+                if manager.unregister_context_menu():
+                    print("[CLEANUP] ✅ Removed context menu entries", flush=True)
+                else:
+                    print("[CLEANUP] ⚠️  No context menu entries found to remove", flush=True)
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not remove context menu entries: {e}", flush=True)
             
             # Remove from Windows startup
             try:

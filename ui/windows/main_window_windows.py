@@ -302,4 +302,90 @@ class MainWindowWindows(MainWindowBase):
         except Exception as e:
             print(f"Failed to enable system tools: {e}")
             return False
+    
+    def cleanup_context_menu(self):
+        """
+        Remove FadCrypt context menu entries from Windows registry.
+        Called during uninstall cleanup.
+        """
+        try:
+            from core.windows.shell_extension import ContextMenuManager
+            manager = ContextMenuManager()
+            if manager.unregister_context_menu():
+                print("Context menu entries removed successfully")
+                return True
+            else:
+                print("No context menu entries found to remove")
+                return True
+        except Exception as e:
+            print(f"Failed to remove context menu entries: {e}")
+            return False
+    
+    def refresh_context_menu(self):
+        """
+        Force refresh FadCrypt context menu entries in Windows registry.
+        Called when user clicks the refresh button in settings.
+        """
+        try:
+            from core.windows.shell_extension import ContextMenuManager
+            import subprocess
+            manager = ContextMenuManager()
+            
+            print("[CONTEXT MENU] Starting force refresh of context menu entries...", flush=True)
+            
+            # Show progress message
+            QMessageBox.information(
+                self,
+                "Refreshing Context Menu",
+                "Refreshing Windows Explorer context menu entries...\n\nThis will restart Windows Explorer."
+            )
+            
+            if manager.force_register_context_menu():
+                print("[CONTEXT MENU] Context menu refreshed successfully, restarting Explorer...", flush=True)
+                
+                # Restart Explorer to apply changes
+                try:
+                    subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                                 stderr=subprocess.DEVNULL, timeout=5)
+                    subprocess.Popen('explorer.exe')
+                    print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
+                    
+                    QMessageBox.information(
+                        self,
+                        "Success",
+                        "Context menu entries refreshed successfully!\n\nWindows Explorer has been restarted."
+                    )
+                    return True
+                except subprocess.TimeoutExpired:
+                    print("[CONTEXT MENU] Explorer restart timed out", flush=True)
+                    QMessageBox.warning(
+                        self,
+                        "Partial Success",
+                        "Context menu entries refreshed successfully!\n\nHowever, Explorer restart timed out. You may need to restart Explorer manually."
+                    )
+                    return True
+                except Exception as e:
+                    print(f"[CONTEXT MENU] Failed to restart Explorer: {e}", flush=True)
+                    QMessageBox.warning(
+                        self,
+                        "Partial Success",
+                        "Context menu entries refreshed successfully!\n\nHowever, failed to restart Explorer automatically. Please restart Explorer manually."
+                    )
+                    return True
+            else:
+                print("[CONTEXT MENU] Failed to refresh context menu entries", flush=True)
+                QMessageBox.warning(
+                    self,
+                    "Refresh Failed",
+                    "Failed to refresh context menu entries.\n\nPlease check the console for error details."
+                )
+                return False
+        except Exception as e:
+            print(f"[CONTEXT MENU] Failed to refresh context menu entries: {e}", flush=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to refresh context menu entries:\n{str(e)}"
+            )
+            return False
 

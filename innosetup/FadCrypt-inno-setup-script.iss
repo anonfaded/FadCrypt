@@ -58,3 +58,21 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 ; Run cleanup to restore system settings before uninstalling
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup"; Flags: runhidden waituntilterminated
 
+[Registry]
+; Register context menu during installation
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock"; ValueType: string; ValueName: ""; ValueData: "Lock with FadCrypt"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptLock.bat"" ""%1"""; Flags: uninsdeletekey
+
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock"; ValueType: string; ValueName: ""; ValueData: "Unlock with FadCrypt"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptUnlock.bat"" ""%1"""; Flags: uninsdeletekey
+
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock"; ValueType: string; ValueName: ""; ValueData: "Lock with FadCrypt"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptLock.bat"" ""%1"""; Flags: uninsdeletekey
+
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock"; ValueType: string; ValueName: ""; ValueData: "Unlock with FadCrypt"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptUnlock.bat"" ""%1"""; Flags: uninsdeletekey
+
