@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "FadCrypt"
-#define MyAppVersion "v0.3.0"
+#define MyAppVersion "v2.0.0"
 #define MyAppPublisher "FadSec Lab"
 #define MyAppURL "https://faded.dev"
 #define MyAppExeName "FadCrypt.exe"
@@ -30,9 +30,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
-OutputDir=C:\Users\faded\Desktop\FadCrypt\setup
+OutputDir=..\dist
 OutputBaseFilename=FadCryptSetup
-SetupIconFile=C:\Users\faded\Documents\repos\FadCrypt\img\1.ico
+SetupIconFile=..\img\1.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -44,7 +44,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\faded\Documents\repos\FadCrypt\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -59,20 +59,20 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup"; Flags: runhidden waituntilterminated
 
 [Registry]
-; Register context menu during installation
+; Register context menu during installation - use PowerShell for silent execution
 Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock"; ValueType: string; ValueName: ""; ValueData: "Lock with FadCrypt"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptLock.bat"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: "powershell.exe -NoProfile -WindowStyle Hidden -Command ""& '{app}\{#MyAppExeName}' --lock '%1'"""; Flags: uninsdeletekey
 
 Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock"; ValueType: string; ValueName: ""; ValueData: "Unlock with FadCrypt"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptUnlock.bat"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: "powershell.exe -NoProfile -WindowStyle Hidden -Command ""& '{app}\{#MyAppExeName}' --unlock '%1'"""; Flags: uninsdeletekey
 
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock"; ValueType: string; ValueName: ""; ValueData: "Lock with FadCrypt"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptLock.bat"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptLock\command"; ValueType: string; ValueName: ""; ValueData: "powershell.exe -NoProfile -WindowStyle Hidden -Command ""& '{app}\{#MyAppExeName}' --lock '%1'"""; Flags: uninsdeletekey
 
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock"; ValueType: string; ValueName: ""; ValueData: "Unlock with FadCrypt"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: """{app}\core\windows\FadCryptUnlock.bat"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\FadCryptUnlock\command"; ValueType: string; ValueName: ""; ValueData: "powershell.exe -NoProfile -WindowStyle Hidden -Command ""& '{app}\{#MyAppExeName}' --unlock '%1'"""; Flags: uninsdeletekey
 
