@@ -80,6 +80,8 @@ a = Analysis(
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.sip',
+        'PyQt6.QtNetwork',
+        'PyQt6.QtDBus',
         # External dependencies - Other
         'PIL',
         'PIL.Image',
@@ -118,6 +120,14 @@ a = Analysis(
         # Windows compatibility modules
         'win_compat',
         'win_mock',
+        # Additional cryptography dependencies
+        'cryptography.hazmat.primitives.ciphers',
+        'cryptography.hazmat.primitives.kdf.pbkdf2',
+        'cryptography.hazmat.primitives.padding',
+        # Additional Windows modules
+        'msvcrt',
+        'nt',
+        '_winapi',
     ],
     hookspath=[],
     hooksconfig={},
@@ -142,7 +152,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # Disable UPX to avoid compression issues
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,  # GUI app, no console

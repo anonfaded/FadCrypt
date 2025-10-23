@@ -71,6 +71,17 @@ if '--cleanup' in sys.argv:
     import platform
     print("[CLEANUP] Starting FadCrypt cleanup...", flush=True)
     
+    # Log to file for debugging uninstall issues
+    try:
+        log_file = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cleanup.log')
+        with open(log_file, 'w') as f:
+            f.write(f"[CLEANUP] Started at {os.times()}\n")
+            f.write(f"[CLEANUP] Executable: {sys.executable}\n")
+            f.write(f"[CLEANUP] Arguments: {sys.argv}\n")
+            f.write(f"[CLEANUP] Platform: {platform.system()}\n")
+    except Exception as e:
+        print(f"[CLEANUP] Could not create log file: {e}", flush=True)
+    
     try:
         system = platform.system()
         
@@ -193,6 +204,66 @@ if '--cleanup' in sys.argv:
             print("[CLEANUP] Windows cleanup - restoring system tools and cleaning registry...", flush=True)
             import winreg
             
+            # Remove FadCrypt from PATH
+            print("[CLEANUP] Removing FadCrypt from PATH...", flush=True)
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ | winreg.KEY_SET_VALUE)
+                try:
+                    current_path, _ = winreg.QueryValueEx(key, "Path")
+                    if not current_path:
+                        print("[CLEANUP] ℹ️  PATH is empty", flush=True)
+                    else:
+                        # Get the installation directory (where this executable should be)
+                        # During uninstall, we should be running from the installed location
+                        exe_path = sys.executable
+                        if hasattr(sys, '_MEIPASS'):
+                            # Running from PyInstaller bundle - get the directory containing the exe
+                            exe_dir = os.path.dirname(exe_path)
+                        else:
+                            # Running from source - don't modify PATH
+                            exe_dir = None
+                        
+                        if exe_dir:
+                            print(f"[CLEANUP] Removing directory from PATH: {exe_dir}", flush=True)
+                            # Split PATH and filter out the exe directory
+                            path_parts = current_path.split(';')
+                            original_count = len(path_parts)
+                            # Remove empty strings and the exe directory
+                            filtered_parts = [p for p in path_parts if p and p.strip() and p.strip() != exe_dir]
+                            
+                            if len(filtered_parts) != original_count:
+                                new_path = ';'.join(filtered_parts)
+                                winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, new_path)
+                                print("[CLEANUP] ✅ Removed FadCrypt from PATH", flush=True)
+                            else:
+                                print("[CLEANUP] ℹ️  FadCrypt directory not found in PATH", flush=True)
+                        else:
+                            print("[CLEANUP] ℹ️  Not running from PyInstaller bundle, skipping PATH removal", flush=True)
+                except FileNotFoundError:
+                    print("[CLEANUP] ℹ️  PATH environment variable not found", flush=True)
+                finally:
+                    winreg.CloseKey(key)
+                    
+                # Notify system of environment change
+                try:
+                    import ctypes
+                    HWND_BROADCAST = 0xFFFF
+                    WM_SETTINGCHANGE = 0x001A
+                    SMTO_ABORTIFHUNG = 0x0002
+                    result = ctypes.windll.user32.SendMessageTimeoutW(
+                        HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+                        SMTO_ABORTIFHUNG, 5000, None
+                    )
+                    if result:
+                        print("[CLEANUP] ✅ Notified system of PATH change", flush=True)
+                except Exception as e:
+                    print(f"[CLEANUP] ℹ️  Could not notify system of PATH change: {e}", flush=True)
+                    
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not remove from PATH: {e}", flush=True)
+            
+            # Registry keys that FadCrypt may have disabled
+            
             # Registry keys that FadCrypt may have disabled
             keys_to_restore = [
                 (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
@@ -242,6 +313,15 @@ if '--cleanup' in sys.argv:
             print(f"[CLEANUP] ✅ Restored {restored_count} Windows settings", flush=True)
         
         print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
+        
+        # Log completion
+        try:
+            log_file = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cleanup.log')
+            with open(log_file, 'a') as f:
+                f.write(f"[CLEANUP] Completed successfully at {os.times()}\n")
+        except:
+            pass
+            
         sys.exit(0)
         
     except Exception as e:

@@ -102,6 +102,25 @@ def lock_file_with_password(file_path: str) -> bool:
     try:
         logger.info(f"Starting lock operation for: {file_path}")
         
+        # Check if password exists first
+        password_manager = get_password_manager()
+        password_file = password_manager.password_file
+        
+        if not os.path.exists(password_file):
+            logger.error("No master password set up. Please open FadCrypt GUI and create a password first.")
+            # Show error dialog
+            from PyQt6.QtWidgets import QApplication, QMessageBox
+            app = QApplication.instance()
+            if app is None:
+                app = QApplication(sys.argv)
+            
+            QMessageBox.critical(
+                None,
+                "FadCrypt - Password Required",
+                "No master password has been set up.\n\nPlease open the FadCrypt application and create a password first before using context menu locking."
+            )
+            return False
+        
         # Show password dialog
         password = show_password_dialog("LOCK")
         if not password:
@@ -110,7 +129,6 @@ def lock_file_with_password(file_path: str) -> bool:
         
         logger.info("Password entered, verifying...")
         # Use same password verification as GUI
-        password_manager = get_password_manager()
         if not password_manager.verify_password(password):
             logger.error("Incorrect password")
             return False
@@ -137,6 +155,25 @@ def lock_file_with_password(file_path: str) -> bool:
 def unlock_file_with_password(file_path: str) -> bool:
     """Unlock file after password verification using existing PasswordManager"""
     try:
+        # Check if password exists first
+        password_manager = get_password_manager()
+        password_file = password_manager.password_file
+        
+        if not os.path.exists(password_file):
+            logger.error("No master password set up. Please open FadCrypt GUI and create a password first.")
+            # Show error dialog
+            from PyQt6.QtWidgets import QApplication, QMessageBox
+            app = QApplication.instance()
+            if app is None:
+                app = QApplication(sys.argv)
+            
+            QMessageBox.critical(
+                None,
+                "FadCrypt - Password Required",
+                "No master password has been set up.\n\nPlease open the FadCrypt application and create a password first before using context menu unlocking."
+            )
+            return False
+        
         # Show password dialog
         password = show_password_dialog("UNLOCK")
         if not password:
@@ -144,7 +181,6 @@ def unlock_file_with_password(file_path: str) -> bool:
             return False
         
         # Use same password verification as GUI
-        password_manager = get_password_manager()
         if not password_manager.verify_password(password):
             logger.error("Incorrect password")
             return False

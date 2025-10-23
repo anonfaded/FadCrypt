@@ -40,9 +40,13 @@ class ContextMenuManager:
         if is_packaged:
             # Running from PyInstaller bundle
             if exe_path is None:
-                exe_path = os.path.join(sys._MEIPASS, 'fadcrypt.exe')
+                exe_path = sys.executable  # Use the actual executable path
             if fadcrypt_folder is None:
-                fadcrypt_folder = sys._MEIPASS
+                exe_dir = os.path.dirname(sys.executable)
+                fadcrypt_folder = exe_dir
+                # Check if we're running from an installed location (not development dist)
+                # If fadcrypt is in PATH, use the command name instead of full path
+                self.use_command_name = self._is_fadcrypt_in_path()
         else:
             # Running from source/script
             if exe_path is None:
@@ -65,6 +69,18 @@ class ContextMenuManager:
         self.fadcrypt_folder = fadcrypt_folder
         self.is_packaged = is_packaged
         self.batch_files_dir = os.path.join(fadcrypt_folder, 'core', 'windows')
+    
+    def _is_fadcrypt_in_path(self) -> bool:
+        """Check if fadcrypt command is available in PATH"""
+        try:
+            import subprocess
+            result = subprocess.run(['where', 'fadcrypt'], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  shell=True)
+            return result.returncode == 0
+        except:
+            return False
     
     def is_context_menu_registered(self) -> bool:
         """Check if FadCrypt context menu entries are already registered"""
@@ -131,9 +147,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution - set working directory and use embedded icon
+                    # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                    if hasattr(self, 'use_command_name') and self.use_command_name:
+                        # Use command name if available in PATH - run completely silently
+                        cmd = f'cmd.exe /c "start /B fadcrypt --lock "%1""'
+                    else:
+                        # Use full path - run completely silently
+                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --lock "%1""'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -159,9 +180,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution - set working directory and use embedded icon
+                    # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                    if hasattr(self, 'use_command_name') and self.use_command_name:
+                        # Use command name if available in PATH - run completely silently
+                        cmd = f'cmd.exe /c "start /B fadcrypt --unlock "%1""'
+                    else:
+                        # Use full path - run completely silently
+                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --unlock "%1""'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -187,9 +213,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution - set working directory and use embedded icon
+                    # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                    if hasattr(self, 'use_command_name') and self.use_command_name:
+                        # Use command name if available in PATH - run completely silently
+                        cmd = f'cmd.exe /c "start /B fadcrypt --lock "%1""'
+                    else:
+                        # Use full path - run completely silently
+                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --lock "%1""'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -215,9 +246,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution - set working directory and use embedded icon
+                    # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                    if hasattr(self, 'use_command_name') and self.use_command_name:
+                        # Use command name if available in PATH - run completely silently
+                        cmd = f'cmd.exe /c "start /B fadcrypt --unlock "%1""'
+                    else:
+                        # Use full path - run completely silently
+                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --unlock "%1""'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')

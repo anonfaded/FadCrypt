@@ -640,7 +640,7 @@ class AppGridWidget(QWidget):
             empty_layout.addWidget(title_label)
             
             # Description
-            desc_label = QLabel("Click the 'Add Application' button below to start\nprotecting your applications with encryption")
+            desc_label = QLabel("Click the 'Add Application' button below to start\nprotecting your applications")
             desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             desc_label.setWordWrap(True)
             desc_label.setStyleSheet("""
