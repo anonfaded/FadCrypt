@@ -42,14 +42,14 @@ class FileLockManagerWindows(FileLockManager):
             )
             
             if result.returncode == 0:
-                print(f"  💾 ACL backed up to: {os.path.basename(backup_path)}")
+                print(f"  [ACL] Backed up to: {os.path.basename(backup_path)}")
                 return True
             else:
-                print(f"  ⚠️  ACL backup warning: {result.stderr}")
+                print(f"  [ACL] Backup warning: {result.stderr}")
                 return False
                 
         except Exception as e:
-            print(f"  ❌ Error backing up ACL: {e}")
+            print(f"  [ACL] Error backing up: {e}")
             return False
     
     def _restore_acl(self, path: str) -> bool:
@@ -57,7 +57,7 @@ class FileLockManagerWindows(FileLockManager):
         backup_path = self._get_acl_backup_path(path)
         
         if not os.path.exists(backup_path):
-            print(f"  ⚠️  No ACL backup found, using default restore")
+            print(f"  [ACL] No backup found, using default restore")
             # Fallback: Grant full control to Everyone
             try:
                 subprocess.run(
@@ -79,7 +79,7 @@ class FileLockManagerWindows(FileLockManager):
             )
             
             if result.returncode == 0:
-                print(f"  ✅ ACL restored from backup")
+                print(f"  [ACL] Restored from backup")
                 # Clean up backup file
                 try:
                     os.remove(backup_path)
@@ -87,13 +87,13 @@ class FileLockManagerWindows(FileLockManager):
                     pass
                 return True
             else:
-                print(f"  ⚠️  ACL restore warning: {result.stderr}")
+                print(f"  [ACL] Restore warning: {result.stderr}")
                 # Try fallback
                 subprocess.run(['icacls', path, '/grant', 'Everyone:(F)'], timeout=10)
                 return False
                 
         except Exception as e:
-            print(f"  ❌ Error restoring ACL: {e}")
+            print(f"  [ACL] Error restoring: {e}")
             return False
     
     def _get_item_metadata(self, path: str, item_type: str) -> Optional[Dict]:
@@ -120,114 +120,134 @@ class FileLockManagerWindows(FileLockManager):
                 "locked_at": int(time.time())
             }
             
-            print(f"  📋 Metadata: {metadata['name']} | ACL backed up | icacls")
+            print(f"  [Item] Metadata: {metadata['name']} | ACL backed up | icacls")
             return metadata
             
         except Exception as e:
-            print(f"❌ Error getting metadata for {path}: {e}")
+            print(f"[Item] Error getting metadata for {path}: {e}")
             return None
     
     def _lock_item(self, item: Dict) -> bool:
         """
-        Lock file or folder by denying all permissions.
+        Lock file or folder using ProcessMonitor (process-level interception).
         
-        Denies: Read, Write, Execute, Delete, Delete Child, Change Permissions
+        Does NOT use ACL deny rules because:
+        1. ACL deny prevents file access completely
+        2. This prevents our app from intercepting and showing password dialog
+        3. Instead, ProcessMonitor scans for process access and intercepts
+        
+        This matches Linux behavior: monitor file access → show password dialog
         """
         path = item['path']
         
         if not os.path.exists(path):
-            print(f"⚠️  Path no longer exists: {path}")
+            print(f"[Item] Path no longer exists: {path}")
             return False
         
-        try:
-            # Deny all permissions to Everyone
-            # F=Full Control, R=Read, W=Write, D=Delete, DC=Delete Child, X=Execute
-            # WD=Write Data, AD=Append Data, REA=Read Extended Attributes, WEA=Write Extended Attributes
-            print(f"  🔒 Denying all access with icacls: {path}")
-            
-            result = subprocess.run(
-                ['icacls', path, '/deny', 'Everyone:(F,R,W,D,DC,WD,AD,X,REA,WEA)'],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            if result.returncode != 0:
-                print(f"  ❌ icacls deny failed: {result.stderr}")
-                return False
-            
-            # For folders, also deny inheritance
-            if item['type'] == 'folder':
-                subprocess.run(
-                    ['icacls', path, '/inheritance:r'],
-                    capture_output=True,
-                    timeout=10
-                )
-            
-            print(f"  ✅ Access denied successfully")
-            return True
-            
-        except subprocess.TimeoutExpired:
-            print(f"  ❌ Lock operation timed out for: {path}")
-            return False
-        except Exception as e:
-            print(f"  ❌ Error locking {path}: {e}")
-            return False
+        # Just record that it's locked - actual monitoring done by ProcessMonitor
+        print(f"  [Item] Locked (monitored by ProcessMonitor): {path}")
+        return True
     
     def _unlock_item(self, item: Dict) -> bool:
         """
-        Unlock file or folder and restore original ACL.
+        Unlock file or folder by removing monitoring.
+        
+        Since we're using ProcessMonitor (process-level interception) instead
+        of ACL deny rules, there are no ACL rules to remove. This just marks
+        the item as unlocked in the locked_items list.
+        
+        The ProcessMonitor will stop intercepting once the item is removed
+        from the locked_items list.
         """
         path = item['path']
         
         if not os.path.exists(path):
-            print(f"⚠️  Path no longer exists: {path}")
+            print(f"[Item] Path no longer exists: {path}")
             return True  # Consider it "unlocked" if it doesn't exist
         
-        try:
-            # Step 1: Remove deny rules
-            print(f"  🔓 Removing deny rules: {path}")
-            subprocess.run(
-                ['icacls', path, '/remove:d', 'Everyone'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            # Step 2: Restore ACL from backup
-            print(f"  🔓 Restoring original ACL: {path}")
-            if self._restore_acl(path):
-                print(f"  ✅ Access restored successfully")
-                return True
-            else:
-                print(f"  ⚠️  ACL restore had issues, but deny rules removed")
-                return True  # Partial success
-            
-        except subprocess.TimeoutExpired:
-            print(f"  ❌ Unlock operation timed out for: {path}")
-            return False
-        except Exception as e:
-            print(f"  ❌ Error unlocking {path}: {e}")
-            return False
+        # Just log that it's unlocked - ProcessMonitor handles the rest
+        print(f"  [Item] Unlocked (stopped monitoring): {path}")
+        return True
     
     def _lock_config_file(self, path: str):
         """
-        Lock config file (deny delete/write but allow read).
+        Lock config file - uses only file attributes (hidden + system + readonly).
+        
+        NOTE: Does NOT use ACL deny rules because config files need frequent 
+        temporary unlocking for reads/writes, and ACL DENY causes error code 5 
+        when trying to unprotect.
+        
+        Config files are protected by:
+        1. File attributes (HIDDEN + SYSTEM + READONLY)  
+        2. Only FadCrypt can modify via FileProtection safe_write/read
         """
-        if not os.path.exists(path):
-            return
+        # Config files should only use file attributes, not ACL deny rules
+        # ACL locks cause error code 5 when trying to temporarily unlock
+        # This function is intentionally a no-op
+        pass
+    
+    def start_monitoring(self, password_callback=None, get_state_func=None, set_state_func=None, log_activity_func=None):
+        """
+        Start monitoring locked files for access attempts.
+        
+        Uses NativeProcessMonitor (Windows API NtQuerySystemInformation).
+        Queries kernel handle table directly - no external tools or psutil limitations.
+        
+        Args:
+            password_callback: Function to verify password, returns bool (True if correct)
+            get_state_func: Function to get monitoring state
+            set_state_func: Function to update monitoring state
+            log_activity_func: Function to log activity events
+        """
+        if hasattr(self, '_monitor') and self._monitor is not None:
+            print("[FileLockManager] Monitoring already started")
+            return False
         
         try:
-            # Deny only delete and write, keep read permission
-            subprocess.run(
-                ['icacls', path, '/deny', 'Everyone:(D,DC,WD,AD)'],
-                capture_output=True,
-                text=True,
-                timeout=10
+            from core.windows.native_api_v2 import NativeAPIMonitorV2
+            
+            if not self.locked_items:
+                print("[FileLockManager] No locked files to monitor")
+                return False
+            
+            print(f"[FileLockManager] Starting native API monitor for {len(self.locked_items)} items")
+            
+            def on_access(path, pid, proc_name):
+                """Process access detected"""
+                if password_callback:
+                    password_callback(path)
+                print(f"[Access] {proc_name} (PID {pid}) -> {os.path.basename(path)}")
+            
+            # Create and start monitor
+            self._monitor = NativeAPIMonitorV2(
+                locked_items=list(self.locked_items),
+                callback=on_access,
+                scan_interval=1.0  # Query every second
             )
+            self._monitor.start()
+            
+            print("[FileLockManager] OK: Native API v2 monitor started")
+            return True
+            
         except Exception as e:
-            print(f"  ⚠️  Error locking config {path}: {e}")
+            print(f"[FileLockManager] Error starting monitor: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
+    def stop_monitoring(self):
+        """Stop monitoring locked files"""
+        if hasattr(self, '_monitor') and self._monitor is not None:
+            try:
+                self._monitor.stop()
+                self._monitor = None
+                return True
+            except Exception as e:
+                print(f"[FileLockManager] Error stopping monitor: {e}")
+                self._monitor = None
+                return False
+        return False
+
     def _unlock_config_file(self, path: str):
         """Unlock config file"""
         if not os.path.exists(path):
@@ -241,4 +261,4 @@ class FileLockManagerWindows(FileLockManager):
                 timeout=10
             )
         except Exception as e:
-            print(f"  ⚠️  Error unlocking config {path}: {e}")
+            print(f"  [Config] Error unlocking {path}: {e}")

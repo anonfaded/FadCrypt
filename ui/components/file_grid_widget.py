@@ -581,11 +581,11 @@ class FileGridWidget(QWidget):
             item_name = os.path.basename(path).lower()
             name_match = (not search_term) or (search_term in item_name)
             
-            # Check type match
+            # Check type match - use card's stored type, not filesystem
             if filter_type == "Files Only":
-                type_match = os.path.isfile(path)
+                type_match = card.item_type == "file"
             elif filter_type == "Folders Only":
-                type_match = os.path.isdir(path)
+                type_match = card.item_type == "folder"
             else:  # "All Items"
                 type_match = True
             

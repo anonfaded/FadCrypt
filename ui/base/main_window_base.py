@@ -211,23 +211,8 @@ class MainWindowBase(QMainWindow):
                                     os.remove(config_file)
                                     print(f"🗑️  Deleted protected file: {os.path.basename(config_file)}")
                                 except PermissionError:
-                                    print(f"❌ Direct deletion failed (permissions), trying elevated removal...")
-                                    # Try via elevated service
-                                    from core.windows.elevated_service_client import get_windows_elevated_client
-                                    try:
-                                        client = get_windows_elevated_client()
-                                        if client.is_available():
-                                            success, msg = client.unprotect_files([config_file])
-                                            if success:
-                                                try:
-                                                    os.remove(config_file)
-                                                    print(f"✅ Deleted via elevated removal: {os.path.basename(config_file)}")
-                                                except Exception as e:
-                                                    print(f"⚠️  Still can't delete after elevated unprotect: {e}")
-                                        else:
-                                            print(f"⚠️  Elevated service not available")
-                                    except Exception as e:
-                                        print(f"⚠️  Elevated removal failed: {e}")
+                                    print(f"❌ Direct deletion failed (permissions), file may be locked by another process")
+                                    # Note: Elevated service approach removed - using ACL locking instead
                                 
                                 # Recreate the file if we have content
                                 if os.path.exists(config_file):
@@ -1834,30 +1819,19 @@ class MainWindowBase(QMainWindow):
         
         for file_path in file_paths:
             if self.file_lock_manager.add_item(file_path, "file"):
-                # Get metadata to display
-                items = self.file_lock_manager.get_locked_items()
-                for item in items:
-                    if item['path'] == file_path:
-                        self.file_grid_widget.add_item(
-                            file_path,
-                            "file",
-                            item.get('unlock_count', 0),
-                            item.get('added_at')
-                        )
-                        break
                 added_count += 1
-                
                 # Process UI events periodically for large batches
                 if added_count % 50 == 0:
                     QApplication.processEvents()
         
-        # Force grid refresh after bulk add
-        if added_count > 0:
-            print(f"[Add Files] Refreshing UI with {added_count} new files...")
-            self.file_grid_widget.refresh_grid()
-        
         if added_count > 0:
             print(f"[Add Files] Added {added_count} file(s) successfully")
+            
+            # Save config with proper preservation of applications
+            self.save_locked_files_config()
+            
+            # Reload the grid to show all locked files
+            self.load_locked_files()
             
             # Auto-lock files if monitoring is active
             if self.monitoring_active and self.file_lock_manager:
@@ -1867,10 +1841,9 @@ class MainWindowBase(QMainWindow):
                 if success > 0:
                     print(f"✅ Re-locked {success} items (including new files)")
                 
-                # Update fanotify watches if using fanotify
-                if hasattr(self.file_lock_manager, 'update_monitored_items'):
-                    self.file_lock_manager.update_monitored_items()
-                    print(f"🔄 Updated fanotify watches")
+                # FileAccessMonitor automatically picks up new locked items
+                # No manual update needed (watchdog will detect the new locked files)
+                print(f"📝 New files will be monitored by FileAccessMonitor automatically")
             
             # Update config display to show new locked items
             if hasattr(self, 'update_config_display'):
@@ -1899,19 +1872,13 @@ class MainWindowBase(QMainWindow):
         print(f"[Add Folder] Processing folder: {folder_path}")
         
         if self.file_lock_manager.add_item(folder_path, "folder"):
-            # Get metadata to display
-            items = self.file_lock_manager.get_locked_items()
-            for item in items:
-                if item['path'] == folder_path:
-                    self.file_grid_widget.add_item(
-                        folder_path,
-                        "folder",
-                        item.get('unlock_count', 0),
-                        item.get('added_at')
-                    )
-                    break
-            
             print(f"[Add Folder] Added folder successfully")
+            
+            # Save config with proper preservation of applications
+            self.save_locked_files_config()
+            
+            # Reload the grid to show all locked files
+            self.load_locked_files()
             
             # Auto-lock folder if monitoring is active
             if self.monitoring_active and self.file_lock_manager:
@@ -1978,7 +1945,14 @@ class MainWindowBase(QMainWindow):
             # Single refresh at end (O(n) instead of O(n²))
             if removed_count > 0:
                 print(f"[Remove] Refreshing file grid after removing {removed_count} items...")
-                self.file_grid_widget.refresh_grid()
+                # Save config with proper preservation of applications
+                self.save_locked_files_config()
+                # Reload the grid to show updated state
+                self.load_locked_files()
+                
+                # Update config display
+                if hasattr(self, 'update_config_display'):
+                    self.update_config_display()
             
             
             if removed_count > 0:
@@ -1991,6 +1965,9 @@ class MainWindowBase(QMainWindow):
         if not self.file_lock_manager:
             return
         
+        # CRITICAL: Reload from file first to get fresh data
+        self.file_lock_manager._load_locked_items()
+        
         self.file_grid_widget.clear()
         items = self.file_lock_manager.get_locked_items()
         
@@ -2002,6 +1979,43 @@ class MainWindowBase(QMainWindow):
                 item.get('added_at')          # Pass added_at as 4th param
             )
     
+    def save_locked_files_config(self):
+        """Save locked files/folders config while preserving applications"""
+        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+        
+        # Reload locked items from file to ensure we have the latest state
+        if self.file_lock_manager:
+            self.file_lock_manager._load_locked_items()
+        
+        # Load existing config to preserve applications
+        existing_config = {"applications": [], "locked_files_and_folders": []}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
+        # Create unified config - preserve applications
+        locked_items = self.file_lock_manager.get_locked_items() if self.file_lock_manager else []
+        unified_config = {
+            'applications': existing_config.get('applications', []),
+            'locked_files_and_folders': locked_items
+        }
+        
+        try:
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(unified_config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
+            
+            if success:
+                print(f"[Files Config] Saved {len(locked_items)} locked items (preserved {len(existing_config.get('applications', []))} apps)")
+            else:
+                print(f"[Files Config] Error saving: {error}")
+                
+        except Exception as e:
+            print(f"[Files Config] Error: {e}")
     def select_all_apps(self):
         """Select all applications in the list"""
         if not self.app_list_widget.apps_data:
@@ -2601,12 +2615,24 @@ class MainWindowBase(QMainWindow):
             # Lock config files
             self.file_lock_manager.lock_fadcrypt_configs()
             
-            # Start monitoring (fanotify on Linux, nothing on Windows yet)
+            # Start monitoring with password callback
             if hasattr(self.file_lock_manager, 'start_monitoring'):
-                if self.file_lock_manager.start_monitoring():
-                    print("✅ Fanotify monitoring started (kernel-level file access interception)")
+                # Define password callback for locked file access
+                def verify_file_access_password(file_path: str) -> bool:
+                    """Callback when process tries to access locked file"""
+                    print(f"🔐 Access attempt detected: {os.path.basename(file_path)}")
+                    # Show password dialog
+                    from ui.dialogs.password_dialog import ask_password
+                    password = ask_password(self)
+                    if not password:
+                        return False
+                    # Verify password
+                    return self.password_manager.verify(password)
+                
+                if self.file_lock_manager.start_monitoring(verify_file_access_password):
+                    print("✅ Process monitoring started (intercepting locked file access)")
                 else:
-                    print("ℹ️  Fanotify monitoring skipped - no files/folders to monitor")
+                    print("ℹ️  Process monitoring skipped - no files/folders to monitor")
             
             # Log lock event
             self.log_activity(
@@ -3686,53 +3712,6 @@ class MainWindowBase(QMainWindow):
             
             self.save_locked_files_config()
             self.show_message("Success", f"Removed {len(selected_items)} item(s) successfully.", "success")
-    
-    def save_locked_files_config(self):
-        """Save locked files to unified config file"""
-        from datetime import datetime
-        from core.file_protection import safe_write_to_protected_file
-        
-        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
-        
-        try:
-            # Load existing config to preserve applications
-            existing_config = {"applications": [], "locked_files_and_folders": []}
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, 'r') as f:
-                        existing_config = json.load(f)
-                except:
-                    pass
-            
-            # Build locked items array from file grid
-            items_dict = self.file_grid_widget.cards
-            locked_items = [
-                {
-                    'path': card.item_path,
-                    'type': card.item_type,
-                    'added_at': card.date_added or datetime.now().isoformat()
-                }
-                for card in items_dict.values()
-            ]
-            
-            # Create unified config - preserve applications
-            unified_config = {
-                'applications': existing_config.get('applications', []),
-                'locked_files_and_folders': locked_items
-            }
-            
-            content = json.dumps(unified_config, indent=4)
-            success, error = safe_write_to_protected_file(config_file, content)
-            
-            if success:
-                print(f"Protected files config saved: {len(locked_items)} items (preserved {len(unified_config.get('applications', []))} apps)")
-                
-                # Update config tab display
-                self.update_config_display()
-            else:
-                print(f"Error saving locked files config: {error}")
-        except Exception as e:
-            print(f"Error saving locked files config: {e}")
     
     def open_stats_window(self):
         """Open the enhanced statistics dashboard window - requires password if monitoring active"""

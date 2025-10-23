@@ -78,14 +78,14 @@ class SingleInstanceWindows(SingleInstanceBase):
             
             # ERROR_ALREADY_EXISTS = 183
             if self.error == 183:
-                print("⚠️  Another instance of FadCrypt is already running")
+                print("[WARNING] Another instance of FadCrypt is already running")
                 return False
             
-            print("✅ Single instance lock acquired (Windows mutex)")
+            print("[OK] Single instance lock acquired (Windows mutex)")
             return True
             
         except Exception as e:
-            print(f"❌ Error acquiring Windows mutex: {e}")
+            print(f"[ERROR] Error acquiring Windows mutex: {e}")
             return True  # Allow running if mutex fails
     
     def release_lock(self):

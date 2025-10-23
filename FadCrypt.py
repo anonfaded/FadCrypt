@@ -10,6 +10,45 @@ Detects platform and loads appropriate platform-specific main window.
 # This is called by the uninstaller to restore disabled tools
 import sys
 import os
+import platform
+
+# Register context menu on Windows (first launch)
+if platform.system() == "Windows" and '--lock' not in sys.argv and '--unlock' not in sys.argv and '--cleanup' not in sys.argv:
+    try:
+        from core.windows.shell_extension import ContextMenuManager
+        import subprocess
+        manager = ContextMenuManager()
+        if manager.register_context_menu():
+            # Restart explorer to apply registry changes
+            try:
+                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], stderr=subprocess.DEVNULL, timeout=5)
+                subprocess.Popen('explorer.exe')
+            except:
+                pass  # Explorer restart failed, but context menu is registered
+    except Exception as e:
+        pass  # Silent fail if registration doesn't work
+
+# Handle --lock and --unlock from context menu
+if '--lock' in sys.argv or '--unlock' in sys.argv:
+    try:
+        if '--lock' in sys.argv:
+            idx = sys.argv.index('--lock')
+            if idx + 1 < len(sys.argv):
+                path = sys.argv[idx + 1]
+                from core.windows.cli_lock_handler import lock_file_with_password
+                success = lock_file_with_password(path)
+                sys.exit(0 if success else 1)
+        
+        elif '--unlock' in sys.argv:
+            idx = sys.argv.index('--unlock')
+            if idx + 1 < len(sys.argv):
+                path = sys.argv[idx + 1]
+                from core.windows.cli_lock_handler import unlock_file_with_password
+                success = unlock_file_with_password(path)
+                sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 if '--cleanup' in sys.argv:
     import subprocess

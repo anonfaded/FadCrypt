@@ -238,20 +238,7 @@ class FileProtectionManager:
         
         Tries service first (seamless, no UAC), falls back to direct API.
         """
-        # Try elevated service first (seamless, no UAC prompt)
-        try:
-            from core.windows.elevated_service_client import get_windows_elevated_client
-            client = get_windows_elevated_client()
-            if client.is_available():
-                success, msg = client.protect_files([file_path])
-                if success:
-                    print(f"[FileProtection] Service: Protected {os.path.basename(file_path)} (no UAC!)")
-                    return True, None
-                else:
-                    print(f"[FileProtection] Service protect failed: {msg}, trying direct method...")
-        except Exception as e:
-            logger.debug(f"Service not available: {e}")
-        
+        # Note: Elevated service approach removed - using ACL locking instead
         # Fallback: Direct SetFileAttributesW
         if not WINDOWS_AVAILABLE:
             return False, "Windows ctypes not available"
@@ -281,14 +268,13 @@ class FileProtectionManager:
         """
         Remove protection from file on Windows.
         
-        Uses `attrib` command + `icacls` to remove both file attributes and NTFS ACLs.
-        Falls back to SetFileAttributesW if attrib is unavailable.
+        # Note: Elevated service approach removed - using direct commands instead
         """
         import subprocess
         
         filename = os.path.basename(file_path)
         
-        # First, use Windows `attrib` command to remove HIDDEN, SYSTEM, READONLY attributes
+        # Fallback 1: Use Windows `attrib` command to remove HIDDEN, SYSTEM, READONLY attributes
         try:
             # attrib -h -s -r <file>  removes HIDDEN, SYSTEM, READONLY
             result = subprocess.run(
@@ -305,8 +291,7 @@ class FileProtectionManager:
         except Exception as e:
             print(f"[FileProtection] `attrib` command not available: {e}")
         
-        # Second, fix NTFS ACLs - remove DENY rules that prevent access
-        # Grant full permissions to current user so file can be read/written
+        # Fallback 2: Fix NTFS ACLs - remove DENY rules that prevent access
         try:
             # Reset file permissions - grant full access to current user
             # icacls <file> /reset - Reset to inherited permissions
@@ -319,11 +304,11 @@ class FileProtectionManager:
             
             if result.returncode == 0:
                 print(f"[FileProtection] Windows: Fixed NTFS ACLs on {filename} (reset to inherited)")
+                return True, None
             else:
                 print(f"[FileProtection] `icacls /reset` failed: {result.stderr}, trying /grant...")
                 
-                # Fallback: Grant permissions to current user
-                # Get current user (DOMAIN\USER format)
+                # Fallback 2b: Grant permissions to current user
                 try:
                     import getpass
                     username = f"{os.getenv('USERDOMAIN')}\\{getpass.getuser()}"
@@ -336,51 +321,16 @@ class FileProtectionManager:
                     
                     if result2.returncode == 0:
                         print(f"[FileProtection] Windows: Granted full permissions to {username}")
+                        return True, None
                     else:
                         print(f"[FileProtection] `icacls /grant` also failed: {result2.stderr}")
+                        return False, f"Permission denied (error code 5)"
                 except Exception as e2:
                     print(f"[FileProtection] Could not grant permissions: {e2}")
+                    return False, str(e2)
         except Exception as e:
             print(f"[FileProtection] `icacls` command not available: {e}")
-        
-        # Try elevated service (seamless, no UAC prompt)
-        try:
-            from core.windows.elevated_service_client import get_windows_elevated_client
-            client = get_windows_elevated_client()
-            if client.is_available():
-                success, msg = client.unprotect_files([file_path])
-                if success:
-                    print(f"[FileProtection] Service: Unprotected {filename} (no UAC!)")
-                    return True, None
-                else:
-                    print(f"[FileProtection] Service unprotect failed: {msg}, using direct method...")
-        except Exception as e:
-            logger.debug(f"Service not available: {e}")
-        
-        # Fallback: Direct SetFileAttributesW
-        if not WINDOWS_AVAILABLE:
-            return False, "Windows ctypes not available"
-        
-        try:
-            # Restore original attributes if available, otherwise set to NORMAL
-            if file_path in self.original_attributes:
-                attributes = self.original_attributes[file_path]
-                del self.original_attributes[file_path]
-            else:
-                attributes = self.FILE_ATTRIBUTE_NORMAL
-            
-            # Set file attributes
-            result = windll.kernel32.SetFileAttributesW(file_path, attributes)
-            
-            if result == 0:
-                error_code = windll.kernel32.GetLastError()
-                return False, f"SetFileAttributesW failed with error code: {error_code}"
-            
-            print(f"[FileProtection] Windows: Restored attributes on {filename}")
-            return True, None
-            
-        except Exception as e:
-            return False, f"Windows unprotection failed: {e}"
+            return False, str(e)
     
     # ========== LINUX IMPLEMENTATION ==========
     

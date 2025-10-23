@@ -73,15 +73,15 @@ class PasswordManager:
             
             if success:
                 self.cached_password = password_bytes
-                print(f"[PasswordManager] ✅ Master password created successfully")
+                print(f"[PasswordManager] [OK] Master password created successfully")
                 print(f"[PasswordManager] File now exists: {os.path.exists(self.password_file)}")
                 return True
             else:
-                print("[PasswordManager] ❌ Failed to create master password")
+                print("[PasswordManager] [ERROR] Failed to create master password")
                 return False
                 
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error creating password: {e}")
+            print(f"[PasswordManager] [ERROR] Error creating password: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -98,7 +98,7 @@ class PasswordManager:
         """
         try:
             if not os.path.exists(self.password_file):
-                print(f"[PasswordManager] ⚠️  Password file not found: {self.password_file}")
+                print(f"[PasswordManager] [WARN] Password file not found: {self.password_file}")
                 return False
             
             password_bytes = password.encode('utf-8')
@@ -112,7 +112,7 @@ class PasswordManager:
             )
             
             if decrypted_hash is None:
-                print("[PasswordManager] ❌ Decryption returned None")
+                print("[PasswordManager] [ERROR] Decryption returned None")
                 return False
             
             # Compare with original password
@@ -120,14 +120,14 @@ class PasswordManager:
             
             if is_valid:
                 self.cached_password = password_bytes
-                print("[PasswordManager] ✅ Password verified successfully")
+                print("[PasswordManager] [OK] Password verified successfully")
             else:
-                print("[PasswordManager] ❌ Password verification failed (mismatch)")
+                print("[PasswordManager] [ERROR] Password verification failed (mismatch)")
             
             return is_valid
             
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error verifying password: {e}")
+            print(f"[PasswordManager] [ERROR] Error verifying password: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -312,7 +312,7 @@ class PasswordManager:
             if os.path.exists(self.password_file):
                 try:
                     os.remove(self.password_file)
-                    print("[PasswordManager] ✅ Deleted old password file")
+                    print("[PasswordManager] [OK] Deleted old password file")
                 except Exception as e:
                     print(f"[PasswordManager] ⚠️  Failed to delete old password: {e}")
             
@@ -334,7 +334,7 @@ class PasswordManager:
             return True, None
             
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error recovering password: {e}")
+            print(f"[PasswordManager] [ERROR] Error recovering password: {e}")
             import traceback
             traceback.print_exc()
             return False, f"Error during recovery: {str(e)}"

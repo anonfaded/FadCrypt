@@ -46,21 +46,33 @@ class FileLockManager(ABC):
         return {"applications": [], "locked_files_and_folders": []}
     
     def _load_locked_items(self):
-        """Load locked items from unified config (apps_config.json)"""
+        """Load locked items from unified config (apps_config.json) - reads directly from file"""
+        # CRITICAL: Always read from file, not from cache, to get fresh data
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    self.locked_items = config.get("locked_files_and_folders", [])
+                    print(f"[FileLockManager] Loaded {len(self.locked_items)} locked items from file")
+                    return
+            except Exception as e:
+                print(f"[FileLockManager] Could not read locked items from file: {e}")
+        else:
+            print(f"[FileLockManager] Config file does not exist: {self.config_file}")
+        
+        # Fallback: use _get_config if file doesn't exist
         config = self._get_config()
         self.locked_items = config.get("locked_files_and_folders", [])
         if self.locked_items:
-            print(f"📁 Loaded {len(self.locked_items)} locked items from unified config")
+            print(f"📁 Loaded {len(self.locked_items)} locked items from config (fallback)")
     
     def _save_locked_items(self):
-        """Save locked items to unified config (apps_config.json)"""
+        """Save locked items to unified config (apps_config.json)
+        
+        NOTE: This is called from remove_item(). For UI consistency, prefer using
+        MainWindow.save_locked_files_config() which preserves applications.
+        """
         try:
-            # Temporarily unlock config if using Linux implementation
-            should_relock = False
-            if hasattr(self, 'temporarily_unlock_config'):
-                self.temporarily_unlock_config('apps_config.json')
-                should_relock = True
-            
             config = self._get_config()
             config["locked_files_and_folders"] = self.locked_items
             
@@ -68,37 +80,19 @@ class FileLockManager(ABC):
             if "applications" not in config:
                 config["applications"] = []
             
-            if self.app_locker and hasattr(self.app_locker, 'config'):
-                # Update app_locker's in-memory config
-                self.app_locker.config = config
-                # Save via app_locker if it has save_config method
-                if hasattr(self.app_locker, 'save_config'):
-                    self.app_locker.save_config()
-                    print(f"💾 Saved {len(self.locked_items)} locked items to unified config via app_locker")
-                else:
-                    # Fallback: save directly using safe write
-                    from core.file_protection import safe_write_to_protected_file
-                    import json
-                    content = json.dumps(config, indent=2)
-                    success, error = safe_write_to_protected_file(self.config_file, content)
-                    if success:
-                        print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
-                    else:
-                        print(f"❌ Error saving locked items: {error}")
+            # Always save directly using safe write to ensure file is updated
+            from core.file_protection import safe_write_to_protected_file
+            import json
+            content = json.dumps(config, indent=2)
+            success, error = safe_write_to_protected_file(self.config_file, content)
+            if success:
+                print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                # Update app_locker config if it exists
+                if self.app_locker and hasattr(self.app_locker, 'config'):
+                    self.app_locker.config = config
             else:
-                # Direct file save (new PyQt6 version) using safe write
-                from core.file_protection import safe_write_to_protected_file
-                import json
-                content = json.dumps(config, indent=2)
-                success, error = safe_write_to_protected_file(self.config_file, content)
-                if success:
-                    print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
-                else:
-                    print(f"❌ Error saving locked items: {error}")
-            
-            # Relock config after saving
-            if should_relock and hasattr(self, 'relock_config'):
-                self.relock_config('apps_config.json')
+                print(f"❌ Error saving locked items: {error}")
+                
         except Exception as e:
             print(f"❌ Error saving locked items: {e}")
     
@@ -113,6 +107,9 @@ class FileLockManager(ABC):
         Returns:
             True if added successfully, False otherwise
         """
+        # CRITICAL: Reload from file first to ensure fresh state
+        self._load_locked_items()
+        
         if not os.path.exists(path):
             print(f"❌ Path does not exist: {path}")
             return False
