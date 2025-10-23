@@ -73,12 +73,9 @@ class ContextMenuManager:
     def _is_fadcrypt_in_path(self) -> bool:
         """Check if fadcrypt command is available in PATH"""
         try:
-            import subprocess
-            result = subprocess.run(['where', 'fadcrypt'], 
-                                  capture_output=True, 
-                                  text=True, 
-                                  shell=True)
-            return result.returncode == 0
+            # Use where without shell to avoid quoting issues
+            result = subprocess.run(['where', 'fadcrypt'], capture_output=True, text=True)
+            return result.returncode == 0 and 'fadcrypt' in result.stdout.lower()
         except:
             return False
     
@@ -151,10 +148,11 @@ class ContextMenuManager:
                     exe_dir = os.path.dirname(self.exe_path)
                     if hasattr(self, 'use_command_name') and self.use_command_name:
                         # Use command name if available in PATH - run completely silently
-                        cmd = f'cmd.exe /c "start /B fadcrypt --lock "%1""'
+                        cmd = 'cmd.exe /c start "" /B fadcrypt --lock "%1"'
                     else:
                         # Use full path - run completely silently
-                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --lock "%1""'
+                        # Quote exe path explicitly
+                        cmd = f'cmd.exe /c start "" /B "{self.exe_path}" --lock "%1"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -183,11 +181,9 @@ class ContextMenuManager:
                     # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        # Use command name if available in PATH - run completely silently
-                        cmd = f'cmd.exe /c "start /B fadcrypt --unlock "%1""'
+                        cmd = 'cmd.exe /c start "" /B fadcrypt --unlock "%1"'
                     else:
-                        # Use full path - run completely silently
-                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --unlock "%1""'
+                        cmd = f'cmd.exe /c start "" /B "{self.exe_path}" --unlock "%1"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -216,11 +212,9 @@ class ContextMenuManager:
                     # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        # Use command name if available in PATH - run completely silently
-                        cmd = f'cmd.exe /c "start /B fadcrypt --lock "%1""'
+                        cmd = 'cmd.exe /c start "" /B fadcrypt --lock "%1"'
                     else:
-                        # Use full path - run completely silently
-                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --lock "%1""'
+                        cmd = f'cmd.exe /c start "" /B "{self.exe_path}" --lock "%1"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
@@ -249,11 +243,9 @@ class ContextMenuManager:
                     # Packaged app execution - use embedded icon
                     exe_dir = os.path.dirname(self.exe_path)
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        # Use command name if available in PATH - run completely silently
-                        cmd = f'cmd.exe /c "start /B fadcrypt --unlock "%1""'
+                        cmd = 'cmd.exe /c start "" /B fadcrypt --unlock "%1"'
                     else:
-                        # Use full path - run completely silently
-                        cmd = f'cmd.exe /c "start /B "{self.exe_path}" --unlock "%1""'
+                        cmd = f'cmd.exe /c start "" /B "{self.exe_path}" --unlock "%1"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')

@@ -52,7 +52,10 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; Register context menu and add CLI PATH entry during install. We call the installed exe with
+; --register-context so the app doesn't need to do first-run registry changes.
+; This MUST run on every install to ensure context menu is registered.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-context"; Flags: runhidden skipifsilent waituntilterminated
 
 [UninstallRun]
 ; Run cleanup to restore system settings before uninstalling

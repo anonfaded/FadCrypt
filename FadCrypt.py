@@ -12,32 +12,63 @@ import sys
 import os
 import platform
 
-# Register context menu on Windows (first launch)
-if platform.system() == "Windows" and '--lock' not in sys.argv and '--unlock' not in sys.argv and '--cleanup' not in sys.argv:
+# NOTE: Installer will perform context menu registration and PATH changes
+# Use --register-context to register context menu (this is invoked by installer)
+if '--register-context' in sys.argv:
     try:
+        # Log to file for debugging installer issues
+        import tempfile
+        log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_register_context.log')
+        with open(log_file, 'w') as f:
+            f.write(f"[REGISTER-CONTEXT] Started at {os.times()}\n")
+            f.write(f"[REGISTER-CONTEXT] Executable: {sys.executable}\n")
+            f.write(f"[REGISTER-CONTEXT] Arguments: {sys.argv}\n")
+            f.write(f"[REGISTER-CONTEXT] Platform: {platform.system()}\n")
+        
         from core.windows.shell_extension import ContextMenuManager
         import subprocess
         manager = ContextMenuManager()
-        success, already_registered = manager.register_context_menu_if_needed()
+        # Force registration on every install to ensure it's always up to date
+        success = manager.force_register_context_menu()
         
-        if success and not already_registered:
-            # Only restart explorer if we actually registered something new
-            print("[CONTEXT MENU] New registration detected, restarting Explorer...", flush=True)
+        with open(log_file, 'a') as f:
+            f.write(f"[REGISTER-CONTEXT] Force registration result: {success}\n")
+        
+        if success:
+            # Always restart explorer after registration to ensure context menu takes effect
+            print("[CONTEXT MENU] Registration completed, restarting Explorer...", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[REGISTER-CONTEXT] Restarting Explorer...\n")
             try:
                 subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
                              stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.Popen('explorer.exe')
                 print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write("[REGISTER-CONTEXT] Explorer restarted successfully\n")
             except Exception as e:
                 print(f"[CONTEXT MENU] Warning: Could not restart Explorer: {e}", flush=True)
-        elif success and already_registered:
-            print("[CONTEXT MENU] Already registered, skipping Explorer restart", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write(f"[REGISTER-CONTEXT] Warning: Could not restart Explorer: {e}\n")
         else:
             print("[CONTEXT MENU] Registration failed", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[REGISTER-CONTEXT] Registration failed\n")
+        
+        with open(log_file, 'a') as f:
+            f.write(f"[REGISTER-CONTEXT] Completed successfully\n")
+            
     except Exception as e:
         print(f"[CONTEXT MENU] Error during registration: {e}", flush=True)
-
-# Handle --lock and --unlock from context menu
+        import traceback
+        traceback.print_exc()
+        try:
+            with open(log_file, 'a') as f:
+                f.write(f"[REGISTER-CONTEXT] Error: {e}\n")
+                f.write(f"[REGISTER-CONTEXT] Traceback: {traceback.format_exc()}\n")
+        except:
+            pass
+    sys.exit(0)# Handle --lock and --unlock from context menu
 if '--lock' in sys.argv or '--unlock' in sys.argv:
     print(f"[CLI] Processing CLI arguments: {sys.argv}", flush=True)
     try:
