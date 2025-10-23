@@ -131,12 +131,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                    # Packaged app execution - set working directory and use embedded icon
+                    exe_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --lock \'%1\'"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
+                    script_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{script_dir}" -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file lock context menu: {key_path}")
@@ -157,12 +159,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                    # Packaged app execution - set working directory and use embedded icon
+                    exe_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
+                    script_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{script_dir}" -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file unlock context menu: {key_path}")
@@ -183,12 +187,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --lock \'%1\'"'
+                    # Packaged app execution - set working directory and use embedded icon
+                    exe_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --lock \'%1\'"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
+                    script_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{script_dir}" -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --lock \'%1\'"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder lock context menu: {key_path}")
@@ -209,12 +215,14 @@ class ContextMenuManager:
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app execution
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
+                    # Packaged app execution - set working directory and use embedded icon
+                    exe_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{exe_dir}" -Command "& \'{self.exe_path}\' --unlock \'%1\'"'
                 else:
                     # Script execution - use pythonw
                     pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
+                    script_dir = os.path.dirname(self.exe_path)
+                    cmd = f'powershell.exe -NoProfile -WindowStyle Hidden -WorkingDirectory "{script_dir}" -Command "& \'{pythonw_path}\' \'{self.exe_path}\' --unlock \'%1\'"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder unlock context menu: {key_path}")

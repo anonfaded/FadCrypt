@@ -23,15 +23,21 @@ class LogCapture:
     def start(self):
         """Start capturing output"""
         if not self.enabled:
-            sys.stdout = TeeOutput(self.original_stdout, self.buffer)
-            sys.stderr = TeeOutput(self.original_stderr, self.buffer)
+            # Only capture if streams are available (not None)
+            if sys.stdout is not None:
+                sys.stdout = TeeOutput(sys.stdout, self.buffer)
+            if sys.stderr is not None:
+                sys.stderr = TeeOutput(sys.stderr, self.buffer)
             self.enabled = True
             
     def stop(self):
         """Stop capturing output"""
         if self.enabled:
-            sys.stdout = self.original_stdout
-            sys.stderr = self.original_stderr
+            # Restore original streams if they exist
+            if self.original_stdout is not None:
+                sys.stdout = self.original_stdout
+            if self.original_stderr is not None:
+                sys.stderr = self.original_stderr
             self.enabled = False
     
     def get_logs(self) -> str:
@@ -55,12 +61,14 @@ class TeeOutput:
         self.buffer = buffer
     
     def write(self, text):
-        self.original.write(text)
+        if self.original is not None:
+            self.original.write(text)
+            self.original.flush()
         self.buffer.write(text)
-        self.original.flush()
     
     def flush(self):
-        self.original.flush()
+        if self.original is not None:
+            self.original.flush()
 
 
 class LogsTabWidget(QWidget):
