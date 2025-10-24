@@ -391,7 +391,7 @@ except ImportError as e:
     print(f"   Error: {e}")
     sys.exit(1)
 
-from version import __version__, __version_code__
+from core.version import __version__, __version_code__
 
 
 def resource_path(relative_path):
@@ -444,7 +444,7 @@ def main():
     mock_windows = '--windows' in sys.argv
     if mock_windows:
         print("🧪 Mock Windows mode enabled - simulating Windows environment on Linux")
-        from win_mock import setup_windows_mocks
+        from core.win_mock import setup_windows_mocks
         setup_windows_mocks()
     
     # Detect platform

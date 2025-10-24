@@ -13,13 +13,12 @@ a = Analysis(
         ('core', 'core'),  # Include all core modules
         ('ui', 'ui'),  # Include all UI modules
         ('core/fonts', 'core/fonts'),  # Include fonts for snake game
-        ('version.py', '.'),  # Version info
-        ('win_compat.py', '.'),  # Windows compatibility layer
-        ('win_mock.py', '.'),  # Mock Windows on Linux for testing
+        ('core/version.py', '.'),  # Version info
+        ('core/win_mock.py', '.'),  # Mock Windows on Linux for testing
     ],
     hiddenimports=[
         # Version module
-        'version',
+        'core.version',
         # Core modules
         'core',
         'core.application_manager',

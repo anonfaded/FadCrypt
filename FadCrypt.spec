@@ -13,13 +13,12 @@ a = Analysis(
         ('core', 'core'),              # Core modules
         ('ui', 'ui'),                  # UI modules
         ('core/fonts', 'core/fonts'),  # Fonts for snake game
-        ('version.py', '.'),           # Version info
-        ('win_compat.py', '.'),        # Windows compatibility layer
-        ('win_mock.py', '.'),          # Mock Windows on Linux for testing
+        ('core/version.py', '.'),      # Version info
+        ('core/win_mock.py', '.'),     # Mock Windows on Linux for testing
     ],
     hiddenimports=[
         # Version module
-        'version',
+        'core.version',
         # Core modules
         'core',
         'core.autostart_manager',
@@ -116,8 +115,7 @@ a = Analysis(
         'ctypes',
         'ctypes.wintypes',
         # Windows compatibility modules
-        'win_compat',
-        'win_mock',
+        'core.win_mock',
         # Cryptography extensions
         'cryptography.hazmat.primitives.ciphers',
         'cryptography.hazmat.primitives.kdf.pbkdf2',
@@ -129,7 +127,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['pyi_rth_dllfix.py'],
+    runtime_hooks=['core/pyi_rth_dllfix.py'],
     excludes=[
     'tkinter',
     'tcl',

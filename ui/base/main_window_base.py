@@ -28,7 +28,7 @@ from core.statistics_manager import StatisticsManager
 from core.file_protection import get_file_protection_manager
 
 # Import version info
-from version import __version__, __version_code__
+from core.version import __version__, __version_code__
 
 
 class JsonSyntaxHighlighter(QSyntaxHighlighter):
