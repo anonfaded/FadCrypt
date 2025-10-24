@@ -293,6 +293,10 @@ class MainWindowBase(QMainWindow):
         # Connect cleanup button to cleanup handler
         self.settings_panel.on_cleanup_clicked = self.cleanup_before_uninstall
         
+        # Connect export/import config buttons
+        self.settings_panel.export_config_requested.connect(self.on_export_config)
+        self.settings_panel.import_config_requested.connect(self.on_import_config)
+        
         # Connect context menu refresh button (Windows only)
         if hasattr(self.settings_panel, 'on_refresh_context_menu'):
             self.settings_panel.on_refresh_context_menu = self.refresh_context_menu

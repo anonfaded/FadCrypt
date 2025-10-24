@@ -9,11 +9,20 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 
 
+# Signals for export/import actions
+class SettingsPanelSignals(QWidget):
+    """Signals for settings panel actions"""
+    export_config_requested = pyqtSignal()
+    import_config_requested = pyqtSignal()
+
+
 class SettingsPanel(QWidget):
     """Settings panel for FadCrypt configuration with preview sections"""
     
     # Signals for settings changes
     settings_changed = pyqtSignal(dict)
+    export_config_requested = pyqtSignal()
+    import_config_requested = pyqtSignal()
     
     def __init__(self, resource_path_func=None, platform_name="Linux"):
         super().__init__()
@@ -387,7 +396,62 @@ class SettingsPanel(QWidget):
         cleanup_button.setMaximumWidth(200)
         bottom_frame.addWidget(cleanup_button)
         
-        layout.addLayout(bottom_frame)
+        bottom_frame.addSpacing(20)
+        
+        # Configuration Backup Section
+        backup_title = QLabel("💾 Configuration Backup")
+        backup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+        bottom_frame.addWidget(backup_title)
+        
+        backup_info = QLabel(
+            "Export your configuration (applications, locked files, settings) to a JSON file.\n"
+            "Import a previously exported configuration to restore your setup.\n"
+            "Useful for backup, migration, or sharing setups across devices."
+        )
+        backup_info.setStyleSheet("color: #888888;")
+        backup_info.setWordWrap(True)
+        bottom_frame.addWidget(backup_info)
+        
+        # Export/Import buttons in horizontal layout
+        backup_buttons = QHBoxLayout()
+        backup_buttons.setSpacing(10)
+        
+        export_button = QPushButton("📥 Export Config")
+        export_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1976d2;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #1565c0;
+            }
+        """)
+        export_button.clicked.connect(self.on_export_config_clicked)
+        export_button.setMaximumWidth(150)
+        backup_buttons.addWidget(export_button)
+        
+        import_button = QPushButton("📤 Import Config")
+        import_button.setStyleSheet("""
+            QPushButton {
+                background-color: #388e3c;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #2e7d32;
+            }
+        """)
+        import_button.clicked.connect(self.on_import_config_clicked)
+        import_button.setMaximumWidth(150)
+        backup_buttons.addWidget(import_button)
+        
+        backup_buttons.addStretch()
+        bottom_frame.addLayout(backup_buttons)
         layout.addStretch()
         
         scroll_area.setWidget(scroll_content)
@@ -454,6 +518,14 @@ class SettingsPanel(QWidget):
         """Handle cleanup button click"""
         # To be implemented by main window
         pass
+        
+    def on_export_config_clicked(self):
+        """Handle export config button click"""
+        self.export_config_requested.emit()
+    
+    def on_import_config_clicked(self):
+        """Handle import config button click"""
+        self.import_config_requested.emit()
         
     def get_settings(self):
         """Get current settings as dictionary"""
