@@ -11,6 +11,18 @@ Detects platform and loads appropriate platform-specific main window.
 import sys
 import os
 import platform
+import tempfile
+
+# CRITICAL FIX: Ensure working directory is correct for PyInstaller DLL loading
+# This fixes CMD/PowerShell working directory mismatch when launched from .lnk shortcuts
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle - set cwd to bundle directory
+    exe_dir = os.path.dirname(sys.executable)
+    os.chdir(exe_dir)
+    # Also ensure TMPDIR points to the correct temp location
+    os.environ['TMPDIR'] = tempfile.gettempdir()
+    os.environ['TEMP'] = tempfile.gettempdir()
+    os.environ['TMP'] = tempfile.gettempdir()
 
 # NOTE: Installer will perform context menu registration and PATH changes
 # Use --register-context to register context menu (this is invoked by installer)

@@ -9,13 +9,13 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('img', 'img'),  # All image assets
-        ('core', 'core'),  # Include all core modules
-        ('ui', 'ui'),  # Include all UI modules
-        ('core/fonts', 'core/fonts'),  # Include fonts for snake game
-        ('version.py', '.'),  # Version info
-        ('win_compat.py', '.'),  # Windows compatibility layer
-        ('win_mock.py', '.'),  # Mock Windows on Linux for testing
+        ('img', 'img'),                # Image assets
+        ('core', 'core'),              # Core modules
+        ('ui', 'ui'),                  # UI modules
+        ('core/fonts', 'core/fonts'),  # Fonts for snake game
+        ('version.py', '.'),           # Version info
+        ('win_compat.py', '.'),        # Windows compatibility layer
+        ('win_mock.py', '.'),          # Mock Windows on Linux for testing
     ],
     hiddenimports=[
         # Version module
@@ -97,7 +97,7 @@ a = Analysis(
         'watchdog',
         'watchdog.observers',
         'watchdog.events',
-        # NumPy and PyQtGraph for enhanced stats
+        # NumPy and PyQtGraph
         'numpy',
         'numpy.core',
         'numpy.core._multiarray_umath',
@@ -106,7 +106,7 @@ a = Analysis(
         'numpy._core.multiarray',
         'pyqtgraph',
         'pyqtgraph.graphicsItems',
-        # Pygame for snake game - avoid circular imports
+        # Pygame for snake game
         'pygame.base',
         'pygame.constants',
         'pygame.color',
@@ -118,7 +118,7 @@ a = Analysis(
         # Windows compatibility modules
         'win_compat',
         'win_mock',
-        # Additional cryptography dependencies
+        # Cryptography extensions
         'cryptography.hazmat.primitives.ciphers',
         'cryptography.hazmat.primitives.kdf.pbkdf2',
         'cryptography.hazmat.primitives.padding',
@@ -129,8 +129,14 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
+    runtime_hooks=['pyi_rth_dllfix.py'],
+    excludes=[
+    'tkinter',
+    'tcl',
+    '_tkinter',
+    'tk',
+    'tcl8',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -142,22 +148,23 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='FadCrypt',  # Windows executable naming convention
+    exclude_binaries=True,
+    name='FadCrypt',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,  # Disable UPX to avoid compression issues
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,  # GUI app, no console
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='img/icon.png',  # Application icon
+    upx=False,
+    console=False,
+    icon='img/icon.png'
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='FadCrypt'
 )
