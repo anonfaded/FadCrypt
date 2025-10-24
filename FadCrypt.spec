@@ -22,7 +22,6 @@ a = Analysis(
         'version',
         # Core modules
         'core',
-        'core.application_manager',
         'core.autostart_manager',
         'core.config_manager',
         'core.crypto_manager',
@@ -85,7 +84,6 @@ a = Analysis(
         # External dependencies - Other
         'PIL',
         'PIL.Image',
-        'PIL.ImageTk',
         'pystray',
         'pystray._win32',
         'pygame',
