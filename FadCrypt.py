@@ -13,6 +13,17 @@ import os
 import platform
 import tempfile
 
+# Force UTF-8 encoding on Windows to prevent Unicode errors
+if platform.system() == 'Windows':
+    try:
+        # Set console encoding to UTF-8
+        import codecs
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python < 3.7 doesn't have reconfigure
+        pass
+
 # CRITICAL FIX: Ensure working directory is correct for PyInstaller DLL loading
 # This fixes CMD/PowerShell working directory mismatch when launched from .lnk shortcuts
 if hasattr(sys, '_MEIPASS'):
@@ -281,12 +292,12 @@ if '--cleanup' in sys.argv:
                             timeout=10
                         )
                         if result.returncode == 0:
-                            print(f"[CLEANUP] ✅ Removed immutable flags", flush=True)
+                            print("[CLEANUP] [OK] Removed immutable flags", flush=True)
                         else:
-                            print(f"[CLEANUP] ⚠️  Could not remove immutable flags via chattr", flush=True)
+                            print("[CLEANUP] [WARN] Could not remove immutable flags via chattr", flush=True)
                             print(f"[CLEANUP]     Note: Daemon will handle cleanup when service stops", flush=True)
                     except Exception as e:
-                        print(f"[CLEANUP] ⚠️ Warning: Could not remove immutable flags: {e}", flush=True)
+                        print("[CLEANUP] [WARN] Warning: Could not remove immutable flags: {e}", flush=True)
             
             # Remove all FadCrypt config and backup folders
             folders_to_remove = [
@@ -353,7 +364,7 @@ if '--cleanup' in sys.argv:
             if os.path.exists(lock_file):
                 try:
                     os.remove(lock_file)
-                    print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                    print("[CLEANUP] [OK] Removed lock file: {lock_file}", flush=True)
                 except PermissionError:
                     # Lock file might be owned by different user - cleanup script runs as root
                     try:
@@ -375,7 +386,7 @@ if '--cleanup' in sys.argv:
                 try:
                     current_path, _ = winreg.QueryValueEx(key, "Path")
                     if not current_path:
-                        print("[CLEANUP] ℹ️  PATH is empty", flush=True)
+                        print("[CLEANUP] [INFO] PATH is empty", flush=True)
                     else:
                         # Get the installation directory (where this executable should be)
                         # During uninstall, we should be running from the installed location
@@ -419,9 +430,9 @@ if '--cleanup' in sys.argv:
                         SMTO_ABORTIFHUNG, 5000, None
                     )
                     if result:
-                        print("[CLEANUP] ✅ Notified system of PATH change", flush=True)
+                        print("[CLEANUP] [OK] Notified system of PATH change", flush=True)
                 except Exception as e:
-                    print(f"[CLEANUP] ℹ️  Could not notify system of PATH change: {e}", flush=True)
+                    print("[CLEANUP] [INFO] Could not notify system of PATH change: {e}", flush=True)
                     
             except Exception as e:
                 print(f"[CLEANUP] Warning: Could not remove from PATH: {e}", flush=True)
@@ -455,9 +466,9 @@ if '--cleanup' in sys.argv:
                 from core.windows.shell_extension import ContextMenuManager
                 manager = ContextMenuManager()
                 if manager.unregister_context_menu():
-                    print("[CLEANUP] ✅ Removed context menu entries", flush=True)
+                    print("[CLEANUP] [OK] Removed context menu entries", flush=True)
                 else:
-                    print("[CLEANUP] ⚠️  No context menu entries found to remove", flush=True)
+                    print("[CLEANUP] [WARN] No context menu entries found to remove", flush=True)
             except Exception as e:
                 print(f"[CLEANUP] Warning: Could not remove context menu entries: {e}", flush=True)
             
@@ -498,15 +509,15 @@ if '--cleanup' in sys.argv:
                 if os.path.exists(data_dir):
                     try:
                         shutil.rmtree(data_dir)
-                        print(f"[CLEANUP] ✅ Removed data directory: {data_dir}", flush=True)
+                        print("[CLEANUP] [OK] Removed data directory: {data_dir}", flush=True)
                         removed_count += 1
                     except Exception as e:
-                        print(f"[CLEANUP] ⚠️ Warning: Could not remove {data_dir}: {e}", flush=True)
+                        print("[CLEANUP] [WARN] Warning: Could not remove {data_dir}: {e}", flush=True)
             
             if removed_count > 0:
-                print(f"[CLEANUP] ✅ Removed {removed_count} data directories", flush=True)
+                print("[CLEANUP] [OK] Removed {removed_count} data directories", flush=True)
             else:
-                print("[CLEANUP] ℹ️  No data directories found to remove", flush=True)
+                print("[CLEANUP] [INFO] No data directories found to remove", flush=True)
             
             # Restart File Explorer to ensure context menu changes take effect
             print("[CLEANUP] Restarting File Explorer to apply context menu changes...", flush=True)
@@ -518,7 +529,7 @@ if '--cleanup' in sys.argv:
                 ], capture_output=True, text=True, timeout=15)
                 
                 if result.returncode == 0:
-                    print("[CLEANUP] ✅ File Explorer restarted successfully", flush=True)
+                    print("[CLEANUP] [OK] File Explorer restarted successfully", flush=True)
                 else:
                     print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {result.stderr}", flush=True)
             except Exception as e:
@@ -550,6 +561,137 @@ from pathlib import Path
 # Add project root to path for imports
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+# Handle --install-service and --uninstall-service flags (called by installer)
+if '--install-service' in sys.argv:
+    # Create log file for service installation
+    import tempfile
+    log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_service_install.log')
+    
+    def log_message(message):
+        print(message, flush=True)
+        try:
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(f"{message}\n")
+        except Exception as e:
+            print(f"Failed to write to log file: {e}", flush=True)
+    
+    log_message("[SERVICE] Installing FadCrypt elevated service...")
+    
+    try:
+        # Log the current environment for debugging
+        log_message(f"[SERVICE] Current working directory: {os.getcwd()}")
+        log_message(f"[SERVICE] Executable: {sys.executable}")
+        log_message(f"[SERVICE] Script location: {__file__}")
+        log_message(f"[SERVICE] Log file: {log_file}")
+        
+        # Try to import and install the service directly
+        try:
+            from core.windows.fadcrypt_elevated_service import install_service, start_service
+            log_message("[SERVICE] Successfully imported service functions")
+            
+            if install_service():
+                log_message("[SERVICE] Service installed successfully")
+                if start_service():
+                    log_message("[SERVICE] Service started successfully")
+                    sys.exit(0)
+                else:
+                    log_message("[SERVICE] Service installed but failed to start")
+                    sys.exit(1)
+            else:
+                log_message("[SERVICE] Failed to install service")
+                sys.exit(1)
+                
+        except ImportError as e:
+            log_message(f"[SERVICE] Failed to import service functions: {e}")
+            log_message("[SERVICE] Falling back to subprocess approach")
+            
+            # Fallback: Run the service installation as a subprocess
+            service_script = os.path.join(project_root, 'core', 'windows', 'fadcrypt_elevated_service.py')
+            log_message(f"[SERVICE] Service script path: {service_script}")
+            log_message(f"[SERVICE] Service script exists: {os.path.exists(service_script)}")
+            
+            import subprocess
+            result = subprocess.run([sys.executable, service_script, 'install'], 
+                                  capture_output=True, text=True, cwd=str(project_root))
+            
+            log_message(f"[SERVICE] Install command exit code: {result.returncode}")
+            log_message(f"[SERVICE] Install stdout: {result.stdout}")
+            log_message(f"[SERVICE] Install stderr: {result.stderr}")
+            
+            if result.returncode == 0:
+                log_message("[SERVICE] Service installed successfully (subprocess)")
+                # Try to start the service
+                start_result = subprocess.run([sys.executable, service_script, 'start'], 
+                                            capture_output=True, text=True, cwd=str(project_root))
+                
+                log_message(f"[SERVICE] Start command exit code: {start_result.returncode}")
+                log_message(f"[SERVICE] Start stdout: {start_result.stdout}")
+                log_message(f"[SERVICE] Start stderr: {start_result.stderr}")
+                
+                if start_result.returncode == 0:
+                    log_message("[SERVICE] Service started successfully (subprocess)")
+                    sys.exit(0)
+                else:
+                    log_message("[SERVICE] Service installed but failed to start (subprocess)")
+                    sys.exit(1)
+            else:
+                log_message("[SERVICE] Failed to install service (subprocess)")
+                sys.exit(1)
+
+    except Exception as e:
+        log_message(f"[SERVICE] Error installing service: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if '--uninstall-service' in sys.argv:
+    import subprocess
+    print("[SERVICE] Uninstalling FadCrypt elevated service...", flush=True)
+
+    try:
+        # Run the service uninstallation as a subprocess
+        service_script = os.path.join(project_root, 'core', 'windows', 'fadcrypt_elevated_service.py')
+        
+        # Try to stop the service first
+        stop_result = subprocess.run([sys.executable, service_script, 'stop'], 
+                                   capture_output=True, text=True, cwd=str(project_root))
+        if stop_result.returncode == 0:
+            print("[SERVICE] Service stopped successfully", flush=True)
+        else:
+            print("[SERVICE] Warning: Could not stop service (may not be running)", flush=True)
+            print(f"[SERVICE] Stop output: {stop_result.stdout}", flush=True)
+            print(f"[SERVICE] Stop error: {stop_result.stderr}", flush=True)
+        
+        # Uninstall the service
+        result = subprocess.run([sys.executable, service_script, 'uninstall'], 
+                              capture_output=True, text=True, cwd=str(project_root))
+        
+        if result.returncode == 0:
+            print("[SERVICE] Service uninstalled successfully", flush=True)
+            sys.exit(0)
+        else:
+            print("[SERVICE] Failed to uninstall service", flush=True)
+            print(f"[SERVICE] Uninstall output: {result.stdout}", flush=True)
+            print(f"[SERVICE] Uninstall error: {result.stderr}", flush=True)
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"[SERVICE] Error uninstalling service: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if '--run-service' in sys.argv:
+    try:
+        from core.windows.fadcrypt_elevated_service import FadCryptElevatedService
+        import servicemanager
+        servicemanager.Initialize()
+        servicemanager.PrepareToHostSingle(FadCryptElevatedService)
+        servicemanager.StartServiceCtrlDispatcher()
+    except Exception as e:
+        print(f"Failed to run service: {e}")
+        sys.exit(1)
 
 try:
     from PyQt6.QtWidgets import QApplication
@@ -622,7 +764,7 @@ def main():
     # Step 1: Single Instance Check - Prevent multiple instances
     from core.single_instance_manager import check_single_instance
     single_instance = check_single_instance(exit_if_running=True)
-    print("🔒 Single instance lock acquired - no other FadCrypt instances running")
+    print("[LOCK] Single instance lock acquired - no other FadCrypt instances running")
     
     # Step 2: Start File Monitor Daemon - Monitors and backs up config files
     from core.file_monitor import start_file_monitor_daemon

@@ -28,8 +28,8 @@ ArchitecturesAllowed=x64compatible
 ; the 64-bit view of the registry.
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-; Install for current user only (no admin privileges needed)
-PrivilegesRequired=lowest
+; Admin privileges required for service installation
+PrivilegesRequired=admin
 OutputDir=..\dist
 OutputBaseFilename=FadCryptSetup
 SetupIconFile=..\img\1.ico
@@ -58,7 +58,15 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 ; This MUST run on every install to ensure context menu is registered.
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-context"; Flags: runhidden skipifsilent waituntilterminated
 
+; Install and start the elevated service for persistent admin rights
+; Note: This runs with admin privileges since PrivilegesRequired=admin
+; Service installation logs to user's temp directory automatically
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; Flags: runhidden waituntilterminated
+
 [UninstallRun]
+; Stop and uninstall the elevated service
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
+
 ; Run cleanup to restore system settings before uninstalling
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
 

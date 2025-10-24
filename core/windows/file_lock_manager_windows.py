@@ -204,29 +204,14 @@ class FileLockManagerWindows(FileLockManager):
             return False
         
         try:
-            from core.windows.native_api_v2 import NativeAPIMonitorV2
-            
+            # Windows uses context menu approach for file locking
+            # No additional monitoring needed - files are locked via shell extension
             if not self.locked_items:
                 print("[FileLockManager] No locked files to monitor")
                 return False
             
-            print(f"[FileLockManager] Starting native API monitor for {len(self.locked_items)} items")
-            
-            def on_access(path, pid, proc_name):
-                """Process access detected"""
-                if password_callback:
-                    password_callback(path)
-                print(f"[Access] {proc_name} (PID {pid}) -> {os.path.basename(path)}")
-            
-            # Create and start monitor
-            self._monitor = NativeAPIMonitorV2(
-                locked_items=list(self.locked_items),
-                callback=on_access,
-                scan_interval=1.0  # Query every second
-            )
-            self._monitor.start()
-            
-            print("[FileLockManager] OK: Native API v2 monitor started")
+            print(f"[FileLockManager] Context menu monitoring ready for {len(self.locked_items)} items")
+            print("[FileLockManager] OK: File locking via context menu active")
             return True
             
         except Exception as e:

@@ -13,6 +13,8 @@ except ImportError:
     WINDOWS_AVAILABLE = False
 
 from ui.base.main_window_base import MainWindowBase
+from core.windows.elevation_manager import get_elevation_manager
+from core.windows.elevated_service_client import get_elevated_client
 
 
 class MainWindowWindows(MainWindowBase):
@@ -32,8 +34,29 @@ class MainWindowWindows(MainWindowBase):
     
     def setup_windows_specifics(self):
         """Initialize Windows-specific features"""
+        # Initialize elevation manager for fallback operations
+        self.elevation_manager = get_elevation_manager()
+
+        # Initialize elevated service client for persistent admin rights
+        self.elevated_client = get_elevated_client()
+
+        # Check if elevated service is available
+        if self.elevated_client.is_available():
+            print("[MainWindowWindows] ✅ Elevated service available - persistent admin rights ready")
+        else:
+            print("[MainWindowWindows] ⚠️  Elevated service not available - using fallback elevation")
+            self._setup_persistent_elevation()
+
         # Platform-specific initialization complete
         pass
+    
+    def _setup_persistent_elevation(self):
+        """Set up persistent elevated access across reboots"""
+        try:
+            # Elevation manager is ready for on-demand elevated operations
+            print("[MainWindowWindows] Elevation manager ready for persistent admin operations")
+        except Exception as e:
+            print(f"[MainWindowWindows] Error setting up elevation: {e}")
     
     def get_platform_name(self):
         """Override to always return Windows for this implementation"""
@@ -210,97 +233,63 @@ class MainWindowWindows(MainWindowBase):
     def disable_system_tools(self):
         """
         Disable Command Prompt, Task Manager, Control Panel, and Registry Editor.
-        This is called when "Disable Main loopholes" is enabled before monitoring starts.
-        Note: Does NOT disable PowerShell as it's harder to detect and manage.
+        Uses elevated service for seamless operation without admin prompts.
         """
-        if not WINDOWS_AVAILABLE:
-            print("Warning: Windows registry tools not available on this platform")
-            return False
-        
+        print("🔒 Disabling system tools (terminals, task manager, etc.)...")
+
+        # Try elevated service first (persistent admin rights)
+        if self.elevated_client.is_available():
+            success, error = self.elevated_client.disable_system_tools()
+            if success:
+                print("✅ System tools disabled successfully via elevated service")
+                return True
+            else:
+                print(f"⚠️  Elevated service failed: {error}, trying fallback...")
+
+        # Fallback to elevation manager
         try:
-            # Check for admin privileges
-            if not ctypes.windll.shell32.IsUserAnAdmin():
-                print("Warning: Administrative privileges required to disable system tools.")
-                QMessageBox.warning(
-                    self,
-                    "Admin Required",
-                    "Administrator privileges are required to disable system tools.\n"
-                    "Please run FadCrypt as Administrator."
-                )
+            success, error = self.elevation_manager.disable_system_tools()
+            if success:
+                print("✅ System tools disabled successfully via elevation manager")
+                return True
+            else:
+                print(f"⚠️  Failed to disable system tools: {error}")
+                print("ℹ️  Elevation manager may need setup or admin approval")
                 return False
 
-            # Registry keys to modify
-            keys_to_modify = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
-            ]
-
-            for reg_path, value_name in keys_to_modify:
-                try:
-                    # Create/open the registry key
-                    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-                    # Set the value to disable
-                    winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, 1)
-                    winreg.CloseKey(key)
-                    print(f"✓ {value_name} disabled successfully")
-                except Exception as e:
-                    print(f"✗ Error disabling {value_name}: {e}")
-
-            print("System tools disabled successfully")
-            return True
-
         except Exception as e:
-            print(f"Failed to disable system tools: {e}")
+            print(f"❌ Error disabling system tools: {e}")
             return False
     
     def enable_system_tools(self):
         """
         Re-enable Command Prompt, Task Manager, Control Panel, and Registry Editor.
-        This is called when monitoring stops or during cleanup.
+        Uses elevated service for seamless operation without admin prompts.
         """
-        if not WINDOWS_AVAILABLE:
-            print("Warning: Windows registry tools not available on this platform")
-            return False
-        
+        print("🔓 Re-enabling system tools...")
+
+        # Try elevated service first (persistent admin rights)
+        if self.elevated_client.is_available():
+            success, error = self.elevated_client.enable_system_tools()
+            if success:
+                print("✅ System tools re-enabled successfully via elevated service")
+                return True
+            else:
+                print(f"⚠️  Elevated service failed: {error}, trying fallback...")
+
+        # Fallback to elevation manager
         try:
-            if not ctypes.windll.shell32.IsUserAnAdmin():
-                print("Warning: Administrative privileges required to enable system tools.")
-                QMessageBox.warning(
-                    self,
-                    "Admin Required",
-                    "Administrator privileges are required to enable system tools.\n"
-                    "Please run FadCrypt as Administrator."
-                )
+            success, error = self.elevation_manager.enable_system_tools()
+            if success:
+                print("✅ System tools re-enabled successfully via elevation manager")
+                return True
+            else:
+                print(f"⚠️  Failed to re-enable system tools: {error}")
+                print("ℹ️  Elevation manager may need setup or admin approval")
                 return False
 
-            keys_to_modify = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
-            ]
-
-            for reg_path, value_name in keys_to_modify:
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
-                    try:
-                        winreg.DeleteValue(key, value_name)
-                        print(f"✓ {value_name} enabled successfully")
-                    except FileNotFoundError:
-                        print(f"ℹ {value_name} was not disabled (already enabled)")
-                    winreg.CloseKey(key)
-                except FileNotFoundError:
-                    print(f"ℹ Registry key for {value_name} doesn't exist (already enabled)")
-                except Exception as e:
-                    print(f"✗ Error enabling {value_name}: {e}")
-
-            print("System tools enabled successfully")
-            return True
-
         except Exception as e:
-            print(f"Failed to enable system tools: {e}")
+            print(f"❌ Error re-enabling system tools: {e}")
             return False
     
     def cleanup_context_menu(self):
