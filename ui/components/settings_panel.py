@@ -372,8 +372,15 @@ class SettingsPanel(QWidget):
         bottom_frame.addWidget(cleanup_title)
         
         cleanup_info = QLabel(
-            "Before uninstalling FadCrypt, run this cleanup to restore all system settings.\n"
-            "This will re-enable disabled terminals, system monitors, and remove autostart entries."
+            "🧹 Complete system cleanup before uninstalling FadCrypt.\n\n"
+            "This will:\n"
+            "• Stop any active file monitoring\n"
+            "• Re-enable disabled system tools (Command Prompt, Task Manager, etc.)\n"
+            "• Remove FadCrypt from Windows startup\n"
+            "• Remove Windows Explorer context menu entries\n"
+            "• Delete all FadCrypt data directories and files\n"
+            "• Restart File Explorer to apply changes\n\n"
+            "Run this before uninstalling to ensure a clean system state."
         )
         cleanup_info.setStyleSheet("color: #888888;")
         cleanup_info.setWordWrap(True)
@@ -452,6 +459,7 @@ class SettingsPanel(QWidget):
         
         backup_buttons.addStretch()
         bottom_frame.addLayout(backup_buttons)
+        layout.addLayout(bottom_frame)
         layout.addStretch()
         
         scroll_area.setWidget(scroll_content)

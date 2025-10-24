@@ -341,42 +341,14 @@ class MainWindowWindows(MainWindowBase):
             )
             
             if manager.force_register_context_menu():
-                print("[CONTEXT MENU] Context menu refreshed successfully, restarting Explorer...", flush=True)
+                print("[CONTEXT MENU] Context menu refreshed successfully", flush=True)
                 
-                # Restart Explorer to apply changes
-                try:
-                    # Use PowerShell to restart Explorer more reliably
-                    import subprocess
-                    result = subprocess.run([
-                        'powershell.exe', '-NoProfile', '-Command',
-                        'Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer'
-                    ], capture_output=True, text=True, timeout=10)
-                    
-                    if result.returncode == 0:
-                        print("[CONTEXT MENU] Explorer restarted successfully via PowerShell", flush=True)
-                        QMessageBox.information(
-                            self,
-                            "Success",
-                            "Context menu entries refreshed successfully!\n\nWindows Explorer has been restarted."
-                        )
-                        return True
-                    else:
-                        print(f"[CONTEXT MENU] PowerShell restart failed: {result.stderr}", flush=True)
-                        QMessageBox.warning(
-                            self,
-                            "Partial Success",
-                            "Context menu entries refreshed successfully!\n\nHowever, failed to restart Explorer automatically. Please restart Explorer manually."
-                        )
-                        return True
-                        
-                except Exception as e:
-                    print(f"[CONTEXT MENU] Failed to restart Explorer: {e}", flush=True)
-                    QMessageBox.warning(
-                        self,
-                        "Partial Success",
-                        "Context menu entries refreshed successfully!\n\nHowever, failed to restart Explorer automatically. Please restart Explorer manually."
-                    )
-                    return True
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    "Context menu entries refreshed successfully!"
+                )
+                return True
             else:
                 print("[CONTEXT MENU] Failed to refresh context menu entries", flush=True)
                 QMessageBox.warning(

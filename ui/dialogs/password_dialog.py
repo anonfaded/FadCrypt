@@ -264,7 +264,7 @@ class PasswordDialog(QDialog):
             # Warning if no recovery codes
             if not self.has_recovery_codes:
                 warning_label = QLabel(
-                    "⚠️  No recovery codes generated!\n"
+                    "WARN  No recovery codes generated!\n"
                     "Generate them from Settings → Generate Recovery Codes"
                 )
                 warning_label.setStyleSheet("""
@@ -385,7 +385,7 @@ class PasswordDialog(QDialog):
             print(f"   Dialog size: {self.width()}x{self.height()}")
             self.move(x, y)
         else:
-            print("[PasswordDialog] ⚠️  No screen found, cannot center")
+            print("[PasswordDialog] WARN  No screen found, cannot center")
         
     def set_wallpaper_background(self):
         """Set wallpaper background for fullscreen mode"""

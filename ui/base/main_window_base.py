@@ -1746,11 +1746,20 @@ class MainWindowBase(QMainWindow):
     
     def on_password_button_click(self):
         """Handle password button click - creates or updates based on current state"""
-        password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
-        if os.path.exists(password_file):
-            self.on_change_password()
-        else:
-            self.on_create_password()
+        try:
+            password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
+            print(f"[PASSWORD] Button clicked, checking file: {password_file}")
+            if os.path.exists(password_file):
+                print("[PASSWORD] Password exists, calling on_change_password")
+                self.on_change_password()
+            else:
+                print("[PASSWORD] Password does not exist, calling on_create_password")
+                self.on_create_password()
+        except Exception as e:
+            print(f"[PASSWORD] ERROR in on_password_button_click: {e}")
+            import traceback
+            traceback.print_exc()
+            self.show_message("Error", f"Failed to handle password button click:\n{e}", "error")
     
     def remove_application(self):
         """Remove selected applications from the list"""
@@ -3317,14 +3326,14 @@ class MainWindowBase(QMainWindow):
         """
         Cleanup function to restore all system settings before uninstallation.
         This ensures users don't have disabled settings after uninstalling FadCrypt.
-        Platform-agnostic - works on both Windows and Linux.
+        Simply calls the same --cleanup flag used by the installer for consistency.
         """
         try:
             print("\n" + "="*60, flush=True)
             print("🧹 RUNNING UNINSTALL CLEANUP...", flush=True)
             print("="*60, flush=True)
-            
-            # Stop monitoring if active
+
+            # Stop monitoring if active first (UI-specific, not in installer cleanup)
             if hasattr(self, 'unified_monitor') and self.unified_monitor:
                 try:
                     print("⏹ Stopping monitoring system...", flush=True)
@@ -3338,58 +3347,71 @@ class MainWindowBase(QMainWindow):
                     print(f"❌ Error stopping monitor: {e}", flush=True)
             else:
                 print("ℹ️  No active monitoring to stop", flush=True)
-            
-            # Re-enable system tools (platform-specific)
-            # These methods are implemented in platform-specific subclasses
-            if hasattr(self, 'enable_system_tools'):
-                try:
-                    print("🔓 Re-enabling system tools...", flush=True)
-                    self.enable_system_tools()
-                    print("✅ System tools re-enabled", flush=True)
-                except Exception as e:
-                    print(f"❌ Error re-enabling tools: {e}", flush=True)
+
+            # Now run the same cleanup as the installer using --cleanup flag
+            print("� Running system cleanup (same as installer)...", flush=True)
+            import subprocess
+
+            # Get the path to this executable
+            if getattr(sys, 'frozen', False):
+                # Running as PyInstaller bundle
+                exec_path = sys.executable
             else:
-                print("ℹ️  No system tools to re-enable", flush=True)
-            
-            # Remove autostart entry using autostart manager
-            if hasattr(self, 'config_manager') and hasattr(self.config_manager, 'autostart_manager'):
-                try:
-                    print("🗑️  Removing from autostart...", flush=True)
-                    from core.autostart_manager import AutostartManager
-                    autostart_mgr = AutostartManager(self.get_fadcrypt_folder())
-                    autostart_mgr.disable_autostart()
-                    print("✅ Removed from autostart", flush=True)
-                except Exception as e:
-                    print(f"❌ Error removing from autostart: {e}", flush=True)
+                # Running as script - use the same Python executable that launched this process
+                exec_path = sys.executable
+                script_path = os.path.abspath(sys.argv[0])
+
+            # Run cleanup with same logic as installer
+            if getattr(sys, 'frozen', False):
+                # PyInstaller bundle
+                result = subprocess.run([exec_path, '--cleanup'],
+                                      capture_output=True,
+                                      text=True,
+                                      timeout=60)
             else:
-                print("ℹ️  No autostart entry to remove", flush=True)
-            
-            # Remove context menu entries (Windows only)
-            if hasattr(self, 'cleanup_context_menu'):
-                try:
-                    print("🗑️  Removing context menu entries...", flush=True)
-                    self.cleanup_context_menu()
-                    print("✅ Context menu entries removed", flush=True)
-                except Exception as e:
-                    print(f"❌ Error removing context menu: {e}", flush=True)
+                # Script mode - run python script --cleanup
+                result = subprocess.run([exec_path, script_path, '--cleanup'],
+                                      capture_output=True,
+                                      text=True,
+                                      timeout=60)
+
+            # Print the cleanup output
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(f"⚠️  Cleanup warnings: {result.stderr}")
+
+            if result.returncode == 0:
+                print("✅ System cleanup completed successfully", flush=True)
+                print("="*60, flush=True)
+
+                # Show confirmation
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Cleanup Complete",
+                    "All system settings have been restored.\n"
+                    "You can now safely uninstall FadCrypt.",
+                    QMessageBox.StandardButton.Ok
+                )
+                return True
             else:
-                print("ℹ️  No context menu entries to remove", flush=True)
-            
-            print("="*60, flush=True)
-            print("✅ CLEANUP COMPLETED SUCCESSFULLY!", flush=True)
-            print("="*60 + "\n", flush=True)
-            
-            # Show confirmation
+                print(f"❌ System cleanup failed with exit code: {result.returncode}", flush=True)
+                raise Exception(f"Cleanup process failed: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            print(f"\n❌ ERROR: Cleanup timed out after 60 seconds\n", flush=True)
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
+            QMessageBox.warning(
                 self,
-                "Cleanup Complete",
-                "All system settings have been restored.\n"
-                "You can now safely uninstall FadCrypt.",
+                "Cleanup Timeout",
+                "Cleanup process timed out.\n\n"
+                "Some settings may not have been fully restored.\n"
+                "Please try again or check system permissions.",
                 QMessageBox.StandardButton.Ok
             )
-            return True
-            
+            return False
+
         except Exception as e:
             print(f"\n❌ ERROR DURING UNINSTALL CLEANUP: {e}\n", flush=True)
             from PyQt6.QtWidgets import QMessageBox
@@ -3402,53 +3424,360 @@ class MainWindowBase(QMainWindow):
             )
             return False
         
+    def _run_cleanup_logic(self):
+        """
+        Run the same cleanup logic as the --cleanup flag.
+        This ensures UI cleanup and installer cleanup are identical.
+        """
+        import subprocess
+        import platform
+        
+        try:
+            system = platform.system()
+            
+            if system == "Linux":
+                # Get user's home directory (handle sudo context)
+                if 'SUDO_USER' in os.environ:
+                    import pwd
+                    user_home = pwd.getpwnam(os.environ['SUDO_USER']).pw_dir
+                    print(f"[CLEANUP] Running as sudo, user home: {user_home}", flush=True)
+                else:
+                    user_home = os.path.expanduser('~')
+                    print(f"[CLEANUP] User home: {user_home}", flush=True)
+                
+                fadcrypt_folder = os.path.join(user_home, '.config', 'FadCrypt')
+                fadcrypt_backup_folder = os.path.join(user_home, '.local', 'share', 'FadCrypt', 'Backup')
+                
+                # CRITICAL: Remove immutable flags before deletion (files may have chattr +i from file protection)
+                folders_to_clean = [
+                    fadcrypt_folder,
+                    fadcrypt_backup_folder
+                ]
+                
+                for folder in folders_to_clean:
+                    if os.path.exists(folder):
+                        try:
+                            # Find all files and remove immutable flag
+                            print(f"[CLEANUP] Removing immutable flags from {folder}...", flush=True)
+                            result = subprocess.run(
+                                ['find', folder, '-type', 'f', '-exec', 'chattr', '-i', '{}', '+'],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                                timeout=10
+                            )
+                            if result.returncode == 0:
+                                print(f"[CLEANUP] ✅ Removed immutable flags", flush=True)
+                            else:
+                                print(f"[CLEANUP] ⚠️  Could not remove immutable flags via chattr", flush=True)
+                                print(f"[CLEANUP]     Note: Daemon will handle cleanup when service stops", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove immutable flags: {e}", flush=True)
+                
+                # Remove all FadCrypt config and backup folders
+                folders_to_remove = [
+                    fadcrypt_folder,
+                    fadcrypt_backup_folder
+                ]
+                
+                for folder in folders_to_remove:
+                    if os.path.exists(folder):
+                        try:
+                            import shutil
+                            shutil.rmtree(folder)
+                            print(f"[CLEANUP] ✅ Removed: {folder}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove {folder}: {e}", flush=True)
+                
+                # List of common system tools that might have been disabled
+                all_tools = [
+                    '/usr/bin/gnome-terminal',
+                    '/usr/bin/konsole',
+                    '/usr/bin/xterm',
+                    '/usr/bin/gnome-system-monitor',
+                    '/usr/bin/htop',
+                    '/usr/bin/top',
+                    '/usr/bin/gnome-control-center'
+                ]
+                
+                print(f"[CLEANUP] Checking {len(all_tools)} common system tools...", flush=True)
+                
+                # Find tools that need restoring
+                tools_to_restore = []
+                for tool in all_tools:
+                    if os.path.exists(tool):
+                        try:
+                            stat_info = os.stat(tool)
+                            # Check if execute permission is missing (was disabled)
+                            if not (stat_info.st_mode & 0o111):
+                                tools_to_restore.append(tool)
+                                print(f"[CLEANUP] Will restore: {tool}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] Error checking {tool}: {e}", flush=True)
+                
+                # Restore permissions for disabled tools
+                if tools_to_restore:
+                    print(f"[CLEANUP] Restoring {len(tools_to_restore)} disabled tools...", flush=True)
+                    chmod_commands = [f'chmod 755 "{tool}"' for tool in tools_to_restore]
+                    full_command = ' && '.join(chmod_commands)
+                    
+                    # Direct chmod (prerm script runs with root)
+                    result = subprocess.run(['bash', '-c', full_command], 
+                                          capture_output=True, 
+                                          text=True,
+                                          check=False)
+                    
+                    if result.returncode == 0:
+                        print(f"[CLEANUP] ✅ Restored {len(tools_to_restore)} tools", flush=True)
+                    else:
+                        print(f"[CLEANUP] ⚠️ Warning: {result.stderr}", flush=True)
+                else:
+                    print("[CLEANUP] No disabled tools found", flush=True)
+                
+                # Remove lock file if it exists
+                lock_file = '/tmp/fadcrypt.lock'
+                if os.path.exists(lock_file):
+                    try:
+                        os.remove(lock_file)
+                        print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                    except PermissionError:
+                        # Lock file might be owned by different user - cleanup script runs as root
+                        try:
+                            subprocess.run(['rm', '-f', lock_file], check=True)
+                            print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+                    except Exception as e:
+                        print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+            
+            elif system == "Windows":
+                print("[CLEANUP] Windows cleanup - restoring system tools and cleaning registry...", flush=True)
+                import winreg
+                
+                # Remove FadCrypt from PATH
+                print("[CLEANUP] Removing FadCrypt from PATH...", flush=True)
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ | winreg.KEY_SET_VALUE)
+                    try:
+                        current_path, _ = winreg.QueryValueEx(key, "Path")
+                        if not current_path:
+                            print("[CLEANUP] ℹ️  PATH is empty", flush=True)
+                        else:
+                            # Get the installation directory (where this executable should be)
+                            # During uninstall, we should be running from the installed location
+                            exe_path = sys.executable
+                            if hasattr(sys, '_MEIPASS'):
+                                # Running from PyInstaller bundle - get the directory containing the exe
+                                exe_dir = os.path.dirname(exe_path)
+                            else:
+                                # Running from source - don't modify PATH
+                                exe_dir = None
+                            
+                            if exe_dir:
+                                print(f"[CLEANUP] Removing directory from PATH: {exe_dir}", flush=True)
+                                # Split PATH and filter out the exe directory
+                                path_parts = current_path.split(';')
+                                original_count = len(path_parts)
+                                # Remove empty strings and the exe directory
+                                filtered_parts = [p for p in path_parts if p and p.strip() and p.strip() != exe_dir]
+                                
+                                if len(filtered_parts) != original_count:
+                                    new_path = ';'.join(filtered_parts)
+                                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, new_path)
+                                    print("[CLEANUP] ✅ Removed FadCrypt from PATH", flush=True)
+                                else:
+                                    print("[CLEANUP] ℹ️  FadCrypt directory not found in PATH", flush=True)
+                            else:
+                                print("[CLEANUP] ℹ️  Not running from PyInstaller bundle, skipping PATH removal", flush=True)
+                    except FileNotFoundError:
+                        print("[CLEANUP] ℹ️  PATH environment variable not found", flush=True)
+                    finally:
+                        winreg.CloseKey(key)
+                        
+                    # Notify system of environment change
+                    try:
+                        import ctypes
+                        HWND_BROADCAST = 0xFFFF
+                        WM_SETTINGCHANGE = 0x001A
+                        SMTO_ABORTIFHUNG = 0x0002
+                        result = ctypes.windll.user32.SendMessageTimeoutW(
+                            HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+                            SMTO_ABORTIFHUNG, 5000, None
+                        )
+                        if result:
+                            print("[CLEANUP] ✅ Notified system of PATH change", flush=True)
+                    except Exception as e:
+                        print(f"[CLEANUP] ℹ️  Could not notify system of PATH change: {e}", flush=True)
+                        
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove from PATH: {e}", flush=True)
+                
+                # Registry keys that FadCrypt may have disabled
+                keys_to_restore = [
+                    (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
+                ]
+                
+                restored_count = 0
+                for reg_path, value_name in keys_to_restore:
+                    try:
+                        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                        winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, 0)  # 0 = enabled
+                        winreg.CloseKey(key)
+                        restored_count += 1
+                        print(f"[CLEANUP] Restored: {value_name}", flush=True)
+                    except FileNotFoundError:
+                        pass  # Key doesn't exist
+                    except Exception as e:
+                        print(f"[CLEANUP] Warning: Could not restore {value_name}: {e}", flush=True)
+                
+                # Remove FadCrypt context menu entries
+                print("[CLEANUP] Removing FadCrypt context menu entries...", flush=True)
+                try:
+                    from core.windows.shell_extension import ContextMenuManager
+                    manager = ContextMenuManager()
+                    if manager.unregister_context_menu():
+                        print("[CLEANUP] ✅ Removed context menu entries", flush=True)
+                    else:
+                        print("[CLEANUP] ⚠️  No context menu entries found to remove", flush=True)
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove context menu entries: {e}", flush=True)
+                
+                # Remove from Windows startup
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                       r"Software\Microsoft\Windows\CurrentVersion\Run",
+                                       0, winreg.KEY_SET_VALUE)
+                    winreg.DeleteValue(key, "FadCrypt")
+                    winreg.CloseKey(key)
+                    print("[CLEANUP] Removed from Windows startup", flush=True)
+                except FileNotFoundError:
+                    pass  # Not in startup
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove startup entry: {e}", flush=True)
+                
+                print(f"[CLEANUP] ✅ Restored {restored_count} Windows settings", flush=True)
+                
+                # Remove FadCrypt data directories
+                print("[CLEANUP] Removing FadCrypt data directories...", flush=True)
+                import shutil
+                
+                # Get standard Windows directories
+                appdata = os.environ.get('APPDATA', '')
+                local_appdata = os.environ.get('LOCALAPPDATA', '')
+                programdata = os.environ.get('PROGRAMDATA', '')
+                
+                data_dirs_to_remove = []
+                if appdata:
+                    data_dirs_to_remove.append(os.path.join(appdata, 'FadCrypt'))
+                if local_appdata:
+                    data_dirs_to_remove.append(os.path.join(local_appdata, 'FadCrypt'))
+                if programdata:
+                    data_dirs_to_remove.append(os.path.join(programdata, 'FadCrypt'))
+                
+                removed_count = 0
+                for data_dir in data_dirs_to_remove:
+                    if os.path.exists(data_dir):
+                        try:
+                            shutil.rmtree(data_dir)
+                            print(f"[CLEANUP] ✅ Removed data directory: {data_dir}", flush=True)
+                            removed_count += 1
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove {data_dir}: {e}", flush=True)
+                
+                if removed_count > 0:
+                    print(f"[CLEANUP] ✅ Removed {removed_count} data directories", flush=True)
+                else:
+                    print("[CLEANUP] ℹ️  No data directories found to remove", flush=True)
+                
+                # Restart File Explorer to ensure context menu changes take effect
+                print("[CLEANUP] Restarting File Explorer to apply context menu changes...", flush=True)
+                try:
+                    # Use PowerShell to restart Explorer more reliably
+                    result = subprocess.run([
+                        'powershell.exe', '-NoProfile', '-Command',
+                        'Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer'
+                    ], capture_output=True, text=True, timeout=15)
+                    
+                    if result.returncode == 0:
+                        print("[CLEANUP] ✅ File Explorer restarted successfully", flush=True)
+                    else:
+                        print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {result.stderr}", flush=True)
+                except Exception as e:
+                    print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {e}", flush=True)
+            
+            print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
+            return True
+            
+        except Exception as e:
+            print(f"[CLEANUP] ❌ Error during cleanup: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def on_create_password(self):
         """Handle create password button click"""
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         
-        print(f"\n🔐 Create Password Request")
+        print(f"\n[PASSWORD] Create Password Request")
         print(f"   Checking password file: {password_file}")
         print(f"   File exists: {os.path.exists(password_file)}")
         
         if os.path.exists(password_file):
-            print(f"   ⚠️  Password file already exists, cannot create")
+            print(f"   WARN Password file already exists, cannot create")
             self.show_message("Info", "Password already exists. Use 'Change Password' to modify.", "info")
         else:
             # First password entry
-            password = ask_password(
-                "Create Password",
-                "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:",
-                self.resource_path,
-                style=self.password_dialog_style,
-                wallpaper=self.wallpaper_choice,
-                parent=self,
-                show_forgot_password=False  # Hide forgot password during creation
-            )
-            if password:
-                # Confirm password entry
-                confirm_password = ask_password(
-                    "Confirm New Password",  # Changed to include "New Password" for "Create" button
-                    "Please re-enter your password to confirm:",
+            try:
+                password = ask_password(
+                    "Create Password",
+                    "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:",
                     self.resource_path,
                     style=self.password_dialog_style,
                     wallpaper=self.wallpaper_choice,
                     parent=self,
                     show_forgot_password=False  # Hide forgot password during creation
                 )
+            except Exception as e:
+                print(f"   ERROR Exception in ask_password (first): {e}")
+                import traceback
+                traceback.print_exc()
+                self.show_message("Error", f"Failed to show password dialog:\n{e}", "error")
+                return
+            if password:
+                # Confirm password entry
+                try:
+                    confirm_password = ask_password(
+                        "Confirm New Password",  # Changed to include "New Password" for "Create" button
+                        "Please re-enter your password to confirm:",
+                        self.resource_path,
+                        style=self.password_dialog_style,
+                        wallpaper=self.wallpaper_choice,
+                        parent=self,
+                        show_forgot_password=False  # Hide forgot password during creation
+                    )
+                except Exception as e:
+                    print(f"   ERROR Exception in ask_password (confirm): {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.show_message("Error", f"Failed to show password confirmation dialog:\n{e}", "error")
+                    return
                 
                 if not confirm_password:
-                    print(f"   ⚠️  Password confirmation cancelled")
+                    print(f"   WARN Password confirmation cancelled")
                     return
                 
                 if password != confirm_password:
-                    print(f"   ❌ Passwords don't match")
+                    print(f"   ERROR Passwords don't match")
                     self.show_message("Error", "Passwords don't match. Please try again.", "error")
                     return
                 
                 try:
                     print(f"   Creating password file at: {password_file}")
                     self.password_manager.create_password(password)
-                    print(f"   ✅ Password created successfully")
+                    print(f"   OK Password created successfully")
                     
                     # Update password button visibility
                     self.update_password_buttons_visibility()
@@ -3458,7 +3787,7 @@ class MainWindowBase(QMainWindow):
                     
                     self.show_message("Success", "Password created successfully.", "success")
                 except Exception as e:
-                    print(f"   ❌ Error creating password: {e}")
+                    print(f"   ERROR Error creating password: {e}")
                     self.show_message("Error", f"Failed to create password:\n{e}", "error")
         
     def on_change_password(self):

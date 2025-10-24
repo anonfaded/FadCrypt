@@ -27,6 +27,127 @@ if hasattr(sys, '_MEIPASS'):
 # NOTE: Installer will perform context menu registration and PATH changes
 # Use --register-context to register context menu (this is invoked by installer)
 if '--register-context' in sys.argv:
+    import subprocess
+    import platform
+    print("[CONTEXT MENU] Registering FadCrypt context menu...", flush=True)
+    
+    # Log to file for debugging
+    try:
+        log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_register_context.log')
+        with open(log_file, 'w') as f:
+            f.write(f"[REGISTER-CONTEXT] Started at {os.times()}\n")
+            f.write(f"[REGISTER-CONTEXT] Executable: {sys.executable}\n")
+            f.write(f"[REGISTER-CONTEXT] Arguments: {sys.argv}\n")
+            f.write(f"[REGISTER-CONTEXT] Platform: {platform.system()}\n")
+    except Exception as e:
+        print(f"[CONTEXT MENU] Could not create log file: {e}", flush=True)
+    
+    try:
+        from core.windows.shell_extension import ContextMenuManager
+        manager = ContextMenuManager()
+        success = manager.force_register_context_menu()
+        
+        if success:
+            print("[CONTEXT MENU] Registration completed successfully", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[REGISTER-CONTEXT] Force registration result: True\n")
+            
+            # Always restart explorer after registration to ensure context menu takes effect
+            print("[CONTEXT MENU] Registration completed, restarting Explorer...", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[REGISTER-CONTEXT] Restarting Explorer...\n")
+            try:
+                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                             stderr=subprocess.DEVNULL, timeout=5)
+                subprocess.Popen('explorer.exe')
+                print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write("[REGISTER-CONTEXT] Explorer restarted successfully\n")
+            except Exception as e:
+                print(f"[CONTEXT MENU] Warning: Could not restart Explorer: {e}", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write(f"[REGISTER-CONTEXT] Warning: Could not restart Explorer: {e}\n")
+        else:
+            print("[CONTEXT MENU] Registration failed", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[REGISTER-CONTEXT] Registration failed\n")
+        
+        with open(log_file, 'a') as f:
+            f.write(f"[REGISTER-CONTEXT] Completed successfully\n")
+            
+    except Exception as e:
+        print(f"[CONTEXT MENU] Error during registration: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        try:
+            with open(log_file, 'a') as f:
+                f.write(f"[REGISTER-CONTEXT] Error: {e}\n")
+                f.write(f"[REGISTER-CONTEXT] Traceback: {traceback.format_exc()}\n")
+        except:
+            pass
+    sys.exit(0)
+
+# Use --unregister-context to unregister context menu (this is invoked by uninstaller)
+if '--unregister-context' in sys.argv:
+    import subprocess
+    import platform
+    print("[CONTEXT MENU] Unregistering FadCrypt context menu...", flush=True)
+    
+    # Log to file for debugging
+    try:
+        log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_unregister_context.log')
+        with open(log_file, 'w') as f:
+            f.write(f"[UNREGISTER-CONTEXT] Started at {os.times()}\n")
+            f.write(f"[UNREGISTER-CONTEXT] Executable: {sys.executable}\n")
+            f.write(f"[UNREGISTER-CONTEXT] Arguments: {sys.argv}\n")
+            f.write(f"[UNREGISTER-CONTEXT] Platform: {platform.system()}\n")
+    except Exception as e:
+        print(f"[CONTEXT MENU] Could not create log file: {e}", flush=True)
+    
+    try:
+        from core.windows.shell_extension import ContextMenuManager
+        manager = ContextMenuManager()
+        success = manager.unregister_context_menu()
+        
+        if success:
+            print("[CONTEXT MENU] Unregistration completed successfully", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[UNREGISTER-CONTEXT] Unregistration result: True\n")
+            
+            # Always restart explorer after unregistration to ensure context menu changes take effect
+            print("[CONTEXT MENU] Unregistration completed, restarting Explorer...", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[UNREGISTER-CONTEXT] Restarting Explorer...\n")
+            try:
+                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                             stderr=subprocess.DEVNULL, timeout=5)
+                subprocess.Popen('explorer.exe')
+                print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write("[UNREGISTER-CONTEXT] Explorer restarted successfully\n")
+            except Exception as e:
+                print(f"[CONTEXT MENU] Warning: Could not restart Explorer: {e}", flush=True)
+                with open(log_file, 'a') as f:
+                    f.write(f"[UNREGISTER-CONTEXT] Warning: Could not restart Explorer: {e}\n")
+        else:
+            print("[CONTEXT MENU] Unregistration failed or no entries found", flush=True)
+            with open(log_file, 'a') as f:
+                f.write("[UNREGISTER-CONTEXT] Unregistration failed or no entries found\n")
+        
+        with open(log_file, 'a') as f:
+            f.write(f"[UNREGISTER-CONTEXT] Completed successfully\n")
+            
+    except Exception as e:
+        print(f"[CONTEXT MENU] Error during unregistration: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        try:
+            with open(log_file, 'a') as f:
+                f.write(f"[UNREGISTER-CONTEXT] Error: {e}\n")
+                f.write(f"[UNREGISTER-CONTEXT] Traceback: {traceback.format_exc()}\n")
+        except:
+            pass
+    sys.exit(0)
     try:
         # Log to file for debugging installer issues
         import tempfile
@@ -178,9 +299,9 @@ if '--cleanup' in sys.argv:
                     try:
                         import shutil
                         shutil.rmtree(folder)
-                        print(f"[CLEANUP] ✅ Removed: {folder}", flush=True)
+                        print(f"[CLEANUP] OK Removed: {folder}", flush=True)
                     except Exception as e:
-                        print(f"[CLEANUP] ⚠️ Warning: Could not remove {folder}: {e}", flush=True)
+                        print(f"[CLEANUP] WARN Warning: Could not remove {folder}: {e}", flush=True)
             
             # List of common system tools that might have been disabled
             all_tools = [
@@ -221,9 +342,9 @@ if '--cleanup' in sys.argv:
                                       check=False)
                 
                 if result.returncode == 0:
-                    print(f"[CLEANUP] ✅ Restored {len(tools_to_restore)} tools", flush=True)
+                    print(f"[CLEANUP] OK Restored {len(tools_to_restore)} tools", flush=True)
                 else:
-                    print(f"[CLEANUP] ⚠️ Warning: {result.stderr}", flush=True)
+                    print(f"[CLEANUP] WARN Warning: {result.stderr}", flush=True)
             else:
                 print("[CLEANUP] No disabled tools found", flush=True)
             
@@ -237,7 +358,7 @@ if '--cleanup' in sys.argv:
                     # Lock file might be owned by different user - cleanup script runs as root
                     try:
                         subprocess.run(['rm', '-f', lock_file], check=True)
-                        print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                        print(f"[CLEANUP] OK Removed lock file: {lock_file}", flush=True)
                     except Exception as e:
                         print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
                 except Exception as e:
@@ -277,13 +398,13 @@ if '--cleanup' in sys.argv:
                             if len(filtered_parts) != original_count:
                                 new_path = ';'.join(filtered_parts)
                                 winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, new_path)
-                                print("[CLEANUP] ✅ Removed FadCrypt from PATH", flush=True)
+                                print("[CLEANUP] OK Removed FadCrypt from PATH", flush=True)
                             else:
-                                print("[CLEANUP] ℹ️  FadCrypt directory not found in PATH", flush=True)
+                                print("[CLEANUP] INFO FadCrypt directory not found in PATH", flush=True)
                         else:
-                            print("[CLEANUP] ℹ️  Not running from PyInstaller bundle, skipping PATH removal", flush=True)
+                            print("[CLEANUP] INFO Not running from PyInstaller bundle, skipping PATH removal", flush=True)
                 except FileNotFoundError:
-                    print("[CLEANUP] ℹ️  PATH environment variable not found", flush=True)
+                    print("[CLEANUP] INFO PATH environment variable not found", flush=True)
                 finally:
                     winreg.CloseKey(key)
                     
@@ -353,7 +474,55 @@ if '--cleanup' in sys.argv:
             except Exception as e:
                 print(f"[CLEANUP] Warning: Could not remove startup entry: {e}", flush=True)
             
-            print(f"[CLEANUP] ✅ Restored {restored_count} Windows settings", flush=True)
+            print(f"[CLEANUP] OK Restored {restored_count} Windows settings", flush=True)
+            
+            # Remove FadCrypt data directories
+            print("[CLEANUP] Removing FadCrypt data directories...", flush=True)
+            import shutil
+            
+            # Get standard Windows directories
+            appdata = os.environ.get('APPDATA', '')
+            local_appdata = os.environ.get('LOCALAPPDATA', '')
+            programdata = os.environ.get('PROGRAMDATA', '')
+            
+            data_dirs_to_remove = []
+            if appdata:
+                data_dirs_to_remove.append(os.path.join(appdata, 'FadCrypt'))
+            if local_appdata:
+                data_dirs_to_remove.append(os.path.join(local_appdata, 'FadCrypt'))
+            if programdata:
+                data_dirs_to_remove.append(os.path.join(programdata, 'FadCrypt'))
+            
+            removed_count = 0
+            for data_dir in data_dirs_to_remove:
+                if os.path.exists(data_dir):
+                    try:
+                        shutil.rmtree(data_dir)
+                        print(f"[CLEANUP] ✅ Removed data directory: {data_dir}", flush=True)
+                        removed_count += 1
+                    except Exception as e:
+                        print(f"[CLEANUP] ⚠️ Warning: Could not remove {data_dir}: {e}", flush=True)
+            
+            if removed_count > 0:
+                print(f"[CLEANUP] ✅ Removed {removed_count} data directories", flush=True)
+            else:
+                print("[CLEANUP] ℹ️  No data directories found to remove", flush=True)
+            
+            # Restart File Explorer to ensure context menu changes take effect
+            print("[CLEANUP] Restarting File Explorer to apply context menu changes...", flush=True)
+            try:
+                # Use PowerShell to restart Explorer more reliably
+                result = subprocess.run([
+                    'powershell.exe', '-NoProfile', '-Command',
+                    'Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer'
+                ], capture_output=True, text=True, timeout=15)
+                
+                if result.returncode == 0:
+                    print("[CLEANUP] ✅ File Explorer restarted successfully", flush=True)
+                else:
+                    print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {result.stderr}", flush=True)
+            except Exception as e:
+                print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {e}", flush=True)
         
         print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
         
@@ -368,7 +537,7 @@ if '--cleanup' in sys.argv:
         sys.exit(0)
         
     except Exception as e:
-        print(f"[CLEANUP] ❌ Error during cleanup: {e}", flush=True)
+        print(f"[CLEANUP] ERROR Error during cleanup: {e}", flush=True)
         import traceback
         traceback.print_exc()
         sys.exit(1)
