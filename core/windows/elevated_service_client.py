@@ -19,6 +19,9 @@ if current_dir not in sys.path:
 try:
     import win32pipe
     import win32file
+    import win32api
+    import win32con
+    import win32security
     WINDOWS_AVAILABLE = True
 except ImportError:
     WINDOWS_AVAILABLE = False
@@ -70,10 +73,20 @@ class ElevatedServiceClient:
             return False, "Elevated service not available"
 
         try:
+            # Get user SID
+            if WINDOWS_AVAILABLE:
+                token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+                user_sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+                user_sid_str = win32security.ConvertSidToStringSid(user_sid)
+                win32api.CloseHandle(token)
+            else:
+                user_sid_str = None
+            
             # Create request
             request = {
                 "operation": operation,
-                "args": args or []
+                "args": args or [],
+                "user_sid": user_sid_str
             }
             request_json = json.dumps(request)
 

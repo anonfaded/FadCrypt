@@ -153,7 +153,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=True,
     icon='img/icon.png'
 )
 

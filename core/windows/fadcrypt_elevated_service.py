@@ -20,6 +20,11 @@ import win32serviceutil
 import win32service
 import win32event
 import servicemanager
+import win32api
+import win32con
+import win32security
+import win32pipe
+import win32file
 import socket
 import threading
 import json
@@ -74,6 +79,49 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
         )
         self.logger = logging.getLogger(__name__)
 
+        # Create security attributes for named pipe
+        self.pipe_sa = self._create_pipe_security_attributes()
+
+    def _create_pipe_security_attributes(self):
+        """Create security attributes to allow user access to the named pipe"""
+        try:
+            # Get current user SID
+            token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+            user_sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+            win32api.CloseHandle(token)
+
+            # Create DACL
+            dacl = win32security.ACL()
+
+            # Allow current user
+            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.GENERIC_READ | win32con.GENERIC_WRITE, user_sid)
+
+            # Allow SYSTEM
+            system_sid = win32security.ConvertStringSidToSid("S-1-5-18")
+            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.GENERIC_READ | win32con.GENERIC_WRITE, system_sid)
+
+            # Allow Administrators
+            admin_sid = win32security.ConvertStringSidToSid("S-1-5-32-544")
+            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.GENERIC_READ | win32con.GENERIC_WRITE, admin_sid)
+
+            # Allow Everyone
+            everyone_sid = win32security.ConvertStringSidToSid("S-1-1-0")
+            dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.GENERIC_READ | win32con.GENERIC_WRITE, everyone_sid)
+
+            # Create security descriptor
+            sd = win32security.SECURITY_DESCRIPTOR()
+            sd.SetDacl(True, dacl, False)
+
+            # Create security attributes
+            sa = win32security.SECURITY_ATTRIBUTES()
+            sa.SECURITY_DESCRIPTOR = sd
+            sa.bInheritHandle = False
+
+            return sa
+        except Exception as e:
+            self.logger.error(f"Failed to create pipe security attributes: {e}")
+            return None
+
     def SvcStop(self):
         """Stop the service"""
         self.logger.info("Service stop requested")
@@ -111,17 +159,18 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
             import win32file
 
             while self.is_running:
+                pipe = None
                 try:
                     # Create named pipe
                     pipe = win32pipe.CreateNamedPipe(
                         SOCKET_FILE,
                         win32pipe.PIPE_ACCESS_DUPLEX,
                         win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
-                        1,  # Max instances
+                        10,  # Max instances - allow multiple simultaneous connections
                         65536,  # Out buffer size
                         65536,  # In buffer size
                         0,  # Default timeout
-                        None  # Security attributes
+                        self.pipe_sa or None  # Security attributes
                     )
 
                     self.logger.info("Waiting for client connection...")
@@ -152,7 +201,14 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
 
                 except Exception as e:
                     self.logger.error(f"Pipe error: {e}")
-                    break
+                    # Don't break - continue listening for new connections
+                finally:
+                    if pipe is not None:
+                        try:
+                            win32file.CloseHandle(pipe)
+                        except Exception as e:
+                            self.logger.warning(f"Error closing pipe handle: {e}")
+                    continue
 
         except Exception as e:
             self.logger.error(f"Server error: {e}")
@@ -162,15 +218,16 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
         try:
             operation = request.get('operation')
             args = request.get('args', [])
+            user_sid = request.get('user_sid')
 
-            self.logger.info(f"Handling operation: {operation}")
+            self.logger.info(f"Handling operation: {operation} for user {user_sid}")
 
             if operation == 'disable-tools':
-                success = self._disable_system_tools()
+                success = self._disable_system_tools(user_sid)
                 return {"success": success}
 
             elif operation == 'enable-tools':
-                success = self._enable_system_tools()
+                success = self._enable_system_tools(user_sid)
                 return {"success": success}
 
             elif operation == 'protect-files':
@@ -190,7 +247,7 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
             self.logger.error(f"Request handling error: {e}")
             return {"success": False, "error": str(e)}
 
-    def _disable_system_tools(self):
+    def _disable_system_tools(self, user_sid):
         """Disable system tools with elevated privileges"""
         try:
             disable_configs = [
@@ -202,10 +259,11 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
 
             for reg_path, value_name, value in disable_configs:
                 try:
-                    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+                    full_reg_path = f"{user_sid}\\{reg_path}"
+                    key = winreg.CreateKey(winreg.HKEY_USERS, full_reg_path)
                     winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, value)
                     winreg.CloseKey(key)
-                    self.logger.info(f"Disabled: {value_name}")
+                    self.logger.info(f"Disabled: {value_name} for user {user_sid}")
                 except Exception as e:
                     self.logger.warning(f"Could not disable {value_name}: {e}")
 
@@ -214,7 +272,7 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
             self.logger.error(f"Error disabling tools: {e}")
             return False
 
-    def _enable_system_tools(self):
+    def _enable_system_tools(self, user_sid):
         """Re-enable system tools"""
         try:
             enable_configs = [
@@ -226,12 +284,13 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
 
             for reg_path, value_name in enable_configs:
                 try:
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                    full_reg_path = f"{user_sid}\\{reg_path}"
+                    key = winreg.OpenKey(winreg.HKEY_USERS, full_reg_path, 0, winreg.KEY_SET_VALUE)
                     try:
                         winreg.DeleteValue(key, value_name)
-                        self.logger.info(f"Enabled: {value_name}")
+                        self.logger.info(f"Enabled: {value_name} for user {user_sid}")
                     except FileNotFoundError:
-                        self.logger.info(f"Already enabled: {value_name}")
+                        self.logger.info(f"Already enabled: {value_name} for user {user_sid}")
                     winreg.CloseKey(key)
                 except Exception as e:
                     self.logger.warning(f"Could not enable {value_name}: {e}")

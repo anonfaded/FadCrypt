@@ -2669,8 +2669,11 @@ class MainWindowBase(QMainWindow):
         if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
             print("🔒 Disabling system tools (terminals, task manager, etc.)...")
             if hasattr(self, 'disable_system_tools'):
-                self.disable_system_tools()
-                print("✅ System tools disabled successfully")
+                result = self.disable_system_tools()
+                if result:
+                    print("✅ System tools disabled successfully")
+                else:
+                    print("❌ Failed to disable system tools")
             else:
                 print("⚠️  Warning: disable_system_tools method not found")
         

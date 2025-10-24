@@ -646,38 +646,78 @@ if '--install-service' in sys.argv:
         sys.exit(1)
 
 if '--uninstall-service' in sys.argv:
-    import subprocess
-    print("[SERVICE] Uninstalling FadCrypt elevated service...", flush=True)
-
+    # Create log file for service uninstallation
+    import tempfile
+    log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_service_uninstall.log')
+    
+    def log_message(message):
+        print(message, flush=True)
+        try:
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(f"{message}\n")
+        except Exception as e:
+            print(f"Failed to write to log file: {e}", flush=True)
+    
+    log_message("[SERVICE] Uninstalling FadCrypt elevated service...")
+    
     try:
-        # Run the service uninstallation as a subprocess
-        service_script = os.path.join(project_root, 'core', 'windows', 'fadcrypt_elevated_service.py')
-        
-        # Try to stop the service first
-        stop_result = subprocess.run([sys.executable, service_script, 'stop'], 
-                                   capture_output=True, text=True, cwd=str(project_root))
-        if stop_result.returncode == 0:
-            print("[SERVICE] Service stopped successfully", flush=True)
-        else:
-            print("[SERVICE] Warning: Could not stop service (may not be running)", flush=True)
-            print(f"[SERVICE] Stop output: {stop_result.stdout}", flush=True)
-            print(f"[SERVICE] Stop error: {stop_result.stderr}", flush=True)
-        
-        # Uninstall the service
-        result = subprocess.run([sys.executable, service_script, 'uninstall'], 
-                              capture_output=True, text=True, cwd=str(project_root))
-        
-        if result.returncode == 0:
-            print("[SERVICE] Service uninstalled successfully", flush=True)
-            sys.exit(0)
-        else:
-            print("[SERVICE] Failed to uninstall service", flush=True)
-            print(f"[SERVICE] Uninstall output: {result.stdout}", flush=True)
-            print(f"[SERVICE] Uninstall error: {result.stderr}", flush=True)
-            sys.exit(1)
+        # Try to import and uninstall the service directly
+        try:
+            from core.windows.fadcrypt_elevated_service import uninstall_service, stop_service
+            log_message("[SERVICE] Successfully imported service functions")
+            
+            if stop_service():
+                log_message("[SERVICE] Service stopped successfully")
+            else:
+                log_message("[SERVICE] Warning: Could not stop service")
+            
+            if uninstall_service():
+                log_message("[SERVICE] Service uninstalled successfully")
+                sys.exit(0)
+            else:
+                log_message("[SERVICE] Failed to uninstall service")
+                sys.exit(1)
+                
+        except ImportError as e:
+            log_message(f"[SERVICE] Failed to import service functions: {e}")
+            log_message("[SERVICE] Falling back to subprocess approach")
+            
+            # Fallback: Run the service uninstallation as a subprocess
+            service_script = os.path.join(project_root, 'core', 'windows', 'fadcrypt_elevated_service.py')
+            log_message(f"[SERVICE] Service script path: {service_script}")
+            log_message(f"[SERVICE] Service script exists: {os.path.exists(service_script)}")
+            
+            import subprocess
+            # Try to stop the service first
+            stop_result = subprocess.run([sys.executable, service_script, 'stop'], 
+                                       capture_output=True, text=True, cwd=str(project_root))
+            
+            log_message(f"[SERVICE] Stop command exit code: {stop_result.returncode}")
+            log_message(f"[SERVICE] Stop stdout: {stop_result.stdout}")
+            log_message(f"[SERVICE] Stop stderr: {stop_result.stderr}")
+            
+            if stop_result.returncode == 0:
+                log_message("[SERVICE] Service stopped successfully (subprocess)")
+            else:
+                log_message("[SERVICE] Warning: Could not stop service (subprocess)")
+            
+            # Uninstall the service
+            result = subprocess.run([sys.executable, service_script, 'uninstall'], 
+                                  capture_output=True, text=True, cwd=str(project_root))
+            
+            log_message(f"[SERVICE] Uninstall command exit code: {result.returncode}")
+            log_message(f"[SERVICE] Uninstall stdout: {result.stdout}")
+            log_message(f"[SERVICE] Uninstall stderr: {result.stderr}")
+            
+            if result.returncode == 0:
+                log_message("[SERVICE] Service uninstalled successfully (subprocess)")
+                sys.exit(0)
+            else:
+                log_message("[SERVICE] Failed to uninstall service (subprocess)")
+                sys.exit(1)
 
     except Exception as e:
-        print(f"[SERVICE] Error uninstalling service: {e}", flush=True)
+        log_message(f"[SERVICE] Error uninstalling service: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
