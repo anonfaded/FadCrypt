@@ -23,7 +23,6 @@ from ui.dialogs.password_dialog import ask_password
 from core.crypto_manager import CryptoManager
 from core.password_manager import PasswordManager
 from core.config_manager import ConfigManager
-from core.application_manager import ApplicationManager
 from core.activity_manager import ActivityManager
 from core.statistics_manager import StatisticsManager
 from core.file_protection import get_file_protection_manager
