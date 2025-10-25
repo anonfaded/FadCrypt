@@ -12,12 +12,20 @@ import logging
 from typing import Optional
 
 # Set up logging to both console and file
+def get_fadcrypt_logs_folder():
+    """Get the unified FadCrypt logs folder for Windows."""
+    import os
+    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+    logs_dir = os.path.join(appdata, 'FadCrypt', 'logs')
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
+
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stderr),  # Console output
-        logging.FileHandler(os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cli_debug.log'), mode='a')  # File output
+        logging.FileHandler(os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_cli_debug.log'), mode='a')  # File output
     ]
 )
 logger = logging.getLogger(__name__)

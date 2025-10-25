@@ -255,10 +255,10 @@ class MainWindowWindows(MainWindowBase):
         Get the FadCrypt configuration folder for Windows.
         
         Returns:
-            str: Path to %APPDATA%\\FadCrypt\\
+            str: Path to %APPDATA%\\FadCrypt\\config\\
         """
         appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        config_dir = os.path.join(appdata, 'FadCrypt')
+        config_dir = os.path.join(appdata, 'FadCrypt', 'config')
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
     
@@ -267,12 +267,36 @@ class MainWindowWindows(MainWindowBase):
         Get the backup folder for Windows.
         
         Returns:
-            str: Path to C:\\ProgramData\\FadCrypt\\Backup\\
+            str: Path to %APPDATA%\\FadCrypt\\backup\\
         """
-        programdata = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        backup_dir = os.path.join(programdata, 'FadCrypt', 'Backup')
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        backup_dir = os.path.join(appdata, 'FadCrypt', 'backup')
         os.makedirs(backup_dir, exist_ok=True)
         return backup_dir
+    
+    def get_logs_folder(self):
+        """
+        Get the logs folder for Windows.
+        
+        Returns:
+            str: Path to %APPDATA%\\FadCrypt\\logs\\
+        """
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        logs_dir = os.path.join(appdata, 'FadCrypt', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        return logs_dir
+    
+    def get_temp_folder(self):
+        """
+        Get the temp folder for Windows.
+        
+        Returns:
+            str: Path to %APPDATA%\\FadCrypt\\temp\\
+        """
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        temp_dir = os.path.join(appdata, 'FadCrypt', 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        return temp_dir
     
     def disable_system_tools(self):
         """

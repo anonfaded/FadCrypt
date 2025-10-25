@@ -13,8 +13,19 @@ import os
 import platform
 import tempfile
 
-# Force UTF-8 encoding on Windows to prevent Unicode errors
-if platform.system() == 'Windows':
+def get_fadcrypt_logs_folder():
+    """Get the unified FadCrypt logs folder for the current platform."""
+    if platform.system() == 'Windows':
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        logs_dir = os.path.join(appdata, 'FadCrypt', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        return logs_dir
+    else:
+        # For Linux, keep using home directory for now
+        user_home = os.path.expanduser('~')
+        logs_dir = os.path.join(user_home, '.config', 'FadCrypt', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        return logs_dir
     try:
         # Set console encoding to UTF-8
         import codecs
@@ -44,7 +55,7 @@ if '--register-context' in sys.argv:
     
     # Log to file for debugging
     try:
-        log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_register_context.log')
+        log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_register_context.log')
         with open(log_file, 'w') as f:
             f.write(f"[REGISTER-CONTEXT] Started at {os.times()}\n")
             f.write(f"[REGISTER-CONTEXT] Executable: {sys.executable}\n")
@@ -106,7 +117,7 @@ if '--unregister-context' in sys.argv:
     
     # Log to file for debugging
     try:
-        log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_unregister_context.log')
+        log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_unregister_context.log')
         with open(log_file, 'w') as f:
             f.write(f"[UNREGISTER-CONTEXT] Started at {os.times()}\n")
             f.write(f"[UNREGISTER-CONTEXT] Executable: {sys.executable}\n")
@@ -248,7 +259,7 @@ if '--cleanup' in sys.argv:
     
     # Log to file for debugging uninstall issues
     try:
-        log_file = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cleanup.log')
+        log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_cleanup.log')
         with open(log_file, 'w') as f:
             f.write(f"[CLEANUP] Started at {os.times()}\n")
             f.write(f"[CLEANUP] Executable: {sys.executable}\n")
@@ -583,7 +594,7 @@ sys.path.insert(0, str(project_root))
 if '--install-service' in sys.argv:
     # Create log file for service installation
     import tempfile
-    log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_service_install.log')
+    log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_service_install.log')
     
     def log_message(message):
         print(message, flush=True)
@@ -665,7 +676,7 @@ if '--install-service' in sys.argv:
 if '--uninstall-service' in sys.argv:
     # Create log file for service uninstallation
     import tempfile
-    log_file = os.path.join(tempfile.gettempdir(), 'fadcrypt_service_uninstall.log')
+    log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_service_uninstall.log')
     
     def log_message(message):
         print(message, flush=True)

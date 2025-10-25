@@ -3685,31 +3685,37 @@ class MainWindowBase(QMainWindow):
                 
                 # Get standard Windows directories
                 appdata = os.environ.get('APPDATA', '')
-                local_appdata = os.environ.get('LOCALAPPDATA', '')
                 programdata = os.environ.get('PROGRAMDATA', '')
                 
+                # Main unified FadCrypt directory (contains config, logs, backup, temp)
                 data_dirs_to_remove = []
                 if appdata:
-                    data_dirs_to_remove.append(os.path.join(appdata, 'FadCrypt'))
-                if local_appdata:
-                    data_dirs_to_remove.append(os.path.join(local_appdata, 'FadCrypt'))
+                    main_fadcrypt_dir = os.path.join(appdata, 'FadCrypt')
+                    data_dirs_to_remove.append(main_fadcrypt_dir)
+                
+                # Legacy service logs directory (if it exists)
                 if programdata:
-                    data_dirs_to_remove.append(os.path.join(programdata, 'FadCrypt'))
+                    legacy_service_dir = os.path.join(programdata, 'FadCrypt')
+                    data_dirs_to_remove.append(legacy_service_dir)
                 
                 removed_count = 0
+                total_files_removed = 0
                 for data_dir in data_dirs_to_remove:
                     if os.path.exists(data_dir):
                         try:
+                            # Count files before removal for logging
+                            file_count = sum(len(files) for _, _, files in os.walk(data_dir))
                             shutil.rmtree(data_dir)
-                            print(f"[CLEANUP] ✅ Removed data directory: {data_dir}", flush=True)
+                            print(f"[CLEANUP] ✅ Removed directory: {data_dir} ({file_count} files)", flush=True)
                             removed_count += 1
+                            total_files_removed += file_count
                         except Exception as e:
                             print(f"[CLEANUP] ⚠️ Warning: Could not remove {data_dir}: {e}", flush=True)
                 
                 if removed_count > 0:
-                    print(f"[CLEANUP] ✅ Removed {removed_count} data directories", flush=True)
+                    print(f"[CLEANUP] ✅ Removed {removed_count} directories with {total_files_removed} total files", flush=True)
                 else:
-                    print("[CLEANUP] ℹ️  No data directories found to remove", flush=True)
+                    print("[CLEANUP] ℹ️  No FadCrypt directories found to remove", flush=True)
                 
                 # Restart File Explorer to ensure context menu changes take effect
                 print("[CLEANUP] Restarting File Explorer to apply context menu changes...", flush=True)
