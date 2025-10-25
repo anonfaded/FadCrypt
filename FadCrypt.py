@@ -495,8 +495,23 @@ if '--cleanup' in sys.argv:
                 manager = ContextMenuManager()
                 if manager.unregister_context_menu():
                     print("[CLEANUP] [OK] Removed context menu entries", flush=True)
+                    # Restart File Explorer to clear context menu cache
+                    print("[CLEANUP] Restarting File Explorer to clear context menu cache...", flush=True)
+                    try:
+                        # Kill explorer and restart it properly
+                        subprocess.run(['taskkill.exe', '/f', '/im', 'explorer.exe'], 
+                                     capture_output=True, timeout=5)
+                        # Give it a moment to fully terminate
+                        import time
+                        time.sleep(1)
+                        # Start explorer again (don't wait for it since it's long-running)
+                        subprocess.Popen(['explorer.exe'])
+                        print("[CLEANUP] [OK] File Explorer restarted (context menu cache cleared)", flush=True)
+                    except Exception as e:
+                        print(f"[CLEANUP] ⚠️  Could not restart File Explorer: {e}", flush=True)
+                        print("[CLEANUP] ℹ️  Context menu changes will take effect on next login", flush=True)
                 else:
-                    print("[CLEANUP] [WARN] No context menu entries found to remove", flush=True)
+                    print("[CLEANUP] [INFO] No context menu entries found to remove", flush=True)
             except Exception as e:
                 print(f"[CLEANUP] Warning: Could not remove context menu entries: {e}", flush=True)
             
@@ -547,21 +562,8 @@ if '--cleanup' in sys.argv:
             else:
                 print("[CLEANUP] [INFO] No data directories found to remove", flush=True)
             
-            # Restart File Explorer to ensure context menu changes take effect
-            print("[CLEANUP] Restarting File Explorer to apply context menu changes...", flush=True)
-            try:
-                # Use PowerShell to restart Explorer more reliably
-                result = subprocess.run([
-                    'powershell.exe', '-NoProfile', '-Command',
-                    'Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer'
-                ], capture_output=True, text=True, timeout=15)
-                
-                if result.returncode == 0:
-                    print("[CLEANUP] [OK] File Explorer restarted successfully", flush=True)
-                else:
-                    print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {result.stderr}", flush=True)
-            except Exception as e:
-                print(f"[CLEANUP] ⚠️ Warning: Could not restart Explorer: {e}", flush=True)
+            # Note: File Explorer restart not needed for context menu changes to take effect
+            print("[CLEANUP] ℹ️  Context menu changes will take effect on next File Explorer restart", flush=True)
         
         print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
         

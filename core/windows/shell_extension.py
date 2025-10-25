@@ -260,16 +260,17 @@ class ContextMenuManager:
                 f"{self.REGISTRY_BASE}\\{self.FOLDER_LOCK_KEY}",
                 f"{self.REGISTRY_BASE}\\{self.FOLDER_UNLOCK_KEY}"
             ]
-            
+
             removed_count = 0
             for key_path in keys_to_remove:
                 try:
+                    logger.info(f"Attempting to remove registry key: {key_path}")
                     self._delete_key(winreg.HKEY_CURRENT_USER, key_path)
                     removed_count += 1
-                    logger.info(f"Removed registry key: {key_path}")
+                    logger.info(f"Successfully removed registry key: {key_path}")
                 except Exception as e:
                     logger.warning(f"Failed to remove key {key_path}: {e}")
-            
+
             logger.info(f"Context menu cleanup completed: {removed_count}/{len(keys_to_remove)} keys removed")
             return removed_count > 0
         except Exception as e:
@@ -277,10 +278,28 @@ class ContextMenuManager:
             return False
     
     def _delete_key(self, hive, path):
-        """Recursively delete registry key"""
+        """Recursively delete registry key and all its subkeys"""
         try:
-            parent, key = path.rsplit('\\', 1)
-            with winreg.OpenKey(hive, parent, 0, winreg.KEY_WRITE) as key_obj:
-                winreg.DeleteKey(key_obj, key)
-        except:
+            # First delete all subkeys recursively
+            with winreg.OpenKey(hive, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+                try:
+                    i = 0
+                    while True:
+                        subkey = winreg.EnumKey(key, i)
+                        subkey_path = f"{path}\\{subkey}"
+                        self._delete_key(hive, subkey_path)
+                        i += 1
+                except OSError:
+                    # No more subkeys
+                    pass
+
+            # Now delete the key itself
+            parent, key_name = path.rsplit('\\', 1)
+            with winreg.OpenKey(hive, parent, 0, winreg.KEY_WRITE) as parent_key:
+                winreg.DeleteKey(parent_key, key_name)
+
+        except FileNotFoundError:
+            # Key doesn't exist, that's fine
             pass
+        except Exception as e:
+            logger.warning(f"Failed to delete registry key {path}: {e}")
