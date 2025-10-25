@@ -47,6 +47,9 @@ class MainWindowWindows(MainWindowBase):
             print("[MainWindowWindows] ⚠️  Elevated service not available - using fallback elevation")
             self._setup_persistent_elevation()
 
+        # Check and fix autostart registry entry if needed
+        self._check_autostart_registry()
+        
         # Platform-specific initialization complete
         pass
     
@@ -57,6 +60,47 @@ class MainWindowWindows(MainWindowBase):
             print("[MainWindowWindows] Elevation manager ready for persistent admin operations")
         except Exception as e:
             print(f"[MainWindowWindows] Error setting up elevation: {e}")
+    
+    def _check_autostart_registry(self):
+        """Check if autostart registry entry exists and points to valid executable"""
+        if not WINDOWS_AVAILABLE:
+            return
+            
+        try:
+            # Check if autostart is currently enabled
+            if self.is_autostart_enabled_windows():
+                # Get current registry value
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Run",
+                    0,
+                    winreg.KEY_READ
+                )
+                
+                try:
+                    current_value, _ = winreg.QueryValueEx(key, "FadCrypt")
+                    winreg.CloseKey(key)
+                    
+                    # Get what the registry value should be
+                    if getattr(sys, 'frozen', False):
+                        expected_exec_path = sys.executable
+                    else:
+                        expected_exec_path = f'pythonw "{os.path.abspath(sys.argv[0])}"'
+                    
+                    expected_value = f'"{expected_exec_path}" --auto-monitor'
+                    
+                    # If registry doesn't match current executable, update it
+                    if current_value != expected_value:
+                        print(f"[MainWindowWindows] Updating autostart registry from '{current_value}' to '{expected_value}'")
+                        self.setup_autostart_windows(enable=True)
+                        
+                except FileNotFoundError:
+                    # Registry value doesn't exist, re-enable it
+                    print("[MainWindowWindows] Autostart registry entry missing, re-enabling...")
+                    self.setup_autostart_windows(enable=True)
+                    
+        except Exception as e:
+            print(f"[MainWindowWindows] Error checking autostart registry: {e}")
     
     def get_platform_name(self):
         """Override to always return Windows for this implementation"""
