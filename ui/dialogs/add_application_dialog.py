@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import os
+import sys
 
 
 class AddApplicationDialog(QDialog):
@@ -313,6 +314,9 @@ class AddApplicationDialog(QDialog):
         
         # Auto-fill name and path
         app_name = os.path.basename(file_path)
+        # Clean up the name for display (remove .exe on Windows)
+        if sys.platform.startswith('win') and app_name.endswith('.exe'):
+            app_name = app_name[:-4]
         self.name_entry.setText(app_name)
         self.path_entry.setText(file_path)
         

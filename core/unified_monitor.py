@@ -154,8 +154,9 @@ class UnifiedMonitor:
             app_name = app["name"]
             app_path = app.get("path", "")
             
-            # Clean the path (remove quotes that might be in config)
+            # Clean the path (remove quotes that might be in config and normalize)
             app_path = app_path.strip().strip('"').strip("'")
+            app_path = os.path.normpath(app_path)  # Normalize path separators
             
             # Handle "env" path specially - it means "find in PATH"
             # We should use app_name as process_name for these apps
@@ -181,8 +182,8 @@ class UnifiedMonitor:
                 if self.get_exec_from_desktop:
                     process_name = self.get_exec_from_desktop(app_path)
             
-            # Remove .exe extension on Windows
-            if not self.is_linux and process_name.endswith('.exe'):
+            # Remove .exe extension on Linux (Windows keeps .exe in process names)
+            if self.is_linux and process_name.endswith('.exe'):
                 process_name = process_name[:-4]
             
             # Detect Chrome apps (but NOT Brave, Edge, or other Chromium-based browsers)
@@ -419,8 +420,9 @@ class UnifiedMonitor:
                     print(f"   [PROTECTED] Skipping critical system process: {proc_name} (PID: {proc.pid})")
                     return True
             
-            # Check if process is owned by root/system (PID < 1000 is usually system)
-            if proc.pid < 1000 and proc.pid > 1:  # Skip PID 0 and 1 (kernel/init)
+            # Check if process is owned by root/system (Linux only - PID < 1000 is usually system)
+            # On Windows, PIDs can be low for user processes, so skip this check
+            if not self.is_linux and proc.pid < 1000 and proc.pid > 1:  # Skip PID 0 and 1 (kernel/init)
                 return True
             
             return False
