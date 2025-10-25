@@ -235,7 +235,7 @@ class MainWindowWindows(MainWindowBase):
         Disable Command Prompt, Task Manager, Control Panel, and Registry Editor.
         Uses elevated service for seamless operation without admin prompts.
         """
-        print("🔒 Disabling system tools (terminals, task manager, etc.)...")
+        print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
 
         # Try elevated service first (persistent admin rights)
         if self.elevated_client.is_available():

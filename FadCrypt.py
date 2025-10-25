@@ -438,27 +438,44 @@ if '--cleanup' in sys.argv:
                 print(f"[CLEANUP] Warning: Could not remove from PATH: {e}", flush=True)
             
             # Registry keys that FadCrypt may have disabled
+            # Note: These are set in HKEY_USERS\{user_sid}, so we need to find the current user's SID
+            import win32security
+            import win32api
+            import win32con
             
-            # Registry keys that FadCrypt may have disabled
-            keys_to_restore = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
-            ]
-            
-            restored_count = 0
-            for reg_path, value_name in keys_to_restore:
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
-                    winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, 0)  # 0 = enabled
-                    winreg.CloseKey(key)
-                    restored_count += 1
-                    print(f"[CLEANUP] Restored: {value_name}", flush=True)
-                except FileNotFoundError:
-                    pass  # Key doesn't exist
-                except Exception as e:
-                    print(f"[CLEANUP] Warning: Could not restore {value_name}: {e}", flush=True)
+            try:
+                token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+                user_sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+                user_sid_str = win32security.ConvertSidToStringSid(user_sid)
+                win32api.CloseHandle(token)
+                
+                keys_to_restore = [
+                    # Note: CMD is not managed by system tools anymore
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
+                ]
+                
+                restored_count = 0
+                for reg_path, value_name in keys_to_restore:
+                    try:
+                        full_reg_path = f"{user_sid_str}\\{reg_path}"
+                        key = winreg.OpenKey(winreg.HKEY_USERS, full_reg_path, 0, winreg.KEY_SET_VALUE)
+                        try:
+                            winreg.DeleteValue(key, value_name)
+                            restored_count += 1
+                            print(f"[CLEANUP] Restored: {value_name}", flush=True)
+                        except FileNotFoundError:
+                            pass  # Value doesn't exist
+                        finally:
+                            winreg.CloseKey(key)
+                    except FileNotFoundError:
+                        pass  # Key doesn't exist
+                    except Exception as e:
+                        print(f"[CLEANUP] Warning: Could not restore {value_name}: {e}", flush=True)
+                        
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not get user SID for registry cleanup: {e}", flush=True)
             
             # Remove FadCrypt context menu entries
             print("[CLEANUP] Removing FadCrypt context menu entries...", flush=True)

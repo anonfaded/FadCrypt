@@ -92,7 +92,8 @@ class ElevatedOperationHandler:
         
         try:
             disable_configs = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD', 1),
+                # Note: CMD is not disabled here to avoid startup issues
+                # Users should lock cmd.exe as an application instead
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr', 1),
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel', 1),
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools', 1),
@@ -131,7 +132,8 @@ class ElevatedOperationHandler:
         
         try:
             enable_configs = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
+                # Note: CMD is not managed here to avoid startup issues
+                # Users should unlock cmd.exe as an application instead
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
                 (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools'),

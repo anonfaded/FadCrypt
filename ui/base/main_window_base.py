@@ -2504,6 +2504,9 @@ class MainWindowBase(QMainWindow):
             return
         
         # Prepare applications list for monitoring
+        # Always reload applications config to ensure we have the latest data
+        self.load_applications_config()
+        
         applications = []
         for app_name, app_data in self.app_list_widget.apps_data.items():
             applications.append({
@@ -2543,6 +2546,10 @@ class MainWindowBase(QMainWindow):
         # Start monitoring
         self.unified_monitor.start_monitoring(applications)
         self.monitoring_active = True
+        
+        # Update monitoring state immediately
+        self.monitoring_state['monitoring_active'] = True
+        self.save_monitoring_state_to_disk()
         
         # Update button state to reflect monitoring is active
         self.update_monitoring_button_state(True)
@@ -2667,7 +2674,7 @@ class MainWindowBase(QMainWindow):
         # CRITICAL: Disable system tools if lock_tools setting is enabled
         # This prevents users from terminating FadCrypt via terminal/task manager
         if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
-            print("🔒 Disabling system tools (terminals, task manager, etc.)...")
+            print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
             if hasattr(self, 'disable_system_tools'):
                 result = self.disable_system_tools()
                 if result:
@@ -2735,8 +2742,11 @@ class MainWindowBase(QMainWindow):
             
             self.monitoring_active = False
             
-            # Save monitoring state to disk (for crash recovery)
+            # Save monitoring state to disk immediately (for crash recovery)
             self.save_monitoring_state_to_disk()
+            
+            # Also update in-memory state
+            self.monitoring_state['monitoring_active'] = False
             
             # Unlock files and folders (config files are daemon-protected)
             if self.file_lock_manager:
@@ -2760,9 +2770,9 @@ class MainWindowBase(QMainWindow):
             print("🔘 Button updated: Changed to Start mode")
             
             # CRITICAL: Re-enable system tools if they were disabled
-            # This restores access to terminals/task manager
+            # This restores access to task manager/control panel/registry editor
             if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
-                print("🔓 Re-enabling system tools (terminals, task manager, etc.)...")
+                print("🔓 Re-enabling system tools (task manager, control panel, registry editor)...")
                 if hasattr(self, 'enable_system_tools'):
                     self.enable_system_tools()
                     print("✅ System tools re-enabled successfully")
@@ -2817,8 +2827,14 @@ class MainWindowBase(QMainWindow):
         try:
             # Include monitoring_active flag
             self.monitoring_state['monitoring_active'] = self.monitoring_active
-            with open(state_file, 'w') as f:
-                json.dump(self.monitoring_state, f, indent=4)
+            
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(self.monitoring_state, indent=2)
+            success, error = safe_write_to_protected_file(state_file, content)
+            
+            if not success:
+                print(f"Error saving monitoring state: {error}")
         except Exception as e:
             print(f"Error saving monitoring state: {e}")
     
@@ -3617,7 +3633,7 @@ class MainWindowBase(QMainWindow):
                 
                 # Registry keys that FadCrypt may have disabled
                 keys_to_restore = [
-                    (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
+                    # Note: CMD is not managed by system tools anymore to avoid boot loops
                     (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
                     (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
                     (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')

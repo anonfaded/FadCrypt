@@ -42,7 +42,7 @@ class UnifiedMonitor:
         is_linux: bool = True,
         sleep_interval: float = 1.0,
         enable_profiling: bool = False,
-        log_activity_func: Optional[Callable[[str, str, str, bool, str], None]] = None
+        log_activity_func: Optional[Callable[..., None]] = None
     ):
         """
         Initialize the unified monitor.
@@ -55,7 +55,7 @@ class UnifiedMonitor:
             is_linux: Whether running on Linux (affects desktop file handling)
             sleep_interval: Seconds to sleep between monitoring cycles (default: 1.0 for max efficiency)
             enable_profiling: Whether to log performance metrics
-            log_activity_func: Function to log activity events (takes event_type, item_name, item_type, success, details)
+            log_activity_func: Function to log activity events (takes event_type, item_name, item_type, and keyword arguments like success, details)
         """
         self.get_state = get_state_func
         self.set_state = set_state_func
@@ -79,6 +79,20 @@ class UnifiedMonitor:
             app_name: Name of the app to remove from tracking
         """
         self.apps_showing_dialog.discard(app_name)
+    
+    def _save_unlocked_apps_if_changed(self, unlocked_apps: List[str], last_saved: List[str]):
+        """
+        Save unlocked_apps to persistent state only if it has actually changed.
+        This prevents unnecessary file I/O during monitoring loops.
+        
+        Args:
+            unlocked_apps: Current list of unlocked apps
+            last_saved: Previously saved list of unlocked apps
+        """
+        if unlocked_apps != last_saved:
+            self.set_state('unlocked_apps', unlocked_apps)
+            return unlocked_apps.copy()  # Return new last_saved
+        return last_saved
         
     def start_monitoring(self, applications: List[Dict[str, str]]):
         """
@@ -88,6 +102,11 @@ class UnifiedMonitor:
             applications: List of app dicts with 'name' and 'path' keys
         """
         if not self.monitoring:
+            # SECURITY: Clear all unlocked apps when monitoring starts
+            # Apps should start locked and only be unlocked via password dialog
+            self.set_state('unlocked_apps', [])
+            self.apps_showing_dialog.clear()
+            
             self.monitoring = True
             self.monitor_thread = threading.Thread(
                 target=self._unified_monitor_loop,
@@ -235,7 +254,28 @@ class UnifiedMonitor:
         
         # Direct name match
         if process_name in all_processes:
-            app_processes.extend(all_processes[process_name])
+            # Special filtering for CMD to exclude background service processes
+            if process_name == 'cmd':
+                filtered_procs = []
+                for proc in all_processes[process_name]:
+                    try:
+                        cmdline = proc.cmdline()
+                        if cmdline and len(cmdline) > 1:
+                            # Exclude CMD processes that are running background services
+                            # These typically have /C followed by service executables
+                            cmd_args = ' '.join(cmdline[1:]).lower()
+                            # Skip if contains system paths or service names
+                            if ('program files' in cmd_args or 'programfiles' in cmd_args or 
+                                'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
+                                'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
+                                'schtasks' in cmd_args):
+                                continue  # Skip background service CMD processes
+                        filtered_procs.append(proc)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                app_processes.extend(filtered_procs)
+            else:
+                app_processes.extend(all_processes[process_name])
         
         # Cmdline fallback (handles wrapper scripts, renamed binaries, etc.)
         if not app_processes:
@@ -265,11 +305,27 @@ class UnifiedMonitor:
                                 import re
                                 pattern = r'\b' + re.escape(process_name) + r'\b'
                                 if re.search(pattern, cmdline_str):
+                                    # Special filtering for CMD to exclude background services
+                                    if process_name == 'cmd':
+                                        cmd_args = ' '.join(cmdline[1:]).lower() if len(cmdline) > 1 else ''
+                                        if ('program files' in cmd_args or 'programfiles' in cmd_args or 
+                                            'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
+                                            'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
+                                            'schtasks' in cmd_args):
+                                            continue  # Skip background service CMD processes
                                     app_processes.append(proc)
                             # For apps with real paths: STRICT path matching
                             elif app_path and len(app_path) >= 4:
                                 # Match full path (more reliable than substring matching)
                                 if app_path in cmdline_str:
+                                    # Special filtering for CMD to exclude background services
+                                    if process_name == 'cmd' and len(cmdline) > 1:
+                                        cmd_args = ' '.join(cmdline[1:]).lower()
+                                        if ('program files' in cmd_args or 'programfiles' in cmd_args or 
+                                            'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
+                                            'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
+                                            'schtasks' in cmd_args):
+                                            continue  # Skip background service CMD processes
                                     app_processes.append(proc)
                             # Fallback: match process_name only if it's specific enough (>= 5 chars)
                             elif len(process_name) >= 5 and process_name in cmdline_str:
@@ -419,6 +475,10 @@ class UnifiedMonitor:
         app_monitors = self._prepare_app_monitors(applications)
         iteration_count = 0
         
+        # Cache unlocked apps in memory to avoid frequent file I/O
+        unlocked_apps = []
+        last_saved_unlocked_apps = []
+        
         while self.monitoring:
             try:
                 iteration_count += 1
@@ -427,9 +487,11 @@ class UnifiedMonitor:
                 # SINGLE PROCESS SCAN for all apps (key optimization)
                 all_processes = self._scan_processes()
                 
-                # Get current state
-                state = self.get_state()
-                unlocked_apps = state.get('unlocked_apps', [])
+                # Only read from disk if we haven't cached it yet
+                if not unlocked_apps:
+                    state = self.get_state()
+                    unlocked_apps = state.get('unlocked_apps', [])
+                    last_saved_unlocked_apps = unlocked_apps.copy()
                 
                 # Check if any Chrome app is unlocked (they all share processes)
                 chrome_unlocked = any(
@@ -445,17 +507,45 @@ class UnifiedMonitor:
                     # Find matching processes from the scan
                     app_processes = self._find_app_processes(monitor, all_processes)
                     
-                    # Debug logging for Chrome-based apps
-                    if self.enable_profiling and monitor['is_chrome'] and app_processes:
+                    # Debug logging for all apps
+                    if self.enable_profiling and app_processes:
                         print(f"[DEBUG] {app_name}: found {len(app_processes)} processes")
                         for proc in app_processes[:2]:
                             try:
                                 print(f"  - PID {proc.pid}: {' '.join(proc.cmdline()[:3])}")
                             except:
                                 pass
+                    elif self.enable_profiling and iteration_count % 10 == 0:
+                        print(f"[DEBUG] {app_name}: no processes found (checked {len(all_processes)} total processes)")
                     
                     # Handle found processes
                     if app_processes:
+                        # Special filtering for CMD - only block user CMD sessions
+                        if app_name == 'cmd':
+                            filtered_processes = []
+                            for proc in app_processes:
+                                try:
+                                    cmdline = proc.cmdline()
+                                    if len(cmdline) == 1:  # CMD with no arguments (user session)
+                                        filtered_processes.append(proc)
+                                    elif len(cmdline) > 1:  # Has arguments
+                                        cmd_args = ' '.join(cmdline[1:]).upper()
+                                        # Only allow CMD with simple commands, not system services
+                                        if not (cmd_args.startswith('/C SCHTASKS') or 
+                                                cmd_args.startswith('/C "C:\\PROGRAM FILES') or
+                                                'AMD' in cmd_args or 'RYZEN' in cmd_args or
+                                                'MICROSOFT' in cmd_args or 'WINDOWS' in cmd_args or
+                                                'SYSTEM32' in cmd_args or 'SYSWOW64' in cmd_args or
+                                                'PROGRAM FILES' in cmd_args or 'PROGRAMFILES' in cmd_args):
+                                            filtered_processes.append(proc)
+                                except:
+                                    continue
+                            app_processes = filtered_processes
+                        
+                        # Skip if no processes left after filtering
+                        if not app_processes:
+                            continue
+                        
                         # For Chrome apps: if ANY Chrome app is unlocked, skip blocking for ALL
                         if monitor['is_chrome'] and chrome_unlocked:
                             monitor['no_process_count'] = 0
@@ -480,18 +570,47 @@ class UnifiedMonitor:
                             monitor['no_process_count'] = 0
                     
                     # Auto-lock logic when no processes found
-                    if app_name in unlocked_apps and not app_processes:
-                        monitor['no_process_count'] += 1
+                    if app_name in unlocked_apps:
+                        # Special handling for CMD - only count user CMD processes for auto-lock
+                        if app_name == 'cmd':
+                            # Count only user CMD processes (not system service ones)
+                            user_cmd_processes = []
+                            for proc in all_processes.get('cmd', []):
+                                try:
+                                    cmdline = proc.cmdline()
+                                    if len(cmdline) > 1:  # Has arguments
+                                        cmd_args = ' '.join(cmdline[1:]).upper()
+                                        # Skip CMD processes running system tasks
+                                        if ('PROGRAM FILES' in cmd_args or 'PROGRAMFILES' in cmd_args or
+                                            'AMD' in cmd_args or 'RYZEN' in cmd_args or 'MICROSOFT' in cmd_args or
+                                            'WINDOWS' in cmd_args or 'SYSTEM32' in cmd_args or 'SYSWOW64' in cmd_args or
+                                            'SCHTASKS' in cmd_args):
+                                            continue  # Skip system CMD processes
+                                    user_cmd_processes.append(proc)
+                                except:
+                                    continue
+                            
+                            if not user_cmd_processes:
+                                monitor['no_process_count'] += 1
+                            else:
+                                monitor['no_process_count'] = 0
+                        elif not app_processes:
+                            monitor['no_process_count'] += 1
+                        else:
+                            monitor['no_process_count'] = 0
                         
-                        # Auto-lock after 10 consecutive checks with no processes
+                        # Auto-lock after 10 consecutive checks with no user processes
                         # (10 cycles × 1.0s = 10 seconds of no activity)
                         if monitor['no_process_count'] >= 10:
                             if self.enable_profiling:
-                                print(f"[AUTO-LOCK] {app_name} (no active processes)")
+                                print(f"[AUTO-LOCK] {app_name} (no active user processes)")
                             
                             unlocked_apps.remove(app_name)
-                            self.set_state('unlocked_apps', unlocked_apps)
                             monitor['no_process_count'] = 0
+                            
+                            # Save state immediately when auto-locking (critical for security)
+                            last_saved_unlocked_apps = self._save_unlocked_apps_if_changed(
+                                unlocked_apps, last_saved_unlocked_apps)
                             
                             # Log the auto-lock event for statistics tracking
                             if self.log_activity_func:
