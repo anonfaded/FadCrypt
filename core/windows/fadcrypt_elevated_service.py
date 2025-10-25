@@ -330,16 +330,51 @@ class FadCryptElevatedService(win32serviceutil.ServiceFramework):
 
 
 def install_service():
-    """Install the Windows service"""
+    """Install the Windows service, handling existing service cleanup"""
     try:
         # Ensure log directory exists
         log_dir = r"C:\ProgramData\FadCrypt"
         os.makedirs(log_dir, exist_ok=True)
         
+        # Check if service already exists
+        try:
+            import win32serviceutil
+            # Try to get service status - this will raise an exception if service doesn't exist
+            status = win32serviceutil.QueryServiceStatus(SERVICE_NAME)
+            service_exists = True
+            print(f"Service '{SERVICE_DISPLAY_NAME}' already exists (status: {status[1]})")
+        except:
+            service_exists = False
+            print(f"Service '{SERVICE_DISPLAY_NAME}' does not exist")
+        
+        # If service exists, stop and remove it first
+        if service_exists:
+            print(f"Stopping and removing existing service '{SERVICE_DISPLAY_NAME}'...")
+            try:
+                # Stop the service if it's running
+                try:
+                    win32serviceutil.StopService(SERVICE_NAME)
+                    print("Service stopped successfully")
+                except Exception as e:
+                    print(f"Warning: Could not stop service (may already be stopped): {e}")
+                
+                # Remove the existing service
+                win32serviceutil.RemoveService(SERVICE_NAME)
+                print("Existing service removed successfully")
+                
+                # Give Windows time to fully remove the service
+                import time
+                time.sleep(2)
+                
+            except Exception as e:
+                print(f"Warning: Could not remove existing service: {e}")
+                # Continue anyway - sometimes the service removal takes effect after a delay
+        
         # Get the path to the service script
         script_path = os.path.abspath(__file__)
 
-        # Install service
+        # Install the new service
+        print(f"Installing new service '{SERVICE_DISPLAY_NAME}'...")
         win32serviceutil.InstallService(
             None,  # cls
             SERVICE_NAME,

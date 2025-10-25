@@ -69,6 +69,7 @@ class UnifiedMonitor:
         self.monitoring = False
         self.monitor_thread = None
         self.apps_showing_dialog: Set[str] = set()
+        self.monitoring_start_time: Optional[float] = None  # For boot-time CMD exclusion
     
     def remove_from_showing_dialog(self, app_name: str):
         """
@@ -108,6 +109,7 @@ class UnifiedMonitor:
             self.apps_showing_dialog.clear()
             
             self.monitoring = True
+            self.monitoring_start_time = time.time()  # Record startup time for CMD grace period
             self.monitor_thread = threading.Thread(
                 target=self._unified_monitor_loop,
                 args=(applications,),
@@ -256,24 +258,35 @@ class UnifiedMonitor:
         if process_name in all_processes:
             # Special filtering for CMD to exclude background service processes
             if process_name == 'cmd':
-                filtered_procs = []
-                for proc in all_processes[process_name]:
-                    try:
-                        cmdline = proc.cmdline()
-                        if cmdline and len(cmdline) > 1:
-                            # Exclude CMD processes that are running background services
-                            # These typically have /C followed by service executables
-                            cmd_args = ' '.join(cmdline[1:]).lower()
-                            # Skip if contains system paths or service names
-                            if ('program files' in cmd_args or 'programfiles' in cmd_args or 
-                                'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
-                                'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
-                                'schtasks' in cmd_args):
-                                continue  # Skip background service CMD processes
-                        filtered_procs.append(proc)
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        continue
-                app_processes.extend(filtered_procs)
+                # BOOT-TIME GRACE PERIOD: Skip ALL CMD blocking for first 5 seconds after monitoring start
+                # This prevents system stability issues during startup when CMD may be used for critical operations
+                if self.monitoring_start_time and (time.time() - self.monitoring_start_time) < 5.0:
+                    if self.enable_profiling:
+                        print(f"[CMD-GRACE] Skipping CMD blocking during boot grace period")
+                    # Skip all CMD processes during grace period - don't add any to app_processes
+                else:
+                    filtered_procs = []
+                    for proc in all_processes[process_name]:
+                        try:
+                            cmdline = proc.cmdline()
+                            if cmdline and len(cmdline) > 1:
+                                # Exclude CMD processes that are running background services
+                                # These typically have /C followed by service executables
+                                cmd_args = ' '.join(cmdline[1:]).lower()
+                                # Skip if contains system paths or service names
+                                if ('program files' in cmd_args or 'programfiles' in cmd_args or 
+                                    'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
+                                    'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
+                                    'schtasks' in cmd_args or 'services' in cmd_args or 'boot' in cmd_args or
+                                    'startup' in cmd_args or 'system' in cmd_args or 'config' in cmd_args or
+                                    'installer' in cmd_args or 'setup' in cmd_args or 'update' in cmd_args or
+                                    'driver' in cmd_args or 'registry' in cmd_args or 'policy' in cmd_args or
+                                    'security' in cmd_args or 'defender' in cmd_args or 'antivirus' in cmd_args):
+                                    continue  # Skip background service CMD processes
+                            filtered_procs.append(proc)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            continue
+                    app_processes.extend(filtered_procs)
             else:
                 app_processes.extend(all_processes[process_name])
         
@@ -584,7 +597,11 @@ class UnifiedMonitor:
                                         if ('PROGRAM FILES' in cmd_args or 'PROGRAMFILES' in cmd_args or
                                             'AMD' in cmd_args or 'RYZEN' in cmd_args or 'MICROSOFT' in cmd_args or
                                             'WINDOWS' in cmd_args or 'SYSTEM32' in cmd_args or 'SYSWOW64' in cmd_args or
-                                            'SCHTASKS' in cmd_args):
+                                            'SCHTASKS' in cmd_args or 'SERVICES' in cmd_args or 'BOOT' in cmd_args or
+                                            'STARTUP' in cmd_args or 'SYSTEM' in cmd_args or 'CONFIG' in cmd_args or
+                                            'INSTALLER' in cmd_args or 'SETUP' in cmd_args or 'UPDATE' in cmd_args or
+                                            'DRIVER' in cmd_args or 'REGISTRY' in cmd_args or 'POLICY' in cmd_args or
+                                            'SECURITY' in cmd_args or 'DEFENDER' in cmd_args or 'ANTIVIRUS' in cmd_args):
                                             continue  # Skip system CMD processes
                                     user_cmd_processes.append(proc)
                                 except:
@@ -601,7 +618,11 @@ class UnifiedMonitor:
                         
                         # Auto-lock after 10 consecutive checks with no user processes
                         # (10 cycles × 1.0s = 10 seconds of no activity)
-                        if monitor['no_process_count'] >= 10:
+                        # Skip auto-lock for CMD during boot grace period
+                        if app_name == 'cmd' and self.monitoring_start_time and (time.time() - self.monitoring_start_time) < 5.0:
+                            # Don't auto-lock CMD during grace period
+                            pass
+                        elif monitor['no_process_count'] >= 10:
                             if self.enable_profiling:
                                 print(f"[AUTO-LOCK] {app_name} (no active user processes)")
                             
