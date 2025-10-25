@@ -1265,9 +1265,7 @@ class MainWindowBase(QMainWindow):
         # Get actual paths - will use platform-specific paths
         fadcrypt_folder = self.get_fadcrypt_folder()
         backup_folder = self.get_backup_folder() if hasattr(self, 'get_backup_folder') else (
-            os.path.join(os.path.expanduser("~/.local/share/FadCrypt/Backup"))
-            if not sys.platform.startswith('win')
-            else os.path.join(os.getenv('PROGRAMDATA', 'C:\\ProgramData'), 'FadCrypt', 'Backup')
+            os.path.expanduser("~/.config/FadCrypt/backup")
         )
         
         # Add path labels

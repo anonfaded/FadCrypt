@@ -193,11 +193,33 @@ X-GNOME-Autostart-enabled=true
         Get the backup folder for Linux.
         
         Returns:
-            str: Path to ~/.local/share/FadCrypt/Backup/
+            str: Path to ~/.config/FadCrypt/backup/
         """
-        backup_dir = os.path.expanduser("~/.local/share/FadCrypt/Backup")
+        backup_dir = os.path.expanduser("~/.config/FadCrypt/backup")
         os.makedirs(backup_dir, exist_ok=True)
         return backup_dir
+    
+    def get_logs_folder(self):
+        """
+        Get the logs folder for Linux.
+        
+        Returns:
+            str: Path to ~/.config/FadCrypt/logs/
+        """
+        logs_dir = os.path.expanduser("~/.config/FadCrypt/logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        return logs_dir
+    
+    def get_temp_folder(self):
+        """
+        Get the temp folder for Linux.
+        
+        Returns:
+            str: Path to ~/.config/FadCrypt/temp/
+        """
+        temp_dir = os.path.expanduser("~/.config/FadCrypt/temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        return temp_dir
     
     def disable_system_tools(self):
         """

@@ -569,7 +569,7 @@ if '--cleanup' in sys.argv:
         
         # Log completion
         try:
-            log_file = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'fadcrypt_cleanup.log')
+            log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_cleanup.log')
             with open(log_file, 'a') as f:
                 f.write(f"[CLEANUP] Completed successfully at {os.times()}\n")
         except:
