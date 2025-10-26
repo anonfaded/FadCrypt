@@ -418,6 +418,9 @@ class AddApplicationDialog(QDialog):
             )
             return
         
+        # Normalize path separators for consistency
+        app_path = os.path.normpath(app_path)
+
         # Check if path exists
         if not os.path.exists(app_path):
             reply = QMessageBox.question(

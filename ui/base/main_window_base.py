@@ -2458,10 +2458,10 @@ class MainWindowBase(QMainWindow):
                 "info"
             )
             return
-        
+
         # Check if any apps or locked items are added
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
-        
+
         # Get locked files/folders from config - handle immutable protected config file
         locked_items = []
         try:
@@ -2470,7 +2470,7 @@ class MainWindowBase(QMainWindow):
                 # Temporarily unlock immutable file for reading
                 from core.file_protection import get_file_protection_manager
                 file_protection = get_file_protection_manager()
-                
+
                 unlock_success, unlock_error = file_protection.temporarily_unlock_file(config_file)
                 if not unlock_success:
                     print(f"⚠️  Warning: Could not unlock config for reading: {unlock_error}")
@@ -2489,10 +2489,10 @@ class MainWindowBase(QMainWindow):
         except Exception as e:
             print(f"⚠️  Warning reading locked items at startup: {e}")
             locked_items = []
-        
+
         locked_count = len(locked_items) if locked_items else 0
         total_items = apps_count + locked_count
-        
+
         if total_items == 0:
             self.show_message(
                 "No Items to Monitor",
@@ -2500,22 +2500,22 @@ class MainWindowBase(QMainWindow):
                 "info"
             )
             return
-        
+
         # Prepare applications list for monitoring
         # Always reload applications config to ensure we have the latest data
         self.load_applications_config()
-        
+
         applications = []
         for app_name, app_data in self.app_list_widget.apps_data.items():
             applications.append({
                 'name': app_name,
                 'path': app_data['path']
             })
-        
+
         print(f"\n🚀 Starting monitoring for {len(applications)} applications...")
         for app in applications:
             print(f"   📦 {app['name']}: {app['path']}")
-        
+
         # CRITICAL: Check for crash recovery - unlock any stuck files from previous crash
         print("🔍 Checking for crash recovery...")
         if self.file_lock_manager:
@@ -2523,14 +2523,14 @@ class MainWindowBase(QMainWindow):
             success, failed = self.file_lock_manager.unlock_all()
             if success > 0:
                 print(f"♻️  Crash recovery: Restored {success} stuck items from previous session")
-        
+
         # Initialize UnifiedMonitor
         from core.unified_monitor import UnifiedMonitor
         import platform
-        
+
         # Detect platform
         is_linux = platform.system() == "Linux"
-        
+
         self.unified_monitor = UnifiedMonitor(
             get_state_func=self.get_monitoring_state,
             set_state_func=self.set_monitoring_state,
@@ -2540,76 +2540,30 @@ class MainWindowBase(QMainWindow):
             enable_profiling=True,
             log_activity_func=self.log_activity
         )
-        
-        # Start monitoring
+
+        # Start monitoring immediately (core functionality)
         self.unified_monitor.start_monitoring(applications)
         self.monitoring_active = True
-        
+
         # Update monitoring state immediately
         self.monitoring_state['monitoring_active'] = True
         self.save_monitoring_state_to_disk()
-        
-        # Update button state to reflect monitoring is active
+
+        # Update button state to reflect monitoring is active (instant UI feedback)
         self.update_monitoring_button_state(True)
-        
-        # Protect critical files from deletion/tampering (if enabled in settings)
-        settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
-        file_protection_enabled = True  # Default: enabled
-        
-        try:
-            if os.path.exists(settings_file):
-                import json
-                with open(settings_file, 'r') as f:
-                    settings = json.load(f)
-                    file_protection_enabled = settings.get('file_protection_enabled', True)
-        except Exception as e:
-            print(f"[FileProtection] Could not read settings, using default: {e}")
-        
-        # DAEMON-ONLY: Elevated daemon handles file protection seamlessly (no password prompts)
-        if file_protection_enabled:
-            print("🛡️  Protecting critical files via elevated daemon...")
-            file_protection = get_file_protection_manager()
-            fadcrypt_folder = self.get_fadcrypt_folder()
-            
-            # List of critical files to protect - these need to be writable by FadCrypt
-            # but should be protected from external tampering
-            # NOTE: Only protect truly immutable files (password, recovery codes)
-            # Config files (apps_config.json, monitoring_state.json) need UI access
-            critical_files = [
-                os.path.join(fadcrypt_folder, "recovery_codes.json"),
-                os.path.join(fadcrypt_folder, "encrypted_password.bin"),
-                # apps_config.json and monitoring_state.json are NOT protected
-                # They need to be readable/writable by the UI
-            ]
-            
-            # Filter to only existing files
-            existing_files = [f for f in critical_files if os.path.exists(f)]
-            
-            if existing_files:
-                success_count, errors = file_protection.protect_multiple_files(existing_files)
-                if success_count > 0:
-                    print(f"✅ Protected {success_count}/{len(existing_files)} immutable critical files")
-                    print(f"✅ Works seamlessly after reboot (daemon auto-starts with root permissions)")
-                else:
-                    error_msg = "❌ File protection failed - elevated daemon required to start monitoring"
-                    print(f"[ERROR] {error_msg}")
-                    self.show_message(
-                        "Elevation Required",
-                        "FadCrypt requires the elevated daemon service to protect critical files.\n\n"
-                        "The daemon may not be:\n"
-                        "  • Running (check: systemctl status fadcrypt-elevated)\n"
-                        "  • Installed (check: dpkg -l | grep fadcrypt)\n"
-                        "  • Available on your system\n\n"
-                        "Monitoring cannot start without file protection."
-                    )
-                    # Stop monitoring since protection failed
-                    self.unified_monitor.stop_monitoring()
-                    self.monitoring_active = False
-                    self.update_monitoring_button_state(False)
-                    return
-        else:
-            print("⏭️  File protection disabled in settings")
-        
+
+        # Update system tray immediately
+        if self.system_tray:
+            self.system_tray.set_monitoring_active(True)
+            self.system_tray.show_message(
+                "Monitoring Started",
+                f"FadCrypt is now monitoring {len(applications)} application(s).",
+                QSystemTrayIcon.MessageIcon.Information
+            )
+
+        # Hide to tray immediately (instant user feedback)
+        self.hide_to_tray()
+
         # Log monitoring start event (needed for duration calculation)
         self.log_activity(
             'start_monitoring',
@@ -2618,93 +2572,135 @@ class MainWindowBase(QMainWindow):
             success=True,
             details=f"Monitoring started for {len(applications)} apps and {locked_count} files/folders"
         )
-        
-        # Save monitoring state to disk (for crash recovery)
-        self.save_monitoring_state_to_disk()
-        
-        # Lock files and folders + start monitoring
-        if self.file_lock_manager:
-            print("🔒 Locking files and starting monitoring...")
-            
-            # Lock all items first
-            success, failed = self.file_lock_manager.lock_all()
-            if success > 0:
-                print(f"✅ Locked {success} items")
-            if failed > 0:
-                print(f"⚠️  Failed to lock {failed} items")
-            
-            # Lock config files
-            self.file_lock_manager.lock_fadcrypt_configs()
-            
-            # Start monitoring with password callback
-            if hasattr(self.file_lock_manager, 'start_monitoring'):
-                # Define password callback for locked file access
-                def verify_file_access_password(file_path: str) -> bool:
-                    """Callback when process tries to access locked file"""
-                    print(f"🔐 Access attempt detected: {os.path.basename(file_path)}")
-                    # Show password dialog
-                    from ui.dialogs.password_dialog import ask_password
-                    password = ask_password(self)
-                    if not password:
-                        return False
-                    # Verify password
-                    return self.password_manager.verify(password)
-                
-                if self.file_lock_manager.start_monitoring(verify_file_access_password):
-                    print("✅ Process monitoring started (intercepting locked file access)")
+
+        # Move heavy operations to background thread for instant startup
+        from PyQt6.QtCore import QThread, pyqtSignal
+        import threading
+
+        def background_monitoring_setup():
+            """Run heavy monitoring setup operations in background thread"""
+            try:
+                # Protect critical files from deletion/tampering (if enabled in settings)
+                settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+                file_protection_enabled = True  # Default: enabled
+
+                try:
+                    if os.path.exists(settings_file):
+                        import json
+                        with open(settings_file, 'r') as f:
+                            settings = json.load(f)
+                            file_protection_enabled = settings.get('file_protection_enabled', True)
+                except Exception as e:
+                    print(f"[FileProtection] Could not read settings, using default: {e}")
+
+                # DAEMON-ONLY: Elevated daemon handles file protection seamlessly (no password prompts)
+                if file_protection_enabled:
+                    print("🛡️  Protecting critical files via elevated daemon...")
+                    file_protection = get_file_protection_manager()
+                    fadcrypt_folder = self.get_fadcrypt_folder()
+
+                    # List of critical files to protect - these need to be writable by FadCrypt
+                    # but should be protected from external tampering
+                    # NOTE: Only protect truly immutable files (password, recovery codes)
+                    # Config files (apps_config.json, monitoring_state.json) need UI access
+                    critical_files = [
+                        os.path.join(fadcrypt_folder, "recovery_codes.json"),
+                        os.path.join(fadcrypt_folder, "encrypted_password.bin"),
+                        # apps_config.json and monitoring_state.json are NOT protected
+                        # They need to be readable/writable by the UI
+                    ]
+
+                    # Filter to only existing files
+                    existing_files = [f for f in critical_files if os.path.exists(f)]
+
+                    if existing_files:
+                        success_count, errors = file_protection.protect_multiple_files(existing_files)
+                        if success_count > 0:
+                            print(f"✅ Protected {success_count}/{len(existing_files)} immutable critical files")
+                            print(f"✅ Works seamlessly after reboot (daemon auto-starts with root permissions)")
+                        else:
+                            error_msg = "❌ File protection failed - elevated daemon required to start monitoring"
+                            print(f"[ERROR] {error_msg}")
+                            # Note: We don't stop monitoring here since core monitoring already started
+                    else:
+                        print("⏭️  File protection disabled in settings")
+
+                # Lock files and folders + start monitoring
+                if self.file_lock_manager:
+                    print("🔒 Locking files and starting monitoring...")
+
+                    # Lock all items first
+                    success, failed = self.file_lock_manager.lock_all()
+                    if success > 0:
+                        print(f"✅ Locked {success} items")
+                    if failed > 0:
+                        print(f"⚠️  Failed to lock {failed} items")
+
+                    # Lock config files
+                    self.file_lock_manager.lock_fadcrypt_configs()
+
+                    # Start monitoring with password callback
+                    if hasattr(self.file_lock_manager, 'start_monitoring'):
+                        # Define password callback for locked file access
+                        def verify_file_access_password(file_path: str) -> bool:
+                            """Callback when process tries to access locked file"""
+                            print(f"🔐 Access attempt detected: {os.path.basename(file_path)}")
+                            # Show password dialog
+                            from ui.dialogs.password_dialog import ask_password
+                            password = ask_password(self)
+                            if not password:
+                                return False
+                            # Verify password
+                            return self.password_manager.verify(password)
+
+                        if self.file_lock_manager.start_monitoring(verify_file_access_password):
+                            print("✅ Process monitoring started (intercepting locked file access)")
+                        else:
+                            print("ℹ️  Process monitoring skipped - no files/folders to monitor")
+
+                    # Log lock event
+                    self.log_activity(
+                        'lock',
+                        'all_items',
+                        success=True,
+                        details=f"Locked {success} items"
+                        )
+
+                    # Config files are now protected by daemon - no permission locking needed
+
+                # CRITICAL: Disable system tools if lock_tools setting is enabled
+                # This prevents users from terminating FadCrypt via terminal/task manager
+                if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
+                    print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
+                    if hasattr(self, 'disable_system_tools'):
+                        result = self.disable_system_tools()
+                        if result:
+                            print("✅ System tools disabled successfully")
+                        else:
+                            print("❌ Failed to disable system tools")
+                    else:
+                        print("⚠️  Warning: disable_system_tools method not found")
+
+                # CRITICAL: Enable autostart when monitoring starts (same as legacy code)
+                # This ensures FadCrypt starts automatically on system boot
+                print("🔧 Enabling autostart for FadCrypt...")
+                if hasattr(self, 'handle_autostart_setting'):
+                    # Call platform-specific autostart method
+                    self.handle_autostart_setting(enable=True)
+                    print("✅ Autostart enabled successfully")
                 else:
-                    print("ℹ️  Process monitoring skipped - no files/folders to monitor")
-            
-            # Log lock event
-            self.log_activity(
-                'lock',
-                'all_items',
-                success=True,
-                details=f"Locked {success} items"
-                )
-                
-            # Config files are now protected by daemon - no permission locking needed
-        
-        # Update UI button state
-        self.update_monitoring_button_state(True)
-        print("🔘 Button updated: Changed to Stop mode")
-        
-        # CRITICAL: Disable system tools if lock_tools setting is enabled
-        # This prevents users from terminating FadCrypt via terminal/task manager
-        if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
-            print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
-            if hasattr(self, 'disable_system_tools'):
-                result = self.disable_system_tools()
-                if result:
-                    print("✅ System tools disabled successfully")
-                else:
-                    print("❌ Failed to disable system tools")
-            else:
-                print("⚠️  Warning: disable_system_tools method not found")
-        
-        # CRITICAL: Enable autostart when monitoring starts (same as legacy code)
-        # This ensures FadCrypt starts automatically on system boot
-        print("🔧 Enabling autostart for FadCrypt...")
-        if hasattr(self, 'handle_autostart_setting'):
-            # Call platform-specific autostart method
-            self.handle_autostart_setting(enable=True)
-            print("✅ Autostart enabled successfully")
-        else:
-            print("⚠️  Warning: handle_autostart_setting method not found")
-        
-        # Update UI
-        if self.system_tray:
-            self.system_tray.set_monitoring_active(True)
-            self.system_tray.show_message(
-                "Monitoring Started",
-                f"FadCrypt is now monitoring {len(applications)} application(s).",
-                QSystemTrayIcon.MessageIcon.Information
-            )
-        
-        # Hide to tray
-        self.hide_to_tray()
-        
-        print(f"✅ Monitoring started successfully for {len(applications)} apps")
+                    print("⚠️  Warning: handle_autostart_setting method not found")
+
+                print("✅ Background monitoring setup completed")
+
+            except Exception as e:
+                print(f"⚠️  Background monitoring setup error: {e}")
+
+        # Start background thread for heavy operations
+        background_thread = threading.Thread(target=background_monitoring_setup, daemon=True)
+        background_thread.start()
+
+        print(f"✅ Monitoring started successfully for {len(applications)} apps (background setup in progress)")
         
     def on_stop_monitoring(self):
         """Handle stop monitoring button click"""

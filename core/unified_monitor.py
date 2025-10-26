@@ -271,19 +271,21 @@ class UnifiedMonitor:
                         try:
                             cmdline = proc.cmdline()
                             if cmdline and len(cmdline) > 1:
-                                # Exclude CMD processes that are running background services
-                                # These typically have /C followed by service executables
-                                cmd_args = ' '.join(cmdline[1:]).lower()
-                                # Skip if contains system paths or service names
-                                if ('program files' in cmd_args or 'programfiles' in cmd_args or 
-                                    'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
-                                    'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
-                                    'schtasks' in cmd_args or 'services' in cmd_args or 'boot' in cmd_args or
-                                    'startup' in cmd_args or 'system' in cmd_args or 'config' in cmd_args or
-                                    'installer' in cmd_args or 'setup' in cmd_args or 'update' in cmd_args or
-                                    'driver' in cmd_args or 'registry' in cmd_args or 'policy' in cmd_args or
-                                    'security' in cmd_args or 'defender' in cmd_args or 'antivirus' in cmd_args):
-                                    continue  # Skip background service CMD processes
+                                # Check for known service CMD processes
+                                cmd_str = ' '.join(cmdline).lower()
+                                
+                                # AMD Ryzen Master service
+                                if 'amdrs' in cmd_str and 'cnext' in cmd_str:
+                                    continue  # Skip AMD service CMD
+                                
+                                # Windows services and scheduled tasks
+                                if any(service in cmd_str for service in [
+                                    'schtasks', 'services', 'boot', 'startup', 'system', 
+                                    'config', 'installer', 'setup', 'update', 'driver',
+                                    'registry', 'policy', 'security', 'defender', 'antivirus'
+                                ]):
+                                    continue  # Skip Windows service CMD
+                            
                             filtered_procs.append(proc)
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
                             continue
@@ -321,12 +323,19 @@ class UnifiedMonitor:
                                 if re.search(pattern, cmdline_str):
                                     # Special filtering for CMD to exclude background services
                                     if process_name == 'cmd':
-                                        cmd_args = ' '.join(cmdline[1:]).lower() if len(cmdline) > 1 else ''
-                                        if ('program files' in cmd_args or 'programfiles' in cmd_args or 
-                                            'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
-                                            'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
-                                            'schtasks' in cmd_args):
-                                            continue  # Skip background service CMD processes
+                                        cmd_str = ' '.join(cmdline).lower()
+                                        
+                                        # AMD Ryzen Master service
+                                        if 'amdrs' in cmd_str and 'cnext' in cmd_str:
+                                            continue  # Skip AMD service CMD
+                                        
+                                        # Windows services and scheduled tasks
+                                        if any(service in cmd_str for service in [
+                                            'schtasks', 'services', 'boot', 'startup', 'system', 
+                                            'config', 'installer', 'setup', 'update', 'driver',
+                                            'registry', 'policy', 'security', 'defender', 'antivirus'
+                                        ]):
+                                            continue  # Skip Windows service CMD
                                     app_processes.append(proc)
                             # For apps with real paths: STRICT path matching
                             elif app_path and len(app_path) >= 4:
@@ -334,12 +343,19 @@ class UnifiedMonitor:
                                 if app_path in cmdline_str:
                                     # Special filtering for CMD to exclude background services
                                     if process_name == 'cmd' and len(cmdline) > 1:
-                                        cmd_args = ' '.join(cmdline[1:]).lower()
-                                        if ('program files' in cmd_args or 'programfiles' in cmd_args or 
-                                            'amd' in cmd_args or 'ryzen' in cmd_args or 'microsoft' in cmd_args or
-                                            'windows' in cmd_args or 'system32' in cmd_args or 'syswow64' in cmd_args or
-                                            'schtasks' in cmd_args):
-                                            continue  # Skip background service CMD processes
+                                        cmd_str = ' '.join(cmdline).lower()
+                                        
+                                        # AMD Ryzen Master service
+                                        if 'amdrs' in cmd_str and 'cnext' in cmd_str:
+                                            continue  # Skip AMD service CMD
+                                        
+                                        # Windows services and scheduled tasks
+                                        if any(service in cmd_str for service in [
+                                            'schtasks', 'services', 'boot', 'startup', 'system', 
+                                            'config', 'installer', 'setup', 'update', 'driver',
+                                            'registry', 'policy', 'security', 'defender', 'antivirus'
+                                        ]):
+                                            continue  # Skip Windows service CMD
                                     app_processes.append(proc)
                             # Fallback: match process_name only if it's specific enough (>= 5 chars)
                             elif len(process_name) >= 5 and process_name in cmdline_str:
@@ -430,13 +446,16 @@ class UnifiedMonitor:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return True  # If we can't check it, treat it as critical to be safe
     
-    def _block_processes(self, app_processes: List[psutil.Process], app_name: str):
+    def _block_processes(self, app_processes: List[psutil.Process], app_name: str) -> int:
         """
         Kill the given processes.
         
         Args:
             app_processes: List of Process objects to kill
             app_name: Name of the app (for logging)
+            
+        Returns:
+            Number of processes actually killed (not skipped)
         """
         killed_count = 0
         skipped_count = 0
@@ -474,6 +493,8 @@ class UnifiedMonitor:
         if skipped_count > 0:
             print(f"   [PROTECTED] Skipped {skipped_count} critical system process(es)")
         print(f"   [SUMMARY] Terminated {killed_count}/{len(app_processes)} processes for {app_name}")
+        
+        return killed_count
     
     def _unified_monitor_loop(self, applications: List[Dict[str, str]]):
         """
@@ -535,24 +556,33 @@ class UnifiedMonitor:
                     
                     # Handle found processes
                     if app_processes:
-                        # Special filtering for CMD - only block user CMD sessions
+                        # Special filtering for CMD - exclude known service processes
                         if app_name == 'cmd':
                             filtered_processes = []
                             for proc in app_processes:
                                 try:
                                     cmdline = proc.cmdline()
-                                    if len(cmdline) == 1:  # CMD with no arguments (user session)
+                                    if len(cmdline) > 1:
+                                        # Check for known service CMD processes that should be ignored
+                                        cmd_str = ' '.join(cmdline).lower()
+                                        
+                                        # AMD Ryzen Master service
+                                        if 'amdrs' in cmd_str and 'cnext' in cmd_str:
+                                            continue  # Skip AMD service CMD
+                                        
+                                        # Windows services and scheduled tasks
+                                        if any(service in cmd_str for service in [
+                                            'schtasks', 'services', 'boot', 'startup', 'system', 
+                                            'config', 'installer', 'setup', 'update', 'driver',
+                                            'registry', 'policy', 'security', 'defender', 'antivirus'
+                                        ]):
+                                            continue  # Skip Windows service CMD
+                                        
+                                        # Allow other CMD processes (user commands)
                                         filtered_processes.append(proc)
-                                    elif len(cmdline) > 1:  # Has arguments
-                                        cmd_args = ' '.join(cmdline[1:]).upper()
-                                        # Only allow CMD with simple commands, not system services
-                                        if not (cmd_args.startswith('/C SCHTASKS') or 
-                                                cmd_args.startswith('/C "C:\\PROGRAM FILES') or
-                                                'AMD' in cmd_args or 'RYZEN' in cmd_args or
-                                                'MICROSOFT' in cmd_args or 'WINDOWS' in cmd_args or
-                                                'SYSTEM32' in cmd_args or 'SYSWOW64' in cmd_args or
-                                                'PROGRAM FILES' in cmd_args or 'PROGRAMFILES' in cmd_args):
-                                            filtered_processes.append(proc)
+                                    else:
+                                        # CMD with no arguments (user session) - allow
+                                        filtered_processes.append(proc)
                                 except:
                                     continue
                             app_processes = filtered_processes
@@ -570,12 +600,13 @@ class UnifiedMonitor:
                             if app_name not in self.apps_showing_dialog:
                                 # Block the app (first detection)
                                 print(f"[BLOCK] {app_name}: terminating {len(app_processes)} processes")
-                                self._block_processes(app_processes, app_name)
+                                killed_count = self._block_processes(app_processes, app_name)
                                 
-                                # Show password dialog (NON-BLOCKING - dialog runs async in main thread)
-                                self.apps_showing_dialog.add(app_name)
-                                self.show_dialog(app_name, app_path)
-                                # Dialog completion handler will add to unlocked_apps and call remove_from_showing_dialog()
+                                # Only show password dialog if we actually killed processes
+                                if killed_count > 0:
+                                    self.apps_showing_dialog.add(app_name)
+                                    self.show_dialog(app_name, app_path)
+                                    # Dialog completion handler will add to unlocked_apps and call remove_from_showing_dialog()
                             else:
                                 # Kill additional processes while dialog is showing
                                 print(f"[BLOCK] {app_name}: terminating {len(app_processes)} additional processes (dialog showing)")

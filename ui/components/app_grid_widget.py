@@ -143,26 +143,37 @@ class AppCard(QFrame):
     def load_app_icon(self):
         """Load icon for the application"""
         try:
+            print(f"[IconLoader] Loading icon for {self.app_name} from: {self.app_path}")
+            
             # Windows: Try to extract icon from exe file
             if os.name == 'nt':
                 # If it's an exe file, try to extract icon
-                if self.app_path.lower().endswith('.exe') and os.path.exists(self.app_path):
-                    try:
-                        pixmap = self._extract_windows_icon_simple(self.app_path)
-                        if pixmap:
-                            return pixmap
-                    except Exception as e:
-                        print(f"Error extracting Windows icon from {self.app_path}: {e}")
+                if self.app_path.lower().endswith('.exe'):
+                    print(f"[IconLoader] Attempting to load Windows exe icon: {self.app_path}")
+                    if os.path.exists(self.app_path):
+                        try:
+                            pixmap = self._extract_windows_icon_simple(self.app_path)
+                            if pixmap:
+                                print(f"[IconLoader] ✅ Successfully loaded icon for {self.app_name}")
+                                return pixmap
+                            else:
+                                print(f"[IconLoader] ❌ No icon found for app: {self.app_name} (tried exe)")
+                        except Exception as e:
+                            print(f"[IconLoader] Error extracting Windows icon from {self.app_path}: {e}")
+                    else:
+                        print(f"[IconLoader] Exe file does not exist: {self.app_path}")
                 
                 # Try to find exe path via Windows-specific methods
                 exe_path = self._find_windows_icon()
                 if exe_path and exe_path.lower().endswith('.exe'):
+                    print(f"[IconLoader] Trying alternative exe path: {exe_path}")
                     try:
                         pixmap = self._extract_windows_icon_simple(exe_path)
                         if pixmap:
+                            print(f"[IconLoader] ✅ Successfully loaded icon from alternative path for {self.app_name}")
                             return pixmap
                     except Exception as e:
-                        print(f"Error extracting Windows icon from {exe_path}: {e}")
+                        print(f"[IconLoader] Error extracting Windows icon from {exe_path}: {e}")
             
             # Try to find icon from .desktop file (Linux) or Windows methods
             icon_path = self.find_desktop_icon()
@@ -240,6 +251,9 @@ class AppCard(QFrame):
                 try:
                     # Convert HICON to QPixmap
                     return self._hicon_to_qpixmap(shfi.hIcon)
+                except OverflowError as oe:
+                    print(f"OverflowError in icon conversion for {exe_path}: {oe}")
+                    return None
                 finally:
                     # Clean up the icon
                     user32.DestroyIcon(shfi.hIcon)
@@ -273,7 +287,11 @@ class AppCard(QFrame):
             GetIconInfo.restype = wintypes.BOOL
             
             iconinfo = ICONINFO()
-            if not GetIconInfo(hicon, ctypes.byref(iconinfo)):
+            try:
+                if not GetIconInfo(hicon, ctypes.byref(iconinfo)):
+                    return None
+            except OverflowError as oe:
+                print(f"OverflowError in GetIconInfo: {oe}")
                 return None
             
             try:
@@ -294,7 +312,11 @@ class AppCard(QFrame):
                 GetObject.restype = ctypes.c_int
                 
                 bitmap = BITMAP()
-                if not GetObject(iconinfo.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)):
+                try:
+                    if not GetObject(iconinfo.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)):
+                        return None
+                except OverflowError as oe:
+                    print(f"OverflowError in GetObject: {oe}")
                     return None
                 
                 # Create QImage from bitmap data
@@ -304,9 +326,14 @@ class AppCard(QFrame):
                 if width <= 0 or height <= 0 or width > 256 or height > 256:
                     return None
                 
+                # Validate bitmap properties to prevent overflow
+                bmWidthBytes = bitmap.bmWidthBytes
+                if bmWidthBytes <= 0 or bmWidthBytes > 10000:
+                    return None
+                
                 # Get bitmap bits - limit size to prevent overflow
-                bmp_size = bitmap.bmWidthBytes * bitmap.bmHeight
-                if bmp_size > 1024 * 1024:  # 1MB limit
+                bmp_size = bmWidthBytes * height
+                if bmp_size > min(1024 * 1024, 2**31 - 1) or bmp_size <= 0:  # 1MB limit and fit in 32-bit signed
                     return None
                     
                 bmp_data = ctypes.create_string_buffer(bmp_size)
@@ -315,8 +342,12 @@ class AppCard(QFrame):
                 GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, wintypes.LPVOID]
                 GetBitmapBits.restype = wintypes.LONG
                 
-                bits_got = GetBitmapBits(iconinfo.hbmColor, bmp_size, bmp_data)
-                if bits_got <= 0:
+                try:
+                    bits_got = GetBitmapBits(iconinfo.hbmColor, bmp_size, bmp_data)
+                    if bits_got <= 0:
+                        return None
+                except OverflowError as oe:
+                    print(f"OverflowError in GetBitmapBits: {oe}")
                     return None
                 
                 # Create QImage from BGRA data (Windows bitmaps are often BGRA)

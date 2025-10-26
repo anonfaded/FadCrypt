@@ -20,9 +20,12 @@ class AppScannerThread(QThread):
     
     scan_complete = pyqtSignal(list)  # List of found apps
     scan_progress = pyqtSignal(str)  # Progress message
+    app_found = pyqtSignal(dict)     # Individual app found
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.emitted_count = 0
+        self.max_emit = 200
         
     def run(self):
         """Scan system for installed applications."""
@@ -71,6 +74,7 @@ class AppScannerThread(QThread):
                         if not any(app['name'] == app_info['name'] for app in apps):
                             apps.append(app_info)
                             self.scan_progress.emit(f"Found: {app_info['name']}")
+                            self.app_found.emit(app_info)
             except (PermissionError, OSError) as e:
                 print(f"[Scanner] Error scanning {desktop_dir}: {e}")
         
@@ -168,27 +172,41 @@ class AppScannerThread(QThread):
         """Scan Windows system for applications."""
         apps = []
 
-        # Method 1: Scan Start Menu shortcuts (most reliable)
+        # Method 1: Scan Start Menu shortcuts (most reliable and fast)
+        self.scan_progress.emit("Scanning Start Menu shortcuts...")
         start_menu_apps = self._scan_windows_start_menu()
         apps.extend(start_menu_apps)
+        self.scan_progress.emit(f"Found {len(start_menu_apps)} apps in Start Menu")
 
         # Method 2: Scan Desktop shortcuts
+        self.scan_progress.emit("Scanning Desktop shortcuts...")
         desktop_apps = self._scan_windows_desktop()
+        new_desktop_apps = []
         for app in desktop_apps:
             if not any(existing['name'] == app['name'] for existing in apps):
-                apps.append(app)
+                new_desktop_apps.append(app)
+        apps.extend(new_desktop_apps)
+        self.scan_progress.emit(f"Found {len(new_desktop_apps)} additional apps on Desktop")
 
-        # Method 3: Scan registry uninstall keys for additional apps
+        # Method 3: Quick scan of common program directories (much faster)
+        self.scan_progress.emit("Scanning Program Files directories...")
+        program_apps = self._scan_windows_program_dirs_fast()
+        new_program_apps = []
+        for app in program_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                new_program_apps.append(app)
+        apps.extend(new_program_apps)
+        self.scan_progress.emit(f"Found {len(new_program_apps)} additional apps in Program Files")
+
+        # Method 4: Registry scan (can be slow, but important for installed apps)
+        self.scan_progress.emit("Scanning Windows Registry...")
         registry_apps = self._scan_windows_registry_uninstall()
+        new_registry_apps = []
         for app in registry_apps:
             if not any(existing['name'] == app['name'] for existing in apps):
-                apps.append(app)
-
-        # Method 4: Scan common installation directories
-        common_apps = self._scan_windows_common_dirs()
-        for app in common_apps:
-            if not any(existing['name'] == app['name'] for existing in apps):
-                apps.append(app)
+                new_registry_apps.append(app)
+        apps.extend(new_registry_apps)
+        self.scan_progress.emit(f"Found {len(new_registry_apps)} additional apps in Registry")
 
         # Filter out system utilities and junk apps
         filtered_apps = []
@@ -196,71 +214,142 @@ class AppScannerThread(QThread):
             if self._should_include_app(app):
                 filtered_apps.append(app)
 
+        self.scan_progress.emit(f"Filtered to {len(filtered_apps)} valid applications")
+
         return sorted(filtered_apps, key=lambda x: x['name'].lower())
 
-    def _scan_windows_common_dirs(self) -> List[Dict[str, str]]:
-        """Scan common Windows installation directories for applications."""
+    def _scan_windows_registry_uninstall(self) -> List[Dict[str, str]]:
+        """Scan Windows registry uninstall keys for installed applications."""
         apps = []
         
-        # Common installation directories
+        try:
+            import winreg
+        except ImportError:
+            return apps
+
+        # Registry keys to scan
+        registry_keys = [
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        ]
+        
+        processed_keys = 0
+        
+        for hkey, subkey_path in registry_keys:
+            try:
+                key = winreg.OpenKey(hkey, subkey_path)
+                i = 0
+                while True:
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        app_info = self._parse_registry_uninstall_key(hkey, f"{subkey_path}\\{subkey_name}")
+                        if app_info:
+                            # Avoid duplicates
+                            if not any(existing['name'] == app_info['name'] for existing in apps):
+                                apps.append(app_info)
+                                try:
+                                    self.app_found.emit(app_info)
+                                except Exception:
+                                    pass
+                        
+                        processed_keys += 1
+                        # Update progress every 20 keys
+                        if processed_keys % 20 == 0:
+                            self.scan_progress.emit(f"Scanning Registry... {len(apps)} apps found")
+                        
+                        i += 1
+                    except OSError:
+                        # No more subkeys
+                        break
+                        
+                winreg.CloseKey(key)
+            except (FileNotFoundError, OSError):
+                # Registry key doesn't exist
+                continue
+        
+        return apps
+
+    def _scan_windows_program_dirs_fast(self) -> List[Dict[str, str]]:
+        """Fast scan of common Windows installation directories."""
+        apps = []
+        
+        # Common installation directories - scan top-level only for speed
         common_dirs = [
             r"C:\Program Files",
             r"C:\Program Files (x86)",
-            r"C:\Program Files\Microsoft Visual Studio",
-            r"C:\Program Files (x86)\Microsoft Visual Studio",
-            r"C:\Users\Public\Desktop",  # Sometimes apps put shortcuts here
         ]
         
-        # Common development tools and their typical exe names
-        dev_tools = {
-            'Visual Studio': ['devenv.exe', 'VSCode.exe'],
-            'Visual Studio Code': ['Code.exe'],
-            'JetBrains': ['idea.exe', 'idea64.exe', 'pycharm.exe', 'pycharm64.exe', 'webstorm.exe', 'webstorm64.exe'],
-            'Eclipse': ['eclipse.exe'],
+        # Known popular applications and their typical exe names
+        known_apps = {
+            'Google Chrome': ['chrome.exe'],
+            'Mozilla Firefox': ['firefox.exe'],
+            'Microsoft Edge': ['msedge.exe'],
+            'Brave': ['brave.exe'],
+            'Opera': ['opera.exe'],
+            'Vivaldi': ['vivaldi.exe'],
             'Notepad++': ['notepad++.exe'],
+            'Visual Studio Code': ['Code.exe'],
             'Sublime Text': ['sublime_text.exe'],
             'Atom': ['atom.exe'],
-            'Brackets': ['Brackets.exe'],
+            'Git': ['git.exe', 'git-bash.exe'],
+            'Python': ['python.exe', 'pythonw.exe'],
+            'Node.js': ['node.exe'],
+            'Java': ['java.exe', 'javaw.exe'],
+            'VLC Media Player': ['vlc.exe'],
+            'Steam': ['Steam.exe'],
+            'Discord': ['Discord.exe'],
+            'Slack': ['slack.exe'],
+            'Zoom': ['zoom.exe'],
+            'Microsoft Teams': ['Teams.exe'],
+            'Skype': ['Skype.exe'],
+            'WhatsApp': ['WhatsApp.exe'],
+            'Telegram': ['Telegram.exe'],
+            'Adobe Acrobat': ['Acrobat.exe', 'AcroRd32.exe'],
+            'WinRAR': ['WinRAR.exe'],
+            '7-Zip': ['7zFM.exe'],
+            'Paint.NET': ['PaintDotNet.exe'],
+            'GIMP': ['gimp-2.10.exe'],
+            'Blender': ['blender.exe'],
+            'Audacity': ['audacity.exe'],
+            'OBS Studio': ['obs64.exe', 'obs32.exe'],
+            'VirtualBox': ['VirtualBox.exe'],
+            'VMware': ['vmware.exe'],
         }
-        
-        self.scan_progress.emit("Scanning common directories...")
         
         for base_dir in common_dirs:
             if not os.path.exists(base_dir):
                 continue
                 
             try:
-                # Look for development tools specifically
-                for tool_category, exe_names in dev_tools.items():
-                    for root, dirs, files in os.walk(base_dir):
+                # Only scan top-level directories for speed
+                for item in os.listdir(base_dir):
+                    item_path = os.path.join(base_dir, item)
+                    if not os.path.isdir(item_path):
+                        continue
+                        
+                    # Check if this directory contains known applications
+                    for app_name, exe_names in known_apps.items():
                         for exe_name in exe_names:
-                            if exe_name in files:
-                                exe_path = os.path.join(root, exe_name)
-                                if os.path.exists(exe_path):
-                                    # Create a reasonable display name
-                                    if 'Visual Studio' in tool_category and 'devenv' in exe_name:
-                                        display_name = 'Visual Studio'
-                                    elif 'Code' in exe_name:
-                                        display_name = 'Visual Studio Code'
-                                    else:
-                                        display_name = tool_category
-                                    
-                                    app_info = {
-                                        'name': display_name,
-                                        'path': exe_path,
-                                        'icon': exe_path,
-                                        'category': 'Development',
-                                        'desktop_file': exe_path
-                                    }
-                                    
-                                    # Avoid duplicates
-                                    if not any(app['name'] == app_info['name'] for app in apps):
-                                        apps.append(app_info)
-                                        self.scan_progress.emit(f"Found: {display_name}")
-                                        break  # Found this tool, move to next category
-                        if any(app['name'] == tool_category for app in apps):
-                            break  # Already found this tool category
-                            
+                            exe_path = os.path.join(item_path, exe_name)
+                            if os.path.exists(exe_path):
+                                app_info = {
+                                    'name': app_name,
+                                    'path': exe_path,
+                                    'icon': exe_path,
+                                    'category': self._categorize_windows_app(exe_path),
+                                    'desktop_file': exe_path
+                                }
+                                
+                                # Avoid duplicates
+                                if not any(app['name'] == app_info['name'] for app in apps):
+                                    apps.append(app_info)
+                                    try:
+                                        self.app_found.emit(app_info)
+                                    except Exception:
+                                        pass
+                                break  # Found this app, move to next
+                                
             except (PermissionError, OSError) as e:
                 print(f"[Scanner] Error scanning {base_dir}: {e}")
         
@@ -274,7 +363,14 @@ class AppScannerThread(QThread):
             os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs")
         ]
 
-        self.scan_progress.emit("Scanning Start Menu...")
+        total_shortcuts = 0
+        processed_shortcuts = 0
+
+        # First pass: count total shortcuts for progress
+        for start_path in start_menu_paths:
+            if os.path.exists(start_path):
+                for root, dirs, files in os.walk(start_path):
+                    total_shortcuts += len([f for f in files if f.endswith('.lnk')])
 
         for start_path in start_menu_paths:
             if not os.path.exists(start_path):
@@ -290,7 +386,18 @@ class AppScannerThread(QThread):
                                 # Avoid duplicates
                                 if not any(app['name'] == app_info['name'] for app in apps):
                                     apps.append(app_info)
-                                    self.scan_progress.emit(f"Found: {app_info['name']}")
+                                    try:
+                                        self.app_found.emit(app_info)
+                                    except Exception:
+                                        pass
+                            
+                            processed_shortcuts += 1
+                            
+                            # Update progress every 10 shortcuts to avoid spam
+                            if processed_shortcuts % 10 == 0 and total_shortcuts > 0:
+                                progress_pct = int((processed_shortcuts / total_shortcuts) * 100)
+                                self.scan_progress.emit(f"Scanning Start Menu... {progress_pct}% ({len(apps)} apps found)")
+                                
             except (PermissionError, OSError) as e:
                 print(f"[Scanner] Error scanning Start Menu {start_path}: {e}")
 
@@ -316,6 +423,7 @@ class AppScannerThread(QThread):
                         if app_info['path'].endswith('.exe'):
                             apps.append(app_info)
                             self.scan_progress.emit(f"Found: {app_info['name']}")
+                            self.app_found.emit(app_info)
         except (PermissionError, OSError) as e:
             print(f"[Scanner] Error scanning Desktop: {e}")
 
@@ -354,6 +462,7 @@ class AppScannerThread(QThread):
                                 not self._is_system_app(app_info['name'])):
                                 apps.append(app_info)
                                 self.scan_progress.emit(f"Found: {app_info['name']}")
+                                self.app_found.emit(app_info)
                         i += 1
                     except OSError:
                         break
@@ -608,7 +717,7 @@ class AppScannerThread(QThread):
             return 'Development'
         elif any(x in filepath_lower for x in ['photoshop', 'gimp', 'paint', 'illustrator']):
             return 'Graphics'
-        elif any(x in filepath_lower for x in ['vlc', 'media', 'spotify', 'itunes', 'winamp']):
+        elif any(x in filepath_lower for x in ['vlc', 'media', 'itunes', 'winamp']):
             return 'Multimedia'
         elif 'system32' in filepath_lower or 'windows' in filepath_lower:
             return 'System'
@@ -627,7 +736,7 @@ class AppScannerThread(QThread):
             return 'Development'
         elif any(x in filepath_lower for x in ['photoshop', 'gimp', 'paint', 'illustrator']):
             return 'Graphics'
-        elif any(x in filepath_lower for x in ['vlc', 'media', 'spotify', 'itunes', 'winamp']):
+        elif any(x in filepath_lower for x in ['vlc', 'media', 'itunes', 'winamp']):
             return 'Multimedia'
         elif 'system32' in filepath_lower or 'windows' in filepath_lower:
             return 'System'
@@ -1016,6 +1125,13 @@ class AppCard(QFrame):
     def is_checked(self) -> bool:
         """Check if this app is selected."""
         return self._is_checked
+    
+    def set_checked(self, checked: bool):
+        """Set the checked state of this card."""
+        if self._is_checked != checked:
+            self._is_checked = checked
+            self.update_style()
+            self.toggled.emit(self._is_checked)
 
 
 class AppScannerDialog(QDialog):
@@ -1083,6 +1199,11 @@ class AppScannerDialog(QDialog):
         self._first_show = True
         # Loading overlay
         self.loading_overlay = None
+        # Pagination
+        self.current_page = 0
+        self.apps_per_page = 50
+        self.filtered_apps = []  # Apps after filtering
+        self.selected_apps = set()  # Store selected app names across pages
 
         self.init_ui()
         # Don't center here - will center on showEvent after dialog has proper size
@@ -1250,6 +1371,17 @@ class AppScannerDialog(QDialog):
         """)
         loading_inner_layout.addWidget(loading_spinner)
         
+        # Add progress indicator
+        self.loading_progress = QLabel("0 applications found")
+        self.loading_progress.setStyleSheet("""
+            QLabel {
+                color: #9ca3af;
+                font-size: 12px;
+                margin-top: 5px;
+            }
+        """)
+        loading_inner_layout.addWidget(self.loading_progress)
+        
         loading_label = QLabel("🔍 Scanning for applications...")
         loading_label.setStyleSheet("""
             QLabel {
@@ -1294,6 +1426,68 @@ class AppScannerDialog(QDialog):
         """)
         self.selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.selection_label)
+        
+        # Pagination controls
+        pagination_layout = QHBoxLayout()
+        pagination_layout.setSpacing(10)
+        
+        self.page_label = QLabel("Page 1 of 1")
+        self.page_label.setStyleSheet("""
+            color: #e5e7eb;
+            font-size: 12px;
+            background-color: transparent;
+        """)
+        pagination_layout.addWidget(self.page_label)
+        
+        pagination_layout.addStretch()
+        
+        self.prev_btn = QPushButton("◀ Previous")
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4b5563;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #374151;
+            }
+            QPushButton:disabled {
+                background-color: #6b7280;
+                color: #9ca3af;
+            }
+        """)
+        pagination_layout.addWidget(self.prev_btn)
+        
+        self.next_btn = QPushButton("Next ▶")
+        self.next_btn.clicked.connect(self.next_page)
+        self.next_btn.setEnabled(False)
+        self.next_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4b5563;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #374151;
+            }
+            QPushButton:disabled {
+                background-color: #6b7280;
+                color: #9ca3af;
+            }
+        """)
+        pagination_layout.addWidget(self.next_btn)
+        
+        layout.addLayout(pagination_layout)
         
         # Separator
         separator2 = QFrame()
@@ -1546,192 +1740,131 @@ class AppScannerDialog(QDialog):
             self.category_filter = category
         # refresh tags and filter
         self._populate_category_tags()
-        self.filter_apps(self.search_input.text())
+        self.filter_apps()
 
     def clear_category_filter(self):
         self.category_filter = None
         self._populate_category_tags()
-        self.filter_apps(self.search_input.text())
+        self.filter_apps()
     
     def start_scan(self):
         """Start scanning for applications in background thread."""
         self.scanner_thread = AppScannerThread(self)
         self.scanner_thread.scan_progress.connect(self.update_progress)
+        self.scanner_thread.app_found.connect(self.add_app_to_display)
         self.scanner_thread.scan_complete.connect(self.display_results)
         self.scanner_thread.start()
     
     def update_progress(self, message: str):
         """Update progress label."""
         self.status_label.setText(message)
+        # Force UI update to prevent freezing
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+    
+    def add_app_to_display(self, app_info: Dict[str, str]):
+        """Add a single app to the display as it's found."""
+        # Ensure scanned_apps exists
+        if not hasattr(self, 'scanned_apps'):
+            self.scanned_apps = []
+
+        # Hide loading overlay on first found app so the UI feels responsive
+        try:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay and self.loading_overlay.isVisible():
+                self.loading_overlay.setVisible(False)
+        except Exception:
+            pass
+
+        # Check for duplicates
+        if not any(app['name'] == app_info['name'] for app in self.scanned_apps):
+            # Add normalized category key
+            app_info['category_lc'] = (app_info.get('category', 'Other') or 'Other').strip().lower()
+            self.scanned_apps.append(app_info)
+
+            # Update loading progress if overlay is still visible
+            try:
+                if hasattr(self, 'loading_overlay') and self.loading_overlay and self.loading_overlay.isVisible():
+                    if hasattr(self, 'loading_progress'):
+                        count = len(self.scanned_apps)
+                        self.loading_progress.setText(f"{count} application{'s' if count != 1 else ''} found")
+            except Exception:
+                pass
+
+            # Update status label to reflect live count and enable add button
+            try:
+                self.status_label.setText(f"🔍 Found {len(self.scanned_apps)} applications (scanning…)")
+                self.add_btn.setEnabled(True)
+            except Exception:
+                pass
+
+            # Force UI update
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
     
     def display_results(self, apps: List[Dict[str, str]]):
-        """Display scanned applications in grid."""
+        """Display scanned applications with pagination."""
         # Hide loading overlay
         if hasattr(self, 'loading_overlay') and self.loading_overlay:
             self.loading_overlay.setVisible(False)
         
-        # Store scanned apps and add a normalized lowercase category key for reliable filtering
-        self.scanned_apps = apps
-        for a in self.scanned_apps:
-            a['category_lc'] = (a.get('category', 'Other') or 'Other').strip().lower()
+        # Store all scanned apps
+        if hasattr(self, 'scanned_apps') and self.scanned_apps:
+            # Apps were added incrementally during scan
+            pass
+        else:
+            # Fallback: Store scanned apps
+            self.scanned_apps = apps
+            for a in self.scanned_apps:
+                a['category_lc'] = (a.get('category', 'Other') or 'Other').strip().lower()
         
-        if not apps:
+        if not self.scanned_apps:
             self.status_label.setText("❌ No applications found")
             return
         
-        self.status_label.setText(f"✅ Found {len(apps)} applications - Select apps to add:")
+        # Apply current filter
+        self.filtered_apps = self._apply_filter(self.scanned_apps)
         
-        # Clear previous cards
-        for card in self.app_cards:
-            card.deleteLater()
-        self.app_cards.clear()
+        # Reset to first page
+        self.current_page = 0
         
-        # Create cards in grid (N columns)
-        row = 0
-        col = 0
-        card_max_w = 320  # keep cards readable and prevent full-row stretching
-        card_fixed_h = 140
-        for app in apps:
-            card = AppCard(app, self)
-            # enforce fixed size so cards are uniform
-            card.setFixedSize(card_max_w, card_fixed_h)
-
-            card.toggled.connect(lambda checked: self.update_selection_count())
-            # Align top+center so cards don't expand horizontally and allow multiple columns
-            self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
-            self.app_cards.append(card)
-
-            col += 1
-            if col >= self.columns:
-                col = 0
-                row += 1
+        # Display first page
+        self._display_page()
+        
+        # Update pagination controls
+        self._update_pagination()
         
         # Enable add button
         self.add_btn.setEnabled(True)
+        
         # Populate category tags for filtering
         try:
             self._populate_category_tags()
         except Exception:
             pass
-        # Ensure layout recalculation now that cards exist (fix initial single-column issue)
-        try:
-            QTimer.singleShot(0, self._ensure_layout)
         except Exception:
             pass
     
-    def filter_apps(self, search_text: str):
-        """Filter displayed apps based on search text."""
-        search_text = search_text.lower().strip()
-        
-        visible_count = 0
-        row = 0
-        col = 0
-        # Clear existing layout placements so we can re-add visible cards
-        while self.scroll_layout.count():
-            item = self.scroll_layout.takeAt(0)
-            widget = item.widget() if item else None
-            if widget:
-                try:
-                    self.scroll_layout.removeWidget(widget)
-                except Exception:
-                    pass
 
-        for card in self.app_cards:
-            app_name = card.app_data.get('name', '').lower()
-            app_path = card.app_data.get('path', '').lower()
-            # prefer the normalized lowercase category key when available
-            app_category = card.app_data.get('category_lc', card.app_data.get('category', '')).lower()
-
-            # Text match
-            matches_text = (not search_text) or (search_text in app_name) or (search_text in app_path) or (search_text in app_category)
-            # Category match
-            matches_category = (not self.category_filter) or (app_category == (self.category_filter or '').lower())
-
-            matches = matches_text and matches_category
-
-            if matches:
-                card.setVisible(True)
-                # Reposition visible cards
-                try:
-                    self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
-                except Exception:
-                    self.scroll_layout.addWidget(card, row, col)
-                visible_count += 1
-                col += 1
-                if col >= self.columns:
-                    col = 0
-                    row += 1
-            else:
-                card.setVisible(False)
-        
-        # Update status
-        # Update status
-        if self.category_filter:
-            self.status_label.setText(f"🔖 Filter: {self.category_filter} — Showing {visible_count} of {len(self.scanned_apps)} apps")
-        elif search_text:
-            self.status_label.setText(f"🔍 Showing {visible_count} of {len(self.scanned_apps)} applications")
-        else:
-            self.status_label.setText(f"✅ Found {len(self.scanned_apps)} applications - Select apps to add:")
-    
-    def clear_search(self):
-        """Clear search input and show all apps."""
-        self.search_input.clear()
-        # Clear category filter as well and refresh
-        self.category_filter = None
-        try:
-            self._populate_category_tags()
-        except Exception:
-            pass
-        try:
-            self.filter_apps("")
-        except Exception:
-            pass
     
     def update_selection_count(self):
         """Update the selection counter label."""
-        selected_count = sum(1 for card in self.app_cards if card.is_checked())
-        if selected_count == 0:
-            self.selection_label.setText("0 apps selected")
-            self.selection_label.setStyleSheet("""
-                color: #6b7280;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 5px;
-                background-color: transparent;
-            """)
-        else:
-            self.selection_label.setText(f"✓ {selected_count} app{'s' if selected_count != 1 else ''} selected")
-            self.selection_label.setStyleSheet("""
-                color: #009E60;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 5px;
-                background-color: transparent;
-            """)
+        self._update_selection_count()
     
     def select_all(self):
-        """Select all application cards."""
+        """Select all application cards on current page."""
         for card in self.app_cards:
-            if card.checkbox:
-                card.checkbox.setChecked(True)
-        self.update_selection_count()
+            card.set_checked(True)
+        self._update_selection_count()
     
     def deselect_all(self):
-        """Deselect all application cards."""
+        """Deselect all application cards on current page."""
         for card in self.app_cards:
-            if card.checkbox:
-                card.checkbox.setChecked(False)
-        self.update_selection_count()
+            card.set_checked(False)
+        self._update_selection_count()
     
     def add_selected_apps(self):
         """Emit signal with selected apps and close dialog."""
-        selected_apps = []
-        
-        for card in self.app_cards:
-            if card.is_checked():
-                selected_apps.append(card.app_data)
-        
-        if not selected_apps:
+        if not self.selected_apps:
             QMessageBox.warning(
                 self,
                 "No Selection",
@@ -1739,8 +1872,14 @@ class AppScannerDialog(QDialog):
             )
             return
         
-        print(f"[AppScanner] User selected {len(selected_apps)} apps to add")
-        self.apps_selected.emit(selected_apps)
+        # Get app data for selected apps
+        selected_app_data = []
+        for app in self.scanned_apps:
+            if app['name'] in self.selected_apps:
+                selected_app_data.append(app)
+        
+        print(f"[AppScanner] User selected {len(selected_app_data)} apps to add")
+        self.apps_selected.emit(selected_app_data)
         self.accept()
     
     def center_on_screen(self):
@@ -1775,6 +1914,123 @@ class AppScannerDialog(QDialog):
             
             self.move(center_x, center_y)
     
+    def _apply_filter(self, apps):
+        """Apply current search and category filters."""
+        filtered = apps
+        
+        # Apply category filter
+        if self.category_filter:
+            filtered = [app for app in filtered if app.get('category_lc') == self.category_filter]
+        
+        # Apply search filter
+        search_text = self.search_input.text().strip().lower()
+        if search_text:
+            filtered = [app for app in filtered 
+                       if search_text in app.get('name', '').lower() or 
+                          search_text in app.get('path', '').lower()]
+        
+        return filtered
+    
+    def _display_page(self):
+        """Display the current page of apps."""
+        # Clear previous cards
+        for card in self.app_cards:
+            card.deleteLater()
+        self.app_cards.clear()
+        
+        # Calculate page bounds
+        start_idx = self.current_page * self.apps_per_page
+        end_idx = min(start_idx + self.apps_per_page, len(self.filtered_apps))
+        page_apps = self.filtered_apps[start_idx:end_idx]
+        
+        if not page_apps:
+            return
+        
+        # Create cards for this page
+        row = 0
+        col = 0
+        card_max_w = 320
+        card_fixed_h = 140
+        
+        for app in page_apps:
+            card = AppCard(app, self)
+            card.setFixedSize(card_max_w, card_fixed_h)
+            # Set checked state based on stored selections
+            if app['name'] in self.selected_apps:
+                card.set_checked(True)
+            card.toggled.connect(lambda checked, app_name=app['name']: self._on_card_toggled(app_name, checked))
+            self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
+            self.app_cards.append(card)
+
+            col += 1
+            if col >= self.columns:
+                col = 0
+                row += 1
+        
+        # Update status
+        total_filtered = len(self.filtered_apps)
+        total_scanned = len(self.scanned_apps)
+        start_num = start_idx + 1
+        end_num = min(end_idx, total_filtered)
+        
+        if total_filtered < total_scanned:
+            self.status_label.setText(f"✅ Found {total_scanned} applications, showing {total_filtered} filtered ({start_num}-{end_num})")
+        else:
+            self.status_label.setText(f"✅ Found {total_scanned} applications ({start_num}-{end_num})")
+        
+        # Update selection count
+        self._update_selection_count()
+    
+    def _update_pagination(self):
+        """Update pagination controls."""
+        total_pages = max(1, (len(self.filtered_apps) + self.apps_per_page - 1) // self.apps_per_page)
+        
+        self.page_label.setText(f"Page {self.current_page + 1} of {total_pages}")
+        
+        self.prev_btn.setEnabled(self.current_page > 0)
+        self.next_btn.setEnabled(self.current_page < total_pages - 1)
+    
+    def prev_page(self):
+        """Go to previous page."""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self._display_page()
+            self._update_pagination()
+    
+    def next_page(self):
+        """Go to next page."""
+        total_pages = max(1, (len(self.filtered_apps) + self.apps_per_page - 1) // self.apps_per_page)
+        if self.current_page < total_pages - 1:
+            self.current_page += 1
+            self._display_page()
+            self._update_pagination()
+    
+    def filter_apps(self):
+        """Apply search filter and refresh display."""
+        self.filtered_apps = self._apply_filter(self.scanned_apps)
+        self.current_page = 0
+        self._display_page()
+        self._update_pagination()
+    
+    def clear_search(self):
+        """Clear search input."""
+        self.search_input.clear()
+        self.filter_apps()
+
+    def _on_card_toggled(self, app_name: str, checked: bool):
+        """Handle card toggle events."""
+        if checked:
+            if app_name not in self.selected_apps:
+                self.selected_apps.add(app_name)
+        else:
+            self.selected_apps.discard(app_name)
+        self._update_selection_count()
+
+    def _update_selection_count(self):
+        """Update the selection count display."""
+        count = len(self.selected_apps)
+        self.selection_label.setText(f"Selected: {count} app{'s' if count != 1 else ''}")
+
     def showEvent(self, event):
         """Override showEvent to center dialog after it has proper size (Wayland-compatible)."""
         super().showEvent(event)
