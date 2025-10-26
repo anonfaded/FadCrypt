@@ -295,7 +295,60 @@ class SettingsPanel(QWidget):
         file_protection_info.setStyleSheet("color: #666666; font-size: 11px; padding-left: 26px;")
         file_protection_info.setWordWrap(True)
         bottom_frame.addWidget(file_protection_info)
-        
+
+        # Process Scanning Interval Section
+        separator_scanning = QFrame()
+        separator_scanning.setFrameShape(QFrame.Shape.HLine)
+        separator_scanning.setFrameShadow(QFrame.Shadow.Sunken)
+        bottom_frame.addWidget(separator_scanning)
+
+        scanning_title = QLabel("⚡ Process Scanning Interval")
+        scanning_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+        bottom_frame.addWidget(scanning_title)
+
+        # Scanning interval input
+        from PyQt6.QtWidgets import QDoubleSpinBox
+        scanning_layout = QHBoxLayout()
+
+        scanning_layout.addWidget(QLabel("Scan every"))
+        self.scanning_interval_spinbox = QDoubleSpinBox()
+        self.scanning_interval_spinbox.setRange(0.5, 5.0)  # 0.5 to 5 seconds
+        self.scanning_interval_spinbox.setSingleStep(0.5)
+        self.scanning_interval_spinbox.setValue(1.0)  # Default: 1.0 seconds
+        self.scanning_interval_spinbox.setSuffix(" seconds")
+        self.scanning_interval_spinbox.setStyleSheet("""
+            QDoubleSpinBox {
+                background-color: #2a2a2a;
+                color: #e0e0e0;
+                border: 1px solid #666666;
+                border-radius: 3px;
+                padding: 4px;
+                min-width: 80px;
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                background-color: #444444;
+                border: none;
+                width: 16px;
+            }
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+                background-color: #555555;
+            }
+        """)
+        scanning_layout.addWidget(self.scanning_interval_spinbox)
+        scanning_layout.addStretch()
+        bottom_frame.addLayout(scanning_layout)
+
+        # Info text for scanning interval
+        scanning_info = QLabel(
+            "How often FadCrypt scans for running applications (0.5-5.0 seconds).\n"
+            "⚠️  Lower values = faster detection but higher CPU usage and battery drain.\n"
+            "⚠️  Higher values = slower detection but better performance.\n"
+            "Default: 1.0 seconds (recommended for most users)."
+        )
+        scanning_info.setStyleSheet("color: #666666; font-size: 11px; padding-left: 0px;")
+        scanning_info.setWordWrap(True)
+        bottom_frame.addWidget(scanning_info)
+
         # Uninstall Cleanup
         separator3 = QFrame()
         separator3.setFrameShape(QFrame.Shape.HLine)
@@ -473,6 +526,7 @@ class SettingsPanel(QWidget):
         self.wallpaper_group.buttonClicked.connect(self.on_settings_changed)
         self.lock_tools_checkbox.stateChanged.connect(self.on_settings_changed)
         self.file_protection_checkbox.stateChanged.connect(self.on_settings_changed)
+        self.scanning_interval_spinbox.valueChanged.connect(self.on_settings_changed)
         
         # Initial preview update
         self.update_preview()
@@ -541,7 +595,8 @@ class SettingsPanel(QWidget):
             'dialog_style': 'simple' if self.simple_dialog_radio.isChecked() else 'fullscreen',
             'wallpaper': self.get_wallpaper_choice(),
             'lock_tools': self.lock_tools_checkbox.isChecked(),
-            'file_protection_enabled': self.file_protection_checkbox.isChecked()
+            'file_protection_enabled': self.file_protection_checkbox.isChecked(),
+            'scanning_interval': self.scanning_interval_spinbox.value()
         }
         
     def get_wallpaper_choice(self):
@@ -576,6 +631,7 @@ class SettingsPanel(QWidget):
             
         self.lock_tools_checkbox.setChecked(settings.get('lock_tools', False))  # Default: False for safety
         self.file_protection_checkbox.setChecked(settings.get('file_protection_enabled', True))  # Default: True (enabled)
+        self.scanning_interval_spinbox.setValue(settings.get('scanning_interval', 1.0))  # Default: 1.0 seconds
         
         self.on_settings_changed()
     

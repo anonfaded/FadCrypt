@@ -42,7 +42,8 @@ class UnifiedMonitor:
         is_linux: bool = True,
         sleep_interval: float = 1.0,
         enable_profiling: bool = False,
-        log_activity_func: Optional[Callable[..., None]] = None
+        log_activity_func: Optional[Callable[..., None]] = None,
+        boot_grace_period: float = None
     ):
         """
         Initialize the unified monitor.
@@ -56,6 +57,7 @@ class UnifiedMonitor:
             sleep_interval: Seconds to sleep between monitoring cycles (default: 1.0 for max efficiency)
             enable_profiling: Whether to log performance metrics
             log_activity_func: Function to log activity events (takes event_type, item_name, item_type, and keyword arguments like success, details)
+            boot_grace_period: Grace period in seconds before blocking CMD (default: 3x sleep_interval, min 1.5s)
         """
         self.get_state = get_state_func
         self.set_state = set_state_func
@@ -65,6 +67,17 @@ class UnifiedMonitor:
         self.sleep_interval = sleep_interval
         self.enable_profiling = enable_profiling
         self.log_activity_func = log_activity_func
+        
+        # Boot grace period: Allow system to stabilize before blocking CMD
+        # Only used when FadCrypt auto-starts with system boot (--auto-monitor flag)
+        # Manual monitoring starts have 0.0 grace period for instant detection
+        if boot_grace_period is None:
+            self.boot_grace_period = max(1.5, sleep_interval * 3)
+        else:
+            self.boot_grace_period = boot_grace_period
+        
+        # Flag to track if grace period is active
+        self.grace_period_active = self.boot_grace_period > 0
         
         self.monitoring = False
         self.monitor_thread = None
@@ -126,7 +139,10 @@ class UnifiedMonitor:
         if self.monitoring:
             self.monitoring = False
             if self.monitor_thread:
-                self.monitor_thread.join(timeout=2.0)
+                # Adaptive timeout based on sleep interval for faster termination
+                # Wait for current sleep cycle + small buffer for processing
+                timeout = self.sleep_interval + 0.5
+                self.monitor_thread.join(timeout=timeout)
             print("[MONITOR] Stopped monitoring")
     
     def _prepare_app_monitors(self, applications: List[Dict[str, str]]) -> List[Dict]:
@@ -259,11 +275,12 @@ class UnifiedMonitor:
         if process_name in all_processes:
             # Special filtering for CMD to exclude background service processes
             if process_name == 'cmd':
-                # BOOT-TIME GRACE PERIOD: Skip ALL CMD blocking for first 5 seconds after monitoring start
+                # BOOT-TIME GRACE PERIOD: Skip ALL CMD blocking for first few seconds after monitoring start
                 # This prevents system stability issues during startup when CMD may be used for critical operations
-                if self.monitoring_start_time and (time.time() - self.monitoring_start_time) < 5.0:
+                # Only applies when FadCrypt auto-starts with system boot (--auto-monitor flag)
+                if self.grace_period_active and self.monitoring_start_time and (time.time() - self.monitoring_start_time) < self.boot_grace_period:
                     if self.enable_profiling:
-                        print(f"[CMD-GRACE] Skipping CMD blocking during boot grace period")
+                        print(f"[CMD-GRACE] Skipping CMD blocking during boot grace period ({self.boot_grace_period}s)")
                     # Skip all CMD processes during grace period - don't add any to app_processes
                 else:
                     filtered_procs = []
@@ -503,9 +520,14 @@ class UnifiedMonitor:
         Args:
             applications: List of app dicts with 'name' and 'path' keys
         """
-        print(f"[MONITOR] Unified monitoring loop started")
-        print(f"[MONITOR] Monitoring {len(applications)} applications")
-        print(f"[MONITOR] Sleep interval: {self.sleep_interval}s")
+        print(f"⚡ [MONITOR] Unified monitoring loop started")
+        print(f"⚡ [MONITOR] Monitoring {len(applications)} applications")
+        print(f"⚡ [MONITOR] Sleep interval: {self.sleep_interval}s")
+        if self.boot_grace_period > 0:
+            print(f"⚡ [MONITOR] Boot grace period: {self.boot_grace_period}s (CMD protected during system boot)")
+        else:
+            print(f"⚡ [MONITOR] Boot grace period: DISABLED (instant detection for all apps including CMD)")
+        print(f"⚡ [MONITOR] Detection speed: Apps will be detected and terminated every {self.sleep_interval}s")
         
         # Prepare app monitoring data with cached process names
         app_monitors = self._prepare_app_monitors(applications)
@@ -519,6 +541,10 @@ class UnifiedMonitor:
             try:
                 iteration_count += 1
                 cycle_start = time.perf_counter()
+                
+                # Log iteration timing for debugging detection speed
+                if self.enable_profiling and iteration_count <= 5:
+                    print(f"⏱️  [TIMING] Iteration {iteration_count} started at {time.time():.3f}")
                 
                 # SINGLE PROCESS SCAN for all apps (key optimization)
                 all_processes = self._scan_processes()
@@ -599,6 +625,9 @@ class UnifiedMonitor:
                         if app_name not in unlocked_apps:
                             if app_name not in self.apps_showing_dialog:
                                 # Block the app (first detection)
+                                detection_time = time.time()
+                                elapsed_since_start = detection_time - self.monitoring_start_time if self.monitoring_start_time else 0
+                                print(f"⚡ [BLOCK] {app_name}: FIRST DETECTION after {elapsed_since_start:.2f}s from monitoring start")
                                 print(f"[BLOCK] {app_name}: terminating {len(app_processes)} processes")
                                 killed_count = self._block_processes(app_processes, app_name)
                                 
@@ -650,9 +679,9 @@ class UnifiedMonitor:
                             monitor['no_process_count'] = 0
                         
                         # Auto-lock after 10 consecutive checks with no user processes
-                        # (10 cycles × 1.0s = 10 seconds of no activity)
-                        # Skip auto-lock for CMD during boot grace period
-                        if app_name == 'cmd' and self.monitoring_start_time and (time.time() - self.monitoring_start_time) < 5.0:
+                        # (10 cycles × sleep_interval = 10 * sleep_interval seconds of no activity)
+                        # Skip auto-lock for CMD during boot grace period (only when auto-starting with system)
+                        if app_name == 'cmd' and self.grace_period_active and self.monitoring_start_time and (time.time() - self.monitoring_start_time) < self.boot_grace_period:
                             # Don't auto-lock CMD during grace period
                             pass
                         elif monitor['no_process_count'] >= 10:
@@ -688,7 +717,12 @@ class UnifiedMonitor:
                           f"{len(app_monitors)} apps monitored")
                 
                 # SLEEP - Critical for CPU efficiency
-                time.sleep(self.sleep_interval)
+                # Check monitoring flag every 0.1s for faster termination response
+                sleep_remaining = self.sleep_interval
+                while sleep_remaining > 0 and self.monitoring:
+                    sleep_chunk = min(0.1, sleep_remaining)
+                    time.sleep(sleep_chunk)
+                    sleep_remaining -= sleep_chunk
                 
             except Exception as e:
                 print(f"[ERROR] Unified monitoring loop error: {e}")

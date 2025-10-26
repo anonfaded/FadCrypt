@@ -2531,14 +2531,34 @@ class MainWindowBase(QMainWindow):
         # Detect platform
         is_linux = platform.system() == "Linux"
 
+        # Get scanning interval from settings
+        scanning_interval = 1.0  # Default
+        try:
+            settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+            if os.path.exists(settings_file):
+                import json
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    scanning_interval = settings.get('scanning_interval', 1.0)
+                    print(f"[Settings] ⚡ Loaded scanning interval: {scanning_interval}s")
+            else:
+                print(f"[Settings] Settings file not found, using default: {scanning_interval}s")
+        except Exception as e:
+            print(f"[Settings] Could not load scanning interval, using default 1.0s: {e}")
+
+        # Only apply boot grace period if this is auto-monitor mode (system boot)
+        # Manual monitoring starts should have no grace period for instant detection
+        boot_grace = scanning_interval * 3 if self.auto_monitor_mode else 0.0
+        
         self.unified_monitor = UnifiedMonitor(
             get_state_func=self.get_monitoring_state,
             set_state_func=self.set_monitoring_state,
             show_dialog_func=self.show_password_prompt_for_app,
             is_linux=is_linux,
-            sleep_interval=1.0,
+            sleep_interval=scanning_interval,
             enable_profiling=True,
-            log_activity_func=self.log_activity
+            log_activity_func=self.log_activity,
+            boot_grace_period=boot_grace
         )
 
         # Start monitoring immediately (core functionality)
