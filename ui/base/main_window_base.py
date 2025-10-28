@@ -426,6 +426,49 @@ class MainWindowBase(QMainWindow):
         self.create_settings_tab()
         self.create_about_tab()
         
+        # Setup file watcher for config file to auto-refresh Files & Folders tab
+        self.setup_config_file_watcher()
+    
+    def setup_config_file_watcher(self):
+        """Setup file watcher to auto-refresh Files & Folders tab when config changes"""
+        from PyQt6.QtCore import QFileSystemWatcher, QTimer
+        
+        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+        
+        self.config_watcher = QFileSystemWatcher()
+        self.config_watcher.addPath(config_file)
+        
+        # Use a timer to debounce rapid file changes
+        self.config_refresh_timer = QTimer()
+        self.config_refresh_timer.setSingleShot(True)
+        self.config_refresh_timer.timeout.connect(self.refresh_files_tab)
+        
+        # Flag to prevent refresh loops
+        self._refreshing_files = False
+        
+        # Connect file watcher to debounced refresh
+        self.config_watcher.fileChanged.connect(lambda: self.config_refresh_timer.start(500))
+        
+        print(f"✅ Config file watcher setup for: {config_file}")
+    
+    def refresh_files_tab(self):
+        """Refresh the Files & Folders tab from disk"""
+        if self._refreshing_files:
+            return
+            
+        try:
+            self._refreshing_files = True
+            print("[UI] Auto-refreshing Files & Folders tab...")
+            self.load_locked_files()
+            
+            # Re-add the file to watcher (it gets removed after file changes)
+            config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+            if config_file not in self.config_watcher.files():
+                self.config_watcher.addPath(config_file)
+        except Exception as e:
+            print(f"[UI] Error refreshing files tab: {e}")
+        finally:
+            self._refreshing_files = False
     
     def init_system_tray(self):
         """Initialize system tray icon"""
@@ -1959,9 +2002,8 @@ class MainWindowBase(QMainWindow):
             # Single refresh at end (O(n) instead of O(n²))
             if removed_count > 0:
                 print(f"[Remove] Refreshing file grid after removing {removed_count} items...")
-                # Save config with proper preservation of applications
-                self.save_locked_files_config()
-                # Reload the grid to show updated state
+                # NOTE: remove_item() already saved to disk via _save_locked_items()
+                # Just reload the grid to show updated state
                 self.load_locked_files()
                 
                 # Update config display
@@ -1994,14 +2036,10 @@ class MainWindowBase(QMainWindow):
             )
     
     def save_locked_files_config(self):
-        """Save locked files/folders config while preserving applications"""
+        """Save locked files/folders config while preserving applications - DO NOT reload from file"""
         config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
         
-        # Reload locked items from file to ensure we have the latest state
-        if self.file_lock_manager:
-            self.file_lock_manager._load_locked_items()
-        
-        # Load existing config to preserve applications
+        # Load existing config to preserve applications ONLY
         existing_config = {"applications": [], "locked_files_and_folders": []}
         if os.path.exists(config_file):
             try:
@@ -2010,7 +2048,7 @@ class MainWindowBase(QMainWindow):
             except:
                 pass
         
-        # Create unified config - preserve applications
+        # Use current in-memory locked items (already up-to-date from add/remove operations)
         locked_items = self.file_lock_manager.get_locked_items() if self.file_lock_manager else []
         unified_config = {
             'applications': existing_config.get('applications', []),

@@ -150,10 +150,9 @@ class ContextMenuManager:
                     else:
                         cmd = f'cmd.exe /c "{self.exe_path}" --lock "%1"'
                 else:
-                    # Script execution
-                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    script_dir = os.path.dirname(self.exe_path)
-                    cmd = f'cmd.exe /c "{pythonw_path}" "{self.exe_path}" --lock "%1"'
+                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    python_path = sys.executable
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file lock context menu: {key_path}")
@@ -180,10 +179,9 @@ class ContextMenuManager:
                     else:
                         cmd = f'cmd.exe /c "{self.exe_path}" --unlock "%1"'
                 else:
-                    # Script execution
-                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    script_dir = os.path.dirname(self.exe_path)
-                    cmd = f'cmd.exe /c "{pythonw_path}" "{self.exe_path}" --unlock "%1"'
+                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    python_path = sys.executable
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file unlock context menu: {key_path}")
@@ -210,10 +208,9 @@ class ContextMenuManager:
                     else:
                         cmd = f'cmd.exe /c "{self.exe_path}" --lock "%1"'
                 else:
-                    # Script execution
-                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    script_dir = os.path.dirname(self.exe_path)
-                    cmd = f'cmd.exe /c "{pythonw_path}" "{self.exe_path}" --lock "%1"'
+                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    python_path = sys.executable
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder lock context menu: {key_path}")
@@ -240,10 +237,9 @@ class ContextMenuManager:
                     else:
                         cmd = f'cmd.exe /c "{self.exe_path}" --unlock "%1"'
                 else:
-                    # Script execution
-                    pythonw_path = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                    script_dir = os.path.dirname(self.exe_path)
-                    cmd = f'cmd.exe /c "{pythonw_path}" "{self.exe_path}" --unlock "%1"'
+                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    python_path = sys.executable
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder unlock context menu: {key_path}")

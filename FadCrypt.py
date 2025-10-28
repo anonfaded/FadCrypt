@@ -13,6 +13,15 @@ import os
 import platform
 import tempfile
 
+# CRITICAL: Set console encoding to UTF-8 FIRST to prevent Unicode errors
+try:
+    import codecs
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 def get_fadcrypt_logs_folder():
     """Get the unified FadCrypt logs folder for the current platform."""
     if platform.system() == 'Windows':
@@ -26,14 +35,6 @@ def get_fadcrypt_logs_folder():
         logs_dir = os.path.join(user_home, '.config', 'FadCrypt', 'logs')
         os.makedirs(logs_dir, exist_ok=True)
         return logs_dir
-    try:
-        # Set console encoding to UTF-8
-        import codecs
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except AttributeError:
-        # Python < 3.7 doesn't have reconfigure
-        pass
 
 # CRITICAL FIX: Ensure working directory is correct for PyInstaller DLL loading
 # This fixes CMD/PowerShell working directory mismatch when launched from .lnk shortcuts
@@ -508,8 +509,8 @@ if '--cleanup' in sys.argv:
                         subprocess.Popen(['explorer.exe'])
                         print("[CLEANUP] [OK] File Explorer restarted (context menu cache cleared)", flush=True)
                     except Exception as e:
-                        print(f"[CLEANUP] ⚠️  Could not restart File Explorer: {e}", flush=True)
-                        print("[CLEANUP] ℹ️  Context menu changes will take effect on next login", flush=True)
+                        print(f"[CLEANUP] WARNING: Could not restart File Explorer: {e}", flush=True)
+                        print("[CLEANUP] INFO: Context menu changes will take effect on next login", flush=True)
                 else:
                     print("[CLEANUP] [INFO] No context menu entries found to remove", flush=True)
             except Exception as e:
@@ -563,9 +564,9 @@ if '--cleanup' in sys.argv:
                 print("[CLEANUP] [INFO] No data directories found to remove", flush=True)
             
             # Note: File Explorer restart not needed for context menu changes to take effect
-            print("[CLEANUP] ℹ️  Context menu changes will take effect on next File Explorer restart", flush=True)
+            print("[CLEANUP] INFO: Context menu changes will take effect on next File Explorer restart", flush=True)
         
-        print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
+        print("[CLEANUP] OK: Cleanup completed successfully", flush=True)
         
         # Log completion
         try:

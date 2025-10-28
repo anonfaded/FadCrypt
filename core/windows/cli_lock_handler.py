@@ -31,15 +31,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_fadcrypt_config_folder():
+    """Get FadCrypt configuration folder path (matches main_window_windows.py)"""
+    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+    config_dir = os.path.join(appdata, 'FadCrypt', 'config')
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
+
+
 def get_password_manager():
     """Get the same PasswordManager used by the GUI"""
     from core.crypto_manager import CryptoManager
     from core.password_manager import PasswordManager
     
-    # Get FadCrypt folder (Windows specific)
-    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-    fadcrypt_folder = os.path.join(appdata, 'FadCrypt')
-    os.makedirs(fadcrypt_folder, exist_ok=True)
+    # Use same folder structure as GUI
+    fadcrypt_folder = get_fadcrypt_config_folder()
     
     # Use exact same initialization as GUI
     password_file = os.path.join(fadcrypt_folder, "encrypted_password.bin")
@@ -49,6 +55,160 @@ def get_password_manager():
     password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
     
     return password_manager
+
+
+def add_to_locked_items(file_path: str) -> bool:
+    """
+    Add file/folder to locked items list in apps_config.json.
+    This makes it appear in the Files & Folders tab.
+    
+    Args:
+        file_path: Absolute path to file or folder
+    
+    Returns:
+        True if added successfully, False otherwise
+    """
+    try:
+        import json
+        import time
+        
+        config_folder = get_fadcrypt_config_folder()
+        config_file = os.path.join(config_folder, 'apps_config.json')
+        
+        # Determine if it's a file or folder
+        if os.path.isfile(file_path):
+            item_type = "file"
+        elif os.path.isdir(file_path):
+            item_type = "folder"
+        else:
+            logger.error(f"Path does not exist or is not a file/folder: {file_path}")
+            return False
+        
+        # Load existing config
+        config = {"applications": [], "locked_files_and_folders": []}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading config: {e}")
+        
+        # Check if already in list
+        locked_items = config.get("locked_files_and_folders", [])
+        if any(item['path'] == file_path for item in locked_items):
+            logger.info(f"Item already in locked list: {file_path}")
+            return False
+        
+        # Create metadata for the item
+        item_metadata = {
+            "name": os.path.basename(file_path) or file_path,
+            "path": os.path.abspath(file_path),
+            "type": item_type,
+            "original_permissions": "default",
+            "filesystem": "ntfs",
+            "lock_method": "icacls",
+            "locked_at": int(time.time()),
+            "unlock_count": 0
+        }
+        
+        # Add to locked items
+        locked_items.append(item_metadata)
+        config["locked_files_and_folders"] = locked_items
+        
+        # Save config using safe write (handles protected files)
+        try:
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
+            
+            if success:
+                logger.info(f"Added to locked items: {os.path.basename(file_path)}")
+                return True
+            else:
+                logger.error(f"Failed to save config: {error}")
+                return False
+        except Exception as e:
+            logger.error(f"Error using safe write: {e}")
+            # Fallback to direct write
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=4)
+            logger.info(f"Added to locked items (direct write): {os.path.basename(file_path)}")
+            return True
+        
+    except Exception as e:
+        logger.error(f"Error adding to locked items: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
+
+
+def remove_from_locked_items(file_path: str) -> bool:
+    """
+    Remove file/folder from locked items list in apps_config.json.
+    This makes it disappear from the Files & Folders tab.
+    
+    Args:
+        file_path: Absolute path to file or folder
+    
+    Returns:
+        True if removed successfully, False otherwise
+    """
+    try:
+        import json
+        
+        config_folder = get_fadcrypt_config_folder()
+        config_file = os.path.join(config_folder, 'apps_config.json')
+        
+        # Load existing config
+        if not os.path.exists(config_file):
+            logger.warning("Config file does not exist")
+            return False
+        
+        try:
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            return False
+        
+        # Remove from locked items
+        locked_items = config.get("locked_files_and_folders", [])
+        original_count = len(locked_items)
+        
+        # Filter out the item with matching path
+        locked_items = [item for item in locked_items if item['path'] != file_path]
+        
+        if len(locked_items) == original_count:
+            logger.warning(f"Item not found in locked list: {file_path}")
+            return False
+        
+        config["locked_files_and_folders"] = locked_items
+        
+        # Save config using safe write (handles protected files)
+        try:
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
+            
+            if success:
+                logger.info(f"Removed from locked items: {os.path.basename(file_path)}")
+                return True
+            else:
+                logger.error(f"Failed to save config: {error}")
+                return False
+        except Exception as e:
+            logger.error(f"Error using safe write: {e}")
+            # Fallback to direct write
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=4)
+            logger.info(f"Removed from locked items (direct write): {os.path.basename(file_path)}")
+            return True
+        
+    except Exception as e:
+        logger.error(f"Error removing from locked items: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
 
 
 def show_password_dialog(operation: str) -> Optional[str]:
@@ -148,6 +308,14 @@ def lock_file_with_password(file_path: str) -> bool:
         
         if locker.lock_path(file_path):
             logger.info(f"File locked: {file_path}")
+            
+            # Add to locked items list so it appears in Files & Folders tab
+            logger.info("Adding to locked items list...")
+            if add_to_locked_items(file_path):
+                logger.info("Successfully added to locked items list")
+            else:
+                logger.warning("Could not add to locked items list (may already exist)")
+            
             return True
         else:
             logger.error(f"Failed to lock file: {file_path}")
@@ -199,6 +367,14 @@ def unlock_file_with_password(file_path: str) -> bool:
         
         if locker.unlock_path(file_path):
             logger.info(f"File unlocked: {file_path}")
+            
+            # Remove from locked items list so it disappears from Files & Folders tab
+            logger.info("Removing from locked items list...")
+            if remove_from_locked_items(file_path):
+                logger.info("Successfully removed from locked items list")
+            else:
+                logger.warning("Could not remove from locked items list (may not exist)")
+            
             return True
         else:
             logger.error(f"Failed to unlock file")

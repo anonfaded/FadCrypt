@@ -107,9 +107,6 @@ class FileLockManager(ABC):
         Returns:
             True if added successfully, False otherwise
         """
-        # CRITICAL: Reload from file first to ensure fresh state
-        self._load_locked_items()
-        
         if not os.path.exists(path):
             print(f"❌ Path does not exist: {path}")
             return False
