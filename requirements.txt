@@ -5,6 +5,7 @@ pystray
 watchdog
 pygame
 requests
+colorama  # For colored TUI output
 
 # PyQt6 dependencies (modern UI framework)
 PyQt6

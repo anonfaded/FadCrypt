@@ -819,8 +819,191 @@ def get_main_window_class(force_windows=False):
         return MainWindowBase
 
 
+def launch_tui():
+    """Launch the Text User Interface (TUI)"""
+    try:
+        # Initialize colorama for Windows
+        from colorama import init
+        init()
+        
+        # Get platform-specific paths
+        system = platform.system()
+        
+        if system == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        os.makedirs(config_folder, exist_ok=True)
+        
+        # Initialize password manager
+        from core.crypto_manager import CryptoManager
+        from core.password_manager import PasswordManager
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        
+        # Initialize CLI handler
+        if system == "Windows":
+            from core.cli.cli_handler_windows import CLIHandlerWindows
+            cli_handler = CLIHandlerWindows(config_folder)
+        else:
+            # Linux handler will be implemented later
+            from core.cli.colors import print_error
+            print_error("Linux CLI support coming soon. Use --gui to launch the GUI.")
+            return
+        
+        # Launch TUI
+        from core.cli.tui_manager import TUIManager
+        tui = TUIManager(password_manager, cli_handler)
+        tui.run()
+        
+    except KeyboardInterrupt:
+        print("\n\nExiting...")
+    except Exception as e:
+        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def handle_direct_cli_commands():
+    """Handle direct CLI commands like --lock, --unlock, --list-locked"""
+    from colorama import init
+    init()
+    
+    from core.cli.colors import print_success, print_error, print_info, print_colored, Colors, BoxChars
+    
+    # Get platform-specific paths
+    system = platform.system()
+    
+    if system == "Windows":
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+    else:
+        config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+    
+    os.makedirs(config_folder, exist_ok=True)
+    
+    # Initialize password manager
+    from core.crypto_manager import CryptoManager
+    from core.password_manager import PasswordManager
+    from core.cli.password_prompt import PasswordPrompt
+    
+    password_file = os.path.join(config_folder, "encrypted_password.bin")
+    recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+    
+    crypto_manager = CryptoManager()
+    password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+    password_prompt = PasswordPrompt(password_manager)
+    
+    # Initialize CLI handler
+    if system == "Windows":
+        from core.cli.cli_handler_windows import CLIHandlerWindows
+        cli_handler = CLIHandlerWindows(config_folder)
+    else:
+        print_error("Linux CLI support coming soon.")
+        return False
+    
+    # Ensure password exists
+    if not password_prompt.ensure_password_exists():
+        print_error("Cannot proceed without a master password.")
+        return False
+    
+    # Handle --lock
+    if '--lock' in sys.argv:
+        idx = sys.argv.index('--lock')
+        if idx + 1 < len(sys.argv):
+            paths = sys.argv[idx + 1:]
+            
+            # Verify password
+            if not password_prompt.verify_password():
+                return False
+            
+            print_info(f"Locking {len(paths)} item(s)...\n")
+            
+            success, failed = cli_handler.lock_multiple(paths)
+            
+            if success > 0:
+                print_success(f"Successfully locked {success} item(s)!")
+            if failed > 0:
+                print_error(f"Failed to lock {failed} item(s).")
+            
+            return True
+        else:
+            print_error("Usage: fadcrypt --lock <path1> [path2] ...")
+            return False
+    
+    # Handle --unlock
+    elif '--unlock' in sys.argv:
+        idx = sys.argv.index('--unlock')
+        if idx + 1 < len(sys.argv):
+            paths = sys.argv[idx + 1:]
+            
+            # Verify password
+            if not password_prompt.verify_password():
+                return False
+            
+            print_info(f"Unlocking {len(paths)} item(s)...\n")
+            
+            success, failed = cli_handler.unlock_multiple(paths)
+            
+            if success > 0:
+                print_success(f"Successfully unlocked {success} item(s)!")
+            if failed > 0:
+                print_error(f"Failed to unlock {failed} item(s).")
+            
+            return True
+        else:
+            print_error("Usage: fadcrypt --unlock <path1> [path2] ...")
+            return False
+    
+    # Handle --list-locked
+    elif '--list-locked' in sys.argv:
+        locked_items = cli_handler.list_locked_items()
+        
+        if not locked_items:
+            print_info("No locked items found.")
+        else:
+            print_colored(f"\n{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.TOP_RIGHT}", Colors.BORDER)
+            print_colored(f"{BoxChars.VERTICAL}{'Locked Items':^61}{BoxChars.VERTICAL}", Colors.TITLE)
+            print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
+            
+            print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
+            print_colored(f"{BoxChars.S_VERTICAL}{'Type':<8}{'Name':<50}{BoxChars.S_VERTICAL}", Colors.TITLE)
+            print_colored(f"{BoxChars.S_T_RIGHT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_T_LEFT}", Colors.BORDER)
+            
+            for item in locked_items:
+                icon = '📁' if item['type'] == 'folder' else '📄'
+                name = item['name']
+                if len(name) > 48:
+                    name = name[:45] + '...'
+                
+                item_type = item['type'].capitalize()
+                line = f"{BoxChars.S_VERTICAL} {icon} {item_type:<6}{name:<48}{BoxChars.S_VERTICAL}"
+                print_colored(line, Colors.TEXT)
+            
+            print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
+            print_colored(f"\nTotal: {len(locked_items)} item(s)\n", Colors.INFO)
+        
+        return True
+    
+    return False
+
+
 def main():
-    """Main entry point for FadCrypt PyQt6 application."""
+    """Main entry point for FadCrypt - TUI or GUI."""
+    
+    # Handle --help first (before any other processing)
+    if '--help' in sys.argv or '-h' in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.help_display import show_help
+        show_help()
+        return
     
     # Check for --windows flag BEFORE any imports
     mock_windows = '--windows' in sys.argv
@@ -832,6 +1015,23 @@ def main():
     # Detect platform
     system = platform.system()
     
+    # Handle direct CLI commands first
+    if '--lock' in sys.argv or '--unlock' in sys.argv or '--list-locked' in sys.argv:
+        handle_direct_cli_commands()
+        return
+    
+    # Check if CLI/TUI mode is requested
+    cli_mode = '--cli' in sys.argv or (len(sys.argv) == 1)
+    
+    # Check if GUI mode is requested
+    gui_mode = '--gui' in sys.argv or '--auto-monitor' in sys.argv
+    
+    # If CLI mode or no arguments, launch TUI
+    if cli_mode and not gui_mode:
+        launch_tui()
+        return
+    
+    # Otherwise, launch GUI
     # Step 1: Single Instance Check - Prevent multiple instances
     from core.single_instance_manager import check_single_instance
     single_instance = check_single_instance(exit_if_running=True)
