@@ -224,28 +224,28 @@ if '--unregister-context' in sys.argv:
                 f.write(f"[REGISTER-CONTEXT] Traceback: {traceback.format_exc()}\n")
         except:
             pass
-    sys.exit(0)# Handle --lock and --unlock from context menu
-if '--lock' in sys.argv or '--unlock' in sys.argv:
-    print(f"[CLI] Processing CLI arguments: {sys.argv}", flush=True)
+    sys.exit(0)# Handle --context-lock and --context-unlock from context menu
+if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
+    print(f"[CONTEXT MENU] Processing context menu arguments: {sys.argv}", flush=True)
     try:
-        if '--lock' in sys.argv:
-            idx = sys.argv.index('--lock')
+        if '--context-lock' in sys.argv:
+            idx = sys.argv.index('--context-lock')
             if idx + 1 < len(sys.argv):
                 path = sys.argv[idx + 1]
-                print(f"[CLI] Locking file: {path}", flush=True)
+                print(f"[CONTEXT MENU] Locking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import lock_file_with_password
                 success = lock_file_with_password(path)
-                print(f"[CLI] Lock result: {success}", flush=True)
+                print(f"[CONTEXT MENU] Lock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
         
-        elif '--unlock' in sys.argv:
-            idx = sys.argv.index('--unlock')
+        elif '--context-unlock' in sys.argv:
+            idx = sys.argv.index('--context-unlock')
             if idx + 1 < len(sys.argv):
                 path = sys.argv[idx + 1]
-                print(f"[CLI] Unlocking file: {path}", flush=True)
+                print(f"[CONTEXT MENU] Unlocking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import unlock_file_with_password
                 success = unlock_file_with_password(path)
-                print(f"[CLI] Unlock result: {success}", flush=True)
+                print(f"[CONTEXT MENU] Unlock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
     except Exception as e:
         print(f"[CLI] Error: {e}", flush=True)

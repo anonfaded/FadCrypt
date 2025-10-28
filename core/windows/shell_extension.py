@@ -146,13 +146,13 @@ class ContextMenuManager:
                 if self.is_packaged:
                     # Packaged app - direct cmd.exe execution
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        cmd = 'cmd.exe /c fadcrypt --lock "%1"'
+                        cmd = 'cmd.exe /c fadcrypt --context-lock "%1"'
                     else:
-                        cmd = f'cmd.exe /c "{self.exe_path}" --lock "%1"'
+                        cmd = f'cmd.exe /c "{self.exe_path}" --context-lock "%1"'
                 else:
                     # Script execution - use python.exe (not pythonw.exe) so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --lock "%1"'
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file lock context menu: {key_path}")
@@ -175,13 +175,13 @@ class ContextMenuManager:
                 if self.is_packaged:
                     # Packaged app - direct cmd.exe execution
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        cmd = 'cmd.exe /c fadcrypt --unlock "%1"'
+                        cmd = 'cmd.exe /c fadcrypt --context-unlock "%1"'
                     else:
-                        cmd = f'cmd.exe /c "{self.exe_path}" --unlock "%1"'
+                        cmd = f'cmd.exe /c "{self.exe_path}" --context-unlock "%1"'
                 else:
                     # Script execution - use python.exe (not pythonw.exe) so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --unlock "%1"'
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file unlock context menu: {key_path}")
@@ -204,13 +204,13 @@ class ContextMenuManager:
                 if self.is_packaged:
                     # Packaged app - direct cmd.exe execution
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        cmd = 'cmd.exe /c fadcrypt --lock "%1"'
+                        cmd = 'cmd.exe /c fadcrypt --context-lock "%1"'
                     else:
-                        cmd = f'cmd.exe /c "{self.exe_path}" --lock "%1"'
+                        cmd = f'cmd.exe /c "{self.exe_path}" --context-lock "%1"'
                 else:
                     # Script execution - use python.exe (not pythonw.exe) so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --lock "%1"'
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder lock context menu: {key_path}")
@@ -233,13 +233,13 @@ class ContextMenuManager:
                 if self.is_packaged:
                     # Packaged app - direct cmd.exe execution
                     if hasattr(self, 'use_command_name') and self.use_command_name:
-                        cmd = 'cmd.exe /c fadcrypt --unlock "%1"'
+                        cmd = 'cmd.exe /c fadcrypt --context-unlock "%1"'
                     else:
-                        cmd = f'cmd.exe /c "{self.exe_path}" --unlock "%1"'
+                        cmd = f'cmd.exe /c "{self.exe_path}" --context-unlock "%1"'
                 else:
                     # Script execution - use python.exe (not pythonw.exe) so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --unlock "%1"'
+                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder unlock context menu: {key_path}")

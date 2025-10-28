@@ -1,7 +1,7 @@
 """
-CLI Lock Handler - Password-Protected File Locking via Context Menu
+Context Menu Lock Handler - Password-Protected File Locking via Context Menu
 
-Handles --lock and --unlock from context menu with password verification.
+Handles --context-lock and --context-unlock from Windows context menu with password verification.
 Uses PyQt6 password dialog for user authentication.
 Uses existing PasswordManager and CryptoManager for consistency with GUI.
 """
