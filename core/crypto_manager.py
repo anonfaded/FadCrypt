@@ -151,7 +151,9 @@ class CryptoManager:
             return None
         except Exception as e:
             if not suppress_errors:
-                print(f"[CryptoManager] Error decrypting data: {e}")
+                # Debug log (commented out for cleaner CLI)
+                # print(f"[CryptoManager] Error decrypting data: {e}")
+                pass
             return None
     
     def encrypt_password_hash(
@@ -245,5 +247,6 @@ class CryptoManager:
             print(f"[CryptoManager] Password file not found: {file_path}")
             return None
         except Exception as e:
-            print(f"[CryptoManager] Error decrypting password hash: {e}")
+            # Debug log (commented out for cleaner CLI)
+            # print(f"[CryptoManager] Error decrypting password hash: {e}")
             return None

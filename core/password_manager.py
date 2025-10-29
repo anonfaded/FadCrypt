@@ -104,7 +104,8 @@ class PasswordManager:
             
             password_bytes = password.encode('utf-8')
             
-            print(f"[PasswordManager] Verifying password from: {self.password_file}")
+            # Debug log (commented out for cleaner CLI)
+            # print(f"[PasswordManager] Verifying password from: {self.password_file}")
             
             # Try to decrypt the password hash
             decrypted_hash = self.crypto.decrypt_password_hash(
@@ -113,7 +114,8 @@ class PasswordManager:
             )
             
             if decrypted_hash is None:
-                print("[PasswordManager] [ERROR] Decryption returned None")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [ERROR] Decryption returned None")
                 return False
             
             # Compare with original password

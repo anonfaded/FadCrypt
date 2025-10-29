@@ -230,7 +230,11 @@ class TUIManager:
                 self.password_prompt.change_password()
                 input("\nPress Enter to continue...")
             elif choice == '2':
-                self.password_prompt.generate_recovery_codes()
+                # Verify password before generating recovery codes
+                if self.password_prompt.verify_password():
+                    self.password_prompt.generate_recovery_codes()
+                else:
+                    input("\nPress Enter to continue...")
             elif choice == '3':
                 self.show_about()
             elif choice == '4':
@@ -241,12 +245,14 @@ class TUIManager:
     
     def show_about(self):
         """Show about information"""
+        from FadCrypt import __version__
+        
         self.show_header()
         print(f"{Colors.TITLE}About FadCrypt{Colors.RESET}\n")
         
         print(f"{Colors.BORDER}╭─ {Colors.TITLE}INFORMATION{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}FadCrypt v2.0{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Cross-platform File & Folder Protection{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}FadCrypt v{__version__}{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Cross-platform File, Folder & Application Protection{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Platform:{Colors.RESET} {platform.system()}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Python:{Colors.RESET} {sys.version.split()[0]}")
@@ -259,23 +265,11 @@ class TUIManager:
     def launch_gui(self):
         """Launch the GUI application"""
         self.show_header()
-        print_colored("Launching GUI application...\n", Colors.INFO)
+        print_colored("Launch GUI Application\n", Colors.TITLE)
         
-        try:
-            # Import and launch GUI
-            from PyQt6.QtWidgets import QApplication
-            
-            # Check if QApplication already exists
-            app = QApplication.instance()
-            if app is None:
-                print_info("Starting GUI...")
-                # This will be handled by the main entry point
-                print_warning("Please use 'fadcrypt --gui' to launch the GUI.")
-            else:
-                print_warning("GUI is already running.")
-        except ImportError:
-            print_error("PyQt6 is not installed. Cannot launch GUI.")
-        except Exception as e:
-            print_error(f"Error launching GUI: {e}")
+        print_info("To launch the GUI, open a new terminal and run:")
+        print_colored("  fadcrypt --gui\n", Colors.HIGHLIGHT)
+        
+        print_warning("Note: The GUI cannot be launched from within this CLI interface.")
         
         input("\nPress Enter to continue...")

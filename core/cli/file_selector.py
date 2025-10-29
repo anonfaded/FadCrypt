@@ -8,7 +8,7 @@ import os
 import sys
 from typing import List, Dict, Optional
 
-from .colors import Colors, BoxChars, print_colored, print_error
+from .colors import Colors, print_error
 
 
 class FileSelector:
@@ -68,18 +68,15 @@ class FileSelector:
         os.system('cls' if os.name == 'nt' else 'clear')
         
         # Header
-        print_colored(f"{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-        print_colored(f"{BoxChars.VERTICAL}{'Select Files/Folders to Lock':^61}{BoxChars.VERTICAL}", Colors.TITLE)
-        print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.BOTTOM_RIGHT}", Colors.BORDER)
-        
-        # Current directory
-        print_colored(f"\nCurrent directory: {Colors.HIGHLIGHT}{self.current_dir}{Colors.RESET}\n", Colors.INFO)
+        print(f"{Colors.BORDER}╭─ {Colors.TITLE}Select Files/Folders to Lock{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current directory: {Colors.HIGHLIGHT}{self.current_dir}{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
         
         # Items box
-        print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
+        print(f"{Colors.BORDER}╭─ {Colors.TITLE}ITEMS{Colors.RESET}")
         
         if not self.items:
-            print_colored(f"{BoxChars.S_VERTICAL}{'No items found':^61}{BoxChars.S_VERTICAL}", Colors.DIM)
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}No items found{Colors.RESET}")
         else:
             # Display items (max 15 visible)
             start_idx = max(0, self.cursor_pos - 7)
@@ -100,18 +97,14 @@ class FileSelector:
                     name = name[:42] + '...'
                 
                 # Highlight cursor position
-                if is_cursor:
-                    line = f"{BoxChars.S_VERTICAL} {checkbox} {icon} {name:<45} {BoxChars.S_VERTICAL}"
-                    print_colored(line, Colors.SELECTED)
-                else:
-                    line = f"{BoxChars.S_VERTICAL} {checkbox} {icon} {name:<45} {BoxChars.S_VERTICAL}"
-                    print_colored(line, Colors.UNSELECTED)
+                cursor_indicator = f"{Colors.SUCCESS}❯{Colors.RESET}" if is_cursor else " "
+                print(f"{Colors.BORDER}│{Colors.RESET}{cursor_indicator} {checkbox} {icon} {Colors.TEXT}{name}{Colors.RESET}")
         
-        print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
         
         # Help text
-        print_colored(f"\n{Colors.DIM}[↑↓] Navigate  [Space] Select  [Enter] Confirm  [B] Back  [Q] Quit{Colors.RESET}", Colors.INFO)
-        print_colored(f"{Colors.DIM}Selected: {len(self.selected_items)} items{Colors.RESET}\n", Colors.INFO)
+        print(f"\n{Colors.INFO}Commands: {Colors.DIM}[u/d] Navigate  [s] Select  [e] Confirm  [b] Back  [q] Quit{Colors.RESET}")
+        print(f"{Colors.INFO}Selected: {Colors.HIGHLIGHT}{len(self.selected_items)} items{Colors.RESET}\n")
     
     def select_files(self) -> List[str]:
         """
@@ -130,7 +123,8 @@ class FileSelector:
         while True:
             self.display_selector()
             
-            print_colored("Enter command: ", Colors.PRIMARY, end='')
+            print(f"{Colors.PRIMARY}Enter command:")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             try:
                 cmd = input().strip().lower()
             except KeyboardInterrupt:
@@ -205,12 +199,11 @@ class FileSelector:
             os.system('cls' if os.name == 'nt' else 'clear')
             
             # Header
-            print_colored(f"{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-            print_colored(f"{BoxChars.VERTICAL}{title:^61}{BoxChars.VERTICAL}", Colors.TITLE)
-            print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
+            print(f"{Colors.BORDER}╭─ {Colors.TITLE}{title}{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
             
             # Items
-            print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
+            print(f"{Colors.BORDER}╭─ {Colors.TITLE}ITEMS{Colors.RESET}")
             
             for i, item in enumerate(self.items):
                 is_selected = item['path'] in self.selected_items
@@ -222,20 +215,17 @@ class FileSelector:
                 if len(name) > 45:
                     name = name[:42] + '...'
                 
-                if is_cursor:
-                    line = f"{BoxChars.S_VERTICAL} {checkbox} {icon} {name:<45} {BoxChars.S_VERTICAL}"
-                    print_colored(line, Colors.SELECTED)
-                else:
-                    line = f"{BoxChars.S_VERTICAL} {checkbox} {icon} {name:<45} {BoxChars.S_VERTICAL}"
-                    print_colored(line, Colors.UNSELECTED)
+                cursor_indicator = f"{Colors.SUCCESS}❯{Colors.RESET}" if is_cursor else " "
+                print(f"{Colors.BORDER}│{Colors.RESET}{cursor_indicator} {checkbox} {icon} {Colors.TEXT}{name}{Colors.RESET}")
             
-            print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
             
             # Help
-            print_colored(f"\n{Colors.DIM}[↑↓] Navigate  [Space] Select  [Enter] Confirm  [Q] Quit{Colors.RESET}", Colors.INFO)
-            print_colored(f"{Colors.DIM}Selected: {len(self.selected_items)} items{Colors.RESET}\n", Colors.INFO)
+            print(f"\n{Colors.INFO}Commands: {Colors.DIM}[u/d] Navigate  [s] Select  [e] Confirm  [q] Quit{Colors.RESET}")
+            print(f"{Colors.INFO}Selected: {Colors.HIGHLIGHT}{len(self.selected_items)} items{Colors.RESET}\n")
             
-            print_colored("Enter command: ", Colors.PRIMARY, end='')
+            print(f"{Colors.PRIMARY}Enter command:")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             try:
                 cmd = input().strip().lower()
             except KeyboardInterrupt:
