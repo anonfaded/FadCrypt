@@ -871,7 +871,7 @@ def launch_tui():
 
 
 def handle_direct_cli_commands():
-    """Handle direct CLI commands like --lock, --unlock, --list-locked"""
+    """Handle direct CLI commands like --lock, --unlock, --list"""
     from colorama import init
     init()
     
@@ -913,15 +913,19 @@ def handle_direct_cli_commands():
         print_error("Cannot proceed without a master password.")
         return False
     
+    # Verify password for all operations
+    if not password_prompt.verify_password():
+        print_error("Authentication failed.")
+        return False
+    
+    # Clear screen after successful authentication
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
     # Handle --lock
     if '--lock' in sys.argv:
         idx = sys.argv.index('--lock')
         if idx + 1 < len(sys.argv):
             paths = sys.argv[idx + 1:]
-            
-            # Verify password
-            if not password_prompt.verify_password():
-                return False
             
             print_info(f"Locking {len(paths)} item(s)...\n")
             
@@ -943,10 +947,6 @@ def handle_direct_cli_commands():
         if idx + 1 < len(sys.argv):
             paths = sys.argv[idx + 1:]
             
-            # Verify password
-            if not password_prompt.verify_password():
-                return False
-            
             print_info(f"Unlocking {len(paths)} item(s)...\n")
             
             success, failed = cli_handler.unlock_multiple(paths)
@@ -961,8 +961,8 @@ def handle_direct_cli_commands():
             print_error("Usage: fadcrypt --unlock <path1> [path2] ...")
             return False
     
-    # Handle --list-locked
-    elif '--list-locked' in sys.argv:
+    # Handle --list (or --list-locked for backwards compatibility)
+    elif '--list' in sys.argv or '--list-locked' in sys.argv:
         locked_items = cli_handler.list_locked_items()
         
         if not locked_items:
@@ -1005,6 +1005,27 @@ def main():
         show_help()
         return
     
+    # Handle --version
+    if '--version' in sys.argv or '-v' in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import Colors
+        
+        python_version = sys.version.split()[0]
+        system = platform.system()
+        
+        RED = Colors.BORDER
+        BRIGHT_RED = Colors.TITLE
+        RESET = Colors.RESET
+        
+        print(f"\n{RED}╭─ 🔒 FadCrypt Version{RESET}")
+        print(f"{RED}│{RESET} Version: {BRIGHT_RED}v{__version__}{RESET}")
+        print(f"{RED}│{RESET} Version Code: {__version_code__}")
+        print(f"{RED}│{RESET} Platform: {system}")
+        print(f"{RED}│{RESET} Python: {python_version}")
+        print(f"{RED}╰───────────────────{RESET}\n")
+        return
+    
     # Check for --windows flag BEFORE any imports
     mock_windows = '--windows' in sys.argv
     if mock_windows:
@@ -1016,7 +1037,7 @@ def main():
     system = platform.system()
     
     # Handle direct CLI commands first
-    if '--lock' in sys.argv or '--unlock' in sys.argv or '--list-locked' in sys.argv:
+    if '--lock' in sys.argv or '--unlock' in sys.argv or '--list' in sys.argv or '--list-locked' in sys.argv:
         handle_direct_cli_commands()
         return
     

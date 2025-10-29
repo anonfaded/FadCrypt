@@ -1,178 +1,133 @@
 """
 Help Display for FadCrypt CLI
 
-Beautiful, categorized help system with colorama.
+Beautiful, categorized, platform-aware help system with modern rounded design.
 """
 
-from .colors import Colors, BoxChars, print_colored
+import sys
+import platform
+from .colors import Colors
 
 
 def show_help():
-    """Display comprehensive help information"""
+    """Display comprehensive help information with modern rounded design"""
+    from FadCrypt import __version__
+    
+    system = platform.system()
+    
+    # Color codes
+    RED = Colors.BORDER
+    BRIGHT_RED = Colors.TITLE
+    DIM = Colors.DIM
+    CYAN = Colors.INFO
+    YELLOW = Colors.WARNING
+    RESET = Colors.RESET
     
     # Header
-    print_colored(f"\n{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 75}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.VERTICAL}{Colors.ICON_LOCK} FadCrypt v2.0 - File & Folder Protection Suite{' ' * 26}{BoxChars.VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 75}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("Cross-platform application for locking and protecting files/folders with", Colors.TEXT)
-    print_colored("password-based encryption and real-time monitoring.\n", Colors.TEXT)
+    print(f"\n{RED}╭─ 🏴 FadCrypt v{__version__}{RESET}")
+    print(f"{RED}│{RESET} {BRIGHT_RED}Open-Source File, Folder & Application Protection Suite{RESET}")
+    print(f"{RED}├──────────────────────────────────────────────────────────────────────{RESET}")
+    print(f"{RED}│{RESET} Cross-platform tool for locking files, folders, and applications")
+    print(f"{RED}│{RESET} with password-based encryption and real-time monitoring.")
+    print(f"{RED}├──────────────────────────────────────────────────────────────────────{RESET}")
+    print(f"{RED}│{RESET} {CYAN}Discord:{RESET} https://discord.gg/kvAZvdkuuN")
+    print(f"{RED}│{RESET} {CYAN}GitHub:{RESET} https://github.com/anonfaded/FadCrypt")
+    print(f"{RED}│{RESET} {CYAN}Support & Buy Me a Ko-fi:{RESET} https://ko-fi.com/fadedx")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Usage
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} USAGE{' ' * 69}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  fadcrypt [OPTIONS] [ARGUMENTS]", Colors.HIGHLIGHT)
-    print_colored("  fadcrypt                    # Launch interactive TUI menu", Colors.DIM)
-    print_colored("  fadcrypt --gui              # Launch graphical interface", Colors.DIM)
-    print_colored("  fadcrypt --lock <path>      # Lock file/folder directly\n", Colors.DIM)
+    print(f"{RED}╭─ 📖 {BRIGHT_RED}USAGE{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}fadcrypt{RESET} [OPTIONS] [ARGUMENTS]")
+    print(f"{RED}│{RESET}")
+    print(f"{RED}│{RESET}   {CYAN}OPTIONS:{RESET}   Flags that control FadCrypt's behavior")
+    print(f"{RED}│{RESET}   {CYAN}ARGUMENTS:{RESET} Paths to files or folders you want to lock/unlock")
+    print(f"{RED}│{RESET}")
+    print(f"{RED}│{RESET}   {CYAN}Examples:{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt                      {DIM}# Interactive menu{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt --gui                {DIM}# Launch GUI{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt --lock file.pdf      {DIM}# Lock a file{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt --unlock folder/     {DIM}# Unlock a folder{RESET}")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Main Commands
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} MAIN COMMANDS{' ' * 62}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  (no arguments)", Colors.PRIMARY)
-    print_colored("      Launch interactive TUI menu with file selector and options", Colors.TEXT)
-    print_colored("      Best for: Interactive file management\n", Colors.DIM)
-    
-    print_colored("  --cli", Colors.PRIMARY)
-    print_colored("      Explicitly launch CLI/TUI mode (same as no arguments)", Colors.TEXT)
-    print_colored("      Best for: Development and testing\n", Colors.DIM)
-    
-    print_colored("  --gui", Colors.PRIMARY)
-    print_colored("      Launch PyQt6 graphical user interface", Colors.TEXT)
-    print_colored("      Best for: Desktop users who prefer GUI\n", Colors.DIM)
-    
-    print_colored("  --help, -h", Colors.PRIMARY)
-    print_colored("      Display this help message and exit\n", Colors.TEXT)
+    print(f"{RED}╭─ 🎯 {BRIGHT_RED}MAIN COMMANDS{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}(no options){RESET}     : Launch interactive menu with file selector")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--cli{RESET}            : Same as no options - interactive menu")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--gui{RESET}            : Launch graphical interface (PyQt6)")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--help, -h{RESET}       : Show this help message")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--version, -v{RESET}    : Show version information")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # File Operations
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} FILE OPERATIONS{' ' * 60}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
+    print(f"{RED}╭─ 📁 {BRIGHT_RED}FILE OPERATIONS{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--lock <path>{RESET}    : Lock files or folders")
+    print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --lock document.pdf photos/{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--unlock <path>{RESET}  : Unlock files or folders")
+    print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --unlock document.pdf{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--list{RESET}           : Show all currently locked items")
+    print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --list{RESET}")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    print_colored("  --lock <path> [path2] [...]", Colors.PRIMARY)
-    print_colored("      Lock one or more files/folders with password protection", Colors.TEXT)
-    print_colored("      Example: fadcrypt --lock document.pdf folder/", Colors.DIM)
-    print_colored("      Note: Requires password verification\n", Colors.DIM)
-    
-    print_colored("  --unlock <path> [path2] [...]", Colors.PRIMARY)
-    print_colored("      Unlock one or more previously locked files/folders", Colors.TEXT)
-    print_colored("      Example: fadcrypt --unlock document.pdf folder/", Colors.DIM)
-    print_colored("      Note: Requires password verification\n", Colors.DIM)
-    
-    print_colored("  --list-locked", Colors.PRIMARY)
-    print_colored("      Display a formatted list of all currently locked items", Colors.TEXT)
-    print_colored("      Shows: Type, name, and path of each locked item\n", Colors.DIM)
-    
-    # Context Menu (Internal)
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} CONTEXT MENU (Internal Use){' ' * 50}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  --context-lock <path>", Colors.PRIMARY)
-    print_colored("      Lock file via Windows context menu (right-click)", Colors.TEXT)
-    print_colored("      Note: Called automatically by shell extension\n", Colors.DIM)
-    
-    print_colored("  --context-unlock <path>", Colors.PRIMARY)
-    print_colored("      Unlock file via Windows context menu (right-click)", Colors.TEXT)
-    print_colored("      Note: Called automatically by shell extension\n", Colors.DIM)
+    # Windows-specific context menu section
+    if system == "Windows":
+        print(f"{RED}╭─ 🖱️  {BRIGHT_RED}CONTEXT MENU (Windows){RESET}")
+        print(f"{RED}│{RESET} Right-click on any file or folder in File Explorer to see:")
+        print(f"{RED}│{RESET}   • Lock with FadCrypt")
+        print(f"{RED}│{RESET}   • Unlock with FadCrypt")
+        print(f"{RED}│{RESET}")
+        print(f"{RED}│{RESET} These options use the following flags internally:")
+        print(f"{RED}│{RESET}   --context-lock <path>    {DIM}(called by context menu){RESET}")
+        print(f"{RED}│{RESET}   --context-unlock <path>  {DIM}(called by context menu){RESET}")
+        print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Installation & Setup
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} INSTALLATION & SETUP (Advanced){' ' * 46}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
+    print(f"{RED}╭─ ⚙️  {BRIGHT_RED}INSTALLATION & SETUP (Advanced){RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--register-context{RESET}   : Add FadCrypt to Windows right-click menu")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--unregister-context{RESET} : Remove from Windows right-click menu")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--install-service{RESET}    : Install FadCrypt elevated service")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--uninstall-service{RESET}  : Uninstall FadCrypt elevated service")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    print_colored("  --register-context", Colors.PRIMARY)
-    print_colored("      Register FadCrypt in Windows context menu (right-click menu)", Colors.TEXT)
-    print_colored("      Purpose: Adds 'Lock/Unlock with FadCrypt' to file explorer", Colors.DIM)
-    print_colored("      Note: Called automatically by installer\n", Colors.DIM)
+    # Maintenance
+    print(f"{RED}╭─ 🔧 {BRIGHT_RED}MAINTENANCE{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--cleanup{RESET}        : Clean up temporary files and orphaned locks")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    print_colored("  --unregister-context", Colors.PRIMARY)
-    print_colored("      Remove FadCrypt from Windows context menu", Colors.TEXT)
-    print_colored("      Purpose: Clean up registry entries during uninstallation", Colors.DIM)
-    print_colored("      Note: Called automatically by uninstaller\n", Colors.DIM)
+    # Tips & Best Practices
+    print(f"{RED}╭─ 💡 {BRIGHT_RED}TIPS & BEST PRACTICES{RESET}")
+    print(f"{RED}│{RESET} • Always remember your master password - it cannot be recovered!")
+    print(f"{RED}│{RESET} • Keep your recovery codes in a safe place")
+    print(f"{RED}│{RESET} • Use --list to see what's currently locked")
+    print(f"{RED}│{RESET} • Locked files are encrypted and hidden from normal view")
+    print(f"{RED}│{RESET} • The GUI {DIM}(--gui){RESET} provides a visual way to manage locks")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    print_colored("  --install-service", Colors.PRIMARY)
-    print_colored("      Install FadCrypt elevated service (Windows only)", Colors.TEXT)
-    print_colored("      Purpose: Enables persistent admin rights for file operations", Colors.DIM)
-    print_colored("      Note: Requires administrator privileges\n", Colors.DIM)
+    # ASCII Art Footer
+    print(f"{RED}  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒{RESET}")
+    print(f"{RED}  ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒{RESET}")
+    print(f"{RED}  ▓    ▓▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒{RESET}")
+    print(f"{RED}  ▓ ▓▓ ▓▓▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒{RESET}\n")
     
-    print_colored("  --uninstall-service", Colors.PRIMARY)
-    print_colored("      Uninstall FadCrypt elevated service (Windows only)", Colors.TEXT)
-    print_colored("      Purpose: Remove service during uninstallation", Colors.DIM)
-    print_colored("      Note: Requires administrator privileges\n", Colors.DIM)
+    print(f"{YELLOW}Found an issue or have a feature request?{RESET}")
+    print(f"{YELLOW}Please open an issue on GitHub:{RESET}")
+    print(f"{CYAN}https://github.com/anonfaded/FadCrypt/issues{RESET}\n")
+
+
+def show_version():
+    """Display version information with modern rounded design"""
+    from FadCrypt import __version__, __version_code__
+    from .colors import Colors
     
-    print_colored("  --run-service", Colors.PRIMARY)
-    print_colored("      Run as Windows service (internal use only)", Colors.TEXT)
-    print_colored("      Purpose: Service control manager entry point\n", Colors.DIM)
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    system = platform.system()
     
-    # Maintenance & Cleanup
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} MAINTENANCE & CLEANUP (Advanced){' ' * 47}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
+    RED = Colors.BORDER
+    BRIGHT_RED = Colors.TITLE
+    RESET = Colors.RESET
     
-    print_colored("  --cleanup", Colors.PRIMARY)
-    print_colored("      Perform complete system cleanup and restore", Colors.TEXT)
-    print_colored("      Actions:", Colors.DIM)
-    print_colored("        • Restore disabled system tools (Task Manager, Registry, etc.)", Colors.DIM)
-    print_colored("        • Remove FadCrypt from PATH environment variable", Colors.DIM)
-    print_colored("        • Unregister context menu entries", Colors.DIM)
-    print_colored("        • Remove configuration and data directories", Colors.DIM)
-    print_colored("        • Restart File Explorer to apply changes", Colors.DIM)
-    print_colored("      Note: Called automatically by uninstaller\n", Colors.DIM)
-    
-    print_colored("  --auto-monitor", Colors.PRIMARY)
-    print_colored("      Start monitoring automatically on system boot (silent mode)", Colors.TEXT)
-    print_colored("      Purpose: Auto-start functionality for system startup", Colors.DIM)
-    print_colored("      Note: Used by autostart configuration\n", Colors.DIM)
-    
-    # Development & Testing
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} DEVELOPMENT & TESTING{' ' * 53}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  --windows", Colors.PRIMARY)
-    print_colored("      Mock Windows environment on Linux (for testing)", Colors.TEXT)
-    print_colored("      Purpose: Cross-platform development and testing\n", Colors.DIM)
-    
-    # Examples
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} EXAMPLES{' ' * 67}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  # Interactive mode with menu", Colors.SUCCESS)
-    print_colored("  fadcrypt\n", Colors.TEXT)
-    
-    print_colored("  # Lock a single file", Colors.SUCCESS)
-    print_colored("  fadcrypt --lock document.pdf\n", Colors.TEXT)
-    
-    print_colored("  # Lock multiple items", Colors.SUCCESS)
-    print_colored("  fadcrypt --lock file1.txt file2.pdf folder/\n", Colors.TEXT)
-    
-    print_colored("  # Unlock files", Colors.SUCCESS)
-    print_colored("  fadcrypt --unlock document.pdf folder/\n", Colors.TEXT)
-    
-    print_colored("  # List all locked items", Colors.SUCCESS)
-    print_colored("  fadcrypt --list-locked\n", Colors.TEXT)
-    
-    print_colored("  # Launch GUI", Colors.SUCCESS)
-    print_colored("  fadcrypt --gui\n", Colors.TEXT)
-    
-    # Footer
-    print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.S_VERTICAL} NOTES{' ' * 69}{BoxChars.S_VERTICAL}", Colors.TITLE)
-    print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 75}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
-    
-    print_colored("  • All file operations require password verification", Colors.INFO)
-    print_colored("  • Locked files are protected until monitoring is stopped", Colors.INFO)
-    print_colored("  • Context menu integration requires Windows", Colors.INFO)
-    print_colored("  • Service features are Windows-specific", Colors.INFO)
-    print_colored("  • Configuration stored in %APPDATA%\\FadCrypt\\config\\ (Windows)", Colors.INFO)
-    print_colored("  • Configuration stored in ~/.config/FadCrypt/ (Linux)\n", Colors.INFO)
-    
-    print_colored(f"{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 75}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-    print_colored(f"{BoxChars.VERTICAL} © 2024-2025 FadSec Lab • Open Source • Cross-Platform{' ' * 22}{BoxChars.VERTICAL}", Colors.DIM)
-    print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 75}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
+    print(f"\n{RED}╭─ 🔒 FadCrypt Version{RESET}")
+    print(f"{RED}│{RESET} Version: {BRIGHT_RED}v{__version__}{RESET}")
+    print(f"{RED}│{RESET} Version Code: {__version_code__}")
+    print(f"{RED}│{RESET} Platform: {system}")
+    print(f"{RED}│{RESET} Python: {python_version}")
+    print(f"{RED}╰───────────────────{RESET}\n")

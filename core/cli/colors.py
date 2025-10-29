@@ -75,6 +75,16 @@ class BoxChars:
     S_T_UP = '┴'
     S_T_RIGHT = '├'
     S_T_LEFT = '┤'
+    
+    # Rounded box (modern style)
+    R_TOP_LEFT = '╭'
+    R_TOP_RIGHT = '╮'
+    R_BOTTOM_LEFT = '╰'
+    R_BOTTOM_RIGHT = '╯'
+    R_HORIZONTAL = '─'
+    R_VERTICAL = '│'
+    R_T_RIGHT = '├'
+    R_T_LEFT = '┤'
 
 
 def print_colored(text: str, color: str = Colors.TEXT, end: str = '\n'):
