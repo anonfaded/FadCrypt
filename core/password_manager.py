@@ -123,9 +123,12 @@ class PasswordManager:
             
             if is_valid:
                 self.cached_password = password_bytes
-                print("[PasswordManager] [OK] Password verified successfully")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [OK] Password verified successfully")
             else:
-                print("[PasswordManager] [ERROR] Password verification failed (mismatch)")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [ERROR] Password verification failed (mismatch)")
+                pass
             
             return is_valid
             

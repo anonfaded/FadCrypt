@@ -36,7 +36,7 @@ class Colors:
     
     # Checkboxes
     CHECKBOX_CHECKED = Fore.GREEN + '✓'
-    CHECKBOX_UNCHECKED = Fore.RED + ' '
+    CHECKBOX_UNCHECKED = Fore.LIGHTBLACK_EX + '□'  # Empty square box
     
     # Icons
     ICON_LOCK = '🔒'

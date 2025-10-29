@@ -183,12 +183,42 @@ class FileLockManager(ABC):
         
         for item in self.locked_items:
             try:
+                path = item['path']
+                name = item['name']
+                
+                # Check specific error conditions
+                if not os.path.exists(path):
+                    failure_count += 1
+                    print(f"  ❌ Path no longer exists: {name}")
+                    continue
+                
+                if not os.access(path, os.R_OK):
+                    failure_count += 1
+                    print(f"  ❌ Permission denied: {name}")
+                    continue
+                
+                # Check if already locked
+                if item['type'] == 'file':
+                    lock_file = path + '.fadcrypt'
+                    if os.path.exists(lock_file):
+                        failure_count += 1
+                        print(f"  ❌ Already locked: {name}")
+                        continue
+                else:
+                    config_file = os.path.join(path, '.fadcrypt_config')
+                    if os.path.exists(config_file):
+                        failure_count += 1
+                        print(f"  ❌ Already locked: {name}")
+                        continue
+                
+                # Attempt to lock
                 if self._lock_item(item):
                     success_count += 1
-                    print(f"  ✅ Locked: {item['name']}")
+                    print(f"  ✅ Locked: {name}")
                 else:
                     failure_count += 1
-                    print(f"  ❌ Failed to lock: {item['name']}")
+                    print(f"  ❌ Lock operation failed: {name}")
+                    
             except Exception as e:
                 failure_count += 1
                 print(f"  ❌ Error locking {item['name']}: {e}")

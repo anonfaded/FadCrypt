@@ -102,10 +102,13 @@ class TUIManager:
             input("\nPress Enter to continue...")
             return
         
-        print_colored("\nSelect files/folders to lock:\n", Colors.INFO)
-        print_colored("1. Browse current directory", Colors.TEXT)
-        print_colored("2. Enter path manually", Colors.TEXT)
-        print_colored("3. Back to main menu\n", Colors.TEXT)
+        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}SELECT FILES/FOLDERS TO LOCK{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} 📁 {Colors.TEXT}Browse current directory{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} ✏️  {Colors.TEXT}Enter path manually{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} ⬅️  {Colors.TEXT}Back to main menu{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
         
         print(f"{Colors.PRIMARY}Enter command:")
         print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
@@ -138,10 +141,29 @@ class TUIManager:
                 path = os.path.abspath(path)
                 print_colored(f"\nLocking {path}...", Colors.INFO)
                 
-                if self.cli_handler.lock_path(path):
-                    print_success("Successfully locked!")
+                if not os.path.exists(path):
+                    print_error(f"Path does not exist: {path}")
+                elif not os.access(path, os.R_OK):
+                    print_error(f"Permission denied: Cannot access {path}")
                 else:
-                    print_error("Failed to lock. Path may not exist or already locked.")
+                    # Check if already locked by looking for .fadcrypt files
+                    if os.path.isfile(path):
+                        lock_file = path + '.fadcrypt'
+                        if os.path.exists(lock_file):
+                            print_error(f"File is already locked: {os.path.basename(path)}")
+                        elif self.cli_handler.lock_path(path):
+                            print_success("Successfully locked!")
+                        else:
+                            print_error("Failed to lock file. Check permissions and try again.")
+                    else:
+                        # Directory
+                        config_file = os.path.join(path, '.fadcrypt_config')
+                        if os.path.exists(config_file):
+                            print_error(f"Folder is already locked: {os.path.basename(path)}")
+                        elif self.cli_handler.lock_path(path):
+                            print_success("Successfully locked!")
+                        else:
+                            print_error("Failed to lock folder. Check permissions and try again.")
                 
                 input("\nPress Enter to continue...")
     
