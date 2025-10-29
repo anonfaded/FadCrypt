@@ -214,15 +214,9 @@ class TUIManager:
             print(f"{Colors.BORDER}╭─ {Colors.TITLE}LOCKED ITEMS{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET}")
             
-            # Header row
-            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{'Type':<6} {'Name':<30} {'Size':>8} {'Modified':<20} {'Path':<40}{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{'-'*6} {'-'*30} {'-'*8} {'-'*20} {'-'*40}{Colors.RESET}")
-            
             for item in locked_items:
                 icon = Colors.ICON_FOLDER if item['type'] == 'folder' else Colors.ICON_FILE
                 name = item['name']
-                if len(name) > 30:
-                    name = name[:27] + '...'
                 
                 # Get file info
                 try:
@@ -244,17 +238,62 @@ class TUIManager:
                     size_display = "N/A"
                     modified_str = "N/A"
                 
-                # Shorten path for display
-                display_path = path
-                if len(display_path) > 40:
-                    display_path = "..." + display_path[-37:]
-                
-                item_type = f"{icon} {item['type'].capitalize()}"
-                print(f"{Colors.BORDER}│{Colors.RESET} {item_type:<7} {Colors.TEXT}{name:<30}{Colors.RESET} {Colors.DIM}{size_display:>8} {modified_str:<20} {display_path:<40}{Colors.RESET}")
+                # Display item with size and date
+                item_type = item['type'].capitalize()
+                size_date = f"{size_display:>8}  {modified_str}" if size_display != "N/A" else modified_str
+                print(f"{Colors.BORDER}│{Colors.RESET} {icon} {Colors.DIM}{item_type:<6}{Colors.RESET} {Colors.TEXT}{name:<40}{Colors.RESET} {Colors.DIM}{size_date}{Colors.RESET}")
+                # Show full path on next line
+                print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {path}{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET}")
             
-            print(f"{Colors.BORDER}│{Colors.RESET}")
-            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
             print(f"\n{Colors.INFO}Total: {len(locked_items)} item(s){Colors.RESET}")
+            
+            # Add teleport feature
+            print(f"\n{Colors.WARNING}📍 Teleport to Location:{Colors.RESET}")
+            print(f"{Colors.DIM}Press [T] to teleport to a locked item's directory{Colors.RESET}")
+            
+            # Get unique directories
+            directories = {}
+            for item in locked_items:
+                dir_path = os.path.dirname(item['path'])
+                if dir_path not in directories:
+                    directories[dir_path] = []
+                directories[dir_path].append(item['name'])
+            
+            # Show directories with item counts
+            print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}LOCATIONS ({len(directories)} unique){Colors.RESET}")
+            for idx, (dir_path, items) in enumerate(directories.items(), 1):
+                dir_name = os.path.basename(dir_path) or dir_path
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}[{idx}]{Colors.RESET} {Colors.TEXT}{dir_name}{Colors.RESET} {Colors.DIM}({len(items)} item(s)){Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {dir_path}{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            
+            # Ask if user wants to teleport
+            print(f"\n{Colors.INFO}Enter location number to teleport (or press Enter to skip): {Colors.RESET}", end='')
+            choice = input().strip()
+            
+            if choice.isdigit():
+                idx = int(choice) - 1
+                dir_list = list(directories.keys())
+                if 0 <= idx < len(dir_list):
+                    target_dir = dir_list[idx]
+                    self.file_selector.current_dir = target_dir
+                    print_success(f"Teleported to: {target_dir}")
+                    input("\nPress Enter to open file selector...")
+                    # Open file selector in that directory
+                    locked_paths = {item['path'] for item in locked_items}
+                    selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
+                    
+                    if selected_paths:
+                        self.show_header()
+                        print_colored(f"Locking {len(selected_paths)} item(s)...\n", Colors.INFO)
+                        success, failed = self.cli_handler.lock_multiple(selected_paths)
+                        if success > 0:
+                            print_success(f"Successfully locked {success} item(s)!")
+                        if failed > 0:
+                            print_error(f"Failed to lock {failed} item(s).")
+                    return
         
         input("\nPress Enter to continue...")
     
@@ -303,6 +342,20 @@ class TUIManager:
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Python:{Colors.RESET} {sys.version.split()[0]}")
         print(f"{Colors.BORDER}│{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}© 2024-2025 FadSec Lab{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+        
+        # Add links section
+        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}LINKS & SUPPORT{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}🌐 GitHub:{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://github.com/anonfaded/FadCrypt{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}💬 Discord Community:{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://discord.gg/kvAZvdkuuN{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}☕ Support Development (Ko-fi):{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://ko-fi.com/fadedx{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
         print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
         
         input("\nPress Enter to continue...")

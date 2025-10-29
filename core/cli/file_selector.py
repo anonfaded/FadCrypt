@@ -578,6 +578,8 @@ class FileSelector:
 
             # Header
             print(f"{Colors.BORDER}╭─ {Colors.TITLE}{title}{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Select items to unlock and restore access{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}Items will be removed from monitoring{Colors.RESET}")
             print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
                   f"─────────────────{Colors.RESET}\n")
 
