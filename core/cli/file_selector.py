@@ -8,6 +8,7 @@ Real-time keyboard input without pressing Enter.
 import os
 import sys
 from typing import List, Dict, Optional
+from datetime import datetime
 
 # Platform-specific keyboard input
 try:
@@ -57,6 +58,8 @@ def get_key():
             return 'i'
         elif key in [b'x', b'X']:
             return 'x'
+        elif key in [b'v', b'V']:
+            return 'v'
         else:
             return key.decode('utf-8', errors='ignore').lower()
     else:
@@ -111,8 +114,8 @@ class FileSelector:
         self.scroll_offset = 0
         self.max_visible_items = 10  # Default items display
         self.max_visible_selected = 4  # Default selected display
-        self.items_view_mode = "normal"  # "normal" (10) or "expanded" (20)
-        self.selected_view_mode = "normal"  # "normal" (4) or "expanded" (8)
+        self.items_view_mode = "normal"  # "normal" (10) or "expanded" (30)
+        self.selected_view_mode = "normal"  # "normal" (4) or "expanded" (30)
 
     def scan_directory(self) -> List[Dict]:
         """
@@ -135,12 +138,40 @@ class FileSelector:
                     continue
 
                 is_dir = os.path.isdir(full_path)
+                
+                # Get file stats
+                try:
+                    stat = os.stat(full_path)
+                    if is_dir:
+                        # For directories, try to get size quickly or leave empty
+                        try:
+                            # Quick check - only count immediate files, not recursive
+                            dir_size = 0
+                            dir_entries = os.listdir(full_path)[:10]  # Limit to first 10 for speed
+                            for dir_entry in dir_entries:
+                                entry_path = os.path.join(full_path, dir_entry)
+                                if os.path.isfile(entry_path):
+                                    dir_size += os.path.getsize(entry_path)
+                            size_mb = dir_size / (1024 * 1024) if dir_size > 0 else 0
+                        except (OSError, PermissionError):
+                            size_mb = 0
+                    else:
+                        size_mb = stat.st_size / (1024 * 1024)
+                    
+                    # Format date as readable: 25-Oct-2025 2:30 PM
+                    dt = datetime.fromtimestamp(stat.st_mtime)
+                    modified = dt.strftime('%d-%b-%Y %I:%M %p')
+                except (OSError, PermissionError):
+                    size_mb = 0
+                    modified = "Unknown"
 
                 items.append({
                     'name': entry,
                     'path': full_path,
                     'type': 'folder' if is_dir else 'file',
-                    'icon': Colors.ICON_FOLDER if is_dir else Colors.ICON_FILE
+                    'icon': Colors.ICON_FOLDER if is_dir else Colors.ICON_FILE,
+                    'size_mb': size_mb,
+                    'modified': modified
                 })
 
         except PermissionError:
@@ -168,10 +199,10 @@ class FileSelector:
         # Items box with view mode indicator
         if self.items_view_mode == "collapsed":
             view_indicator = "▶"
-            view_text = "ITEMS (collapsed)"
+            view_text = f"ITEMS ({len(self.items)}) - collapsed"
         elif self.items_view_mode == "expanded":
             view_indicator = "▼"
-            view_text = f"ITEMS (showing 20/{len(self.items)})"
+            view_text = f"ITEMS (showing 30/{len(self.items)})"
         else:
             view_indicator = "▼"
             view_text = f"ITEMS (showing 10/{len(self.items)})"
@@ -181,9 +212,11 @@ class FileSelector:
         if not self.items:
             if self.items_view_mode != "collapsed":
                 print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}No items found{Colors.RESET}")
-        elif self.items_view_mode != "collapsed":
+        elif self.items_view_mode == "collapsed":
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}[Press [I] to show items]{Colors.RESET}")
+        else:
             # Calculate visible range for scrolling
-            max_items = 20 if self.items_view_mode == "expanded" else 10
+            max_items = 30 if self.items_view_mode == "expanded" else 10
             start_idx = max(0, self.cursor_pos - max_items // 2)
             if start_idx + max_items > len(self.items):
                 start_idx = max(0, len(self.items) - max_items)
@@ -197,31 +230,50 @@ class FileSelector:
                 # Checkbox
                 checkbox = Colors.CHECKBOX_CHECKED if is_selected else Colors.CHECKBOX_UNCHECKED
 
-                # Item text
+                # Item text with file info
                 icon = item['icon']
                 name = item['name']
-                if len(name) > 50:
-                    name = name[:47] + '...'
+                if len(name) > 35:  # Reduced to make room for file info
+                    name = name[:32] + '...'
+                
+                # File info columns - consistent 8-character width
+                if item['type'] == 'folder':
+                    if item['size_mb'] > 0:
+                        size_info = f"{Colors.DIM}{item['size_mb']:6.2f}MB{Colors.RESET}"
+                    else:
+                        size_info = f"{Colors.DIM}{'':>8}{Colors.RESET}"  # 8 spaces for consistent alignment
+                else:
+                    if item['size_mb'] < 0.01:
+                        size_info = f"{Colors.DIM}{'0.01MB':>8}{Colors.RESET}"
+                    else:
+                        size_info = f"{Colors.DIM}{f'{item["size_mb"]:.2f}MB':>8}{Colors.RESET}"
+                
+                date_info = f"{Colors.DIM}{item['modified']}{Colors.RESET}"
 
                 # Cursor indicator and background
                 if is_cursor:
-                    # Full line with red background, green arrow, red pipe
-                    # Build the line without color codes first for proper padding
-                    plain_text = f"│❯ {checkbox} {icon} {name}"
-                    # Pad to 80 chars
-                    padded_plain = f"{plain_text:<80}"
-                    # Apply colors: red background for entire line, red pipe, green arrow
-                    colored_line = f"\033[41m\033[31m│\033[32m❯\033[37m {checkbox} {icon} {name}"
-                    # Pad the colored version to match
-                    final_padding = 80 - len(plain_text)
-                    colored_padded = colored_line + (" " * final_padding)
-                    print(f"{colored_padded}\033[0m")
+                    # Red background covers content up to end of time column
+                    line_start = f"{Colors.BORDER}│{Colors.SUCCESS}❯{Colors.RESET} {checkbox} "
+                    # Format size display consistently
+                    if item['type'] == 'folder':
+                        if item['size_mb'] > 0:
+                            size_display = f"{item['size_mb']:6.2f}MB"
+                        else:
+                            size_display = ""
+                    else:
+                        if item['size_mb'] < 0.01:
+                            size_display = "0.01MB"
+                        else:
+                            size_display = f"{item['size_mb']:6.2f}MB"
+                    
+                    # Apply red background only to content, ending after time column with one space
+                    print(f"{line_start}\033[41m{icon} {name:<35} {size_display:>8} {item['modified']} \033[0m")
                 else:
                     print(f"{Colors.BORDER}│{Colors.RESET}  {checkbox} {icon} "
-                          f"{Colors.TEXT}{name}{Colors.RESET}")
+                          f"{Colors.TEXT}{name:<35}{Colors.RESET} {size_info} {date_info}")
 
             # Show scroll indicators - only show relevant direction
-            max_items = 20 if self.items_view_mode == "expanded" else 10
+            max_items = 30 if self.items_view_mode == "expanded" else 10
             if len(self.items) > max_items:
                 current_pos = self.cursor_pos + 1
                 total_items = len(self.items)
@@ -253,7 +305,7 @@ class FileSelector:
                 view_text = f"SELECTED ITEMS ({len(self.selected_items)}) - collapsed"
             elif self.selected_view_mode == "expanded":
                 view_indicator = "▼"
-                view_text = f"SELECTED ITEMS (showing 8/{len(self.selected_items)})"
+                view_text = f"SELECTED ITEMS (showing 30/{len(self.selected_items)})"
             else:
                 view_indicator = "▼"
                 view_text = f"SELECTED ITEMS (showing 4/{len(self.selected_items)})"
@@ -261,7 +313,7 @@ class FileSelector:
             print(f"\n{Colors.BORDER}╭─ {Colors.SUCCESS}{view_indicator} {view_text}{Colors.RESET}")
 
             if self.selected_view_mode != "collapsed" and self.selected_items:
-                max_selected = 8 if self.selected_view_mode == "expanded" else 4
+                max_selected = 30 if self.selected_view_mode == "expanded" else 4
                 display_count = min(max_selected, len(self.selected_items))
                 for path in list(self.selected_items)[:display_count]:
                     name = os.path.basename(path)
@@ -276,7 +328,7 @@ class FileSelector:
                     print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}... and {remaining} "
                           f"more{Colors.RESET}")
             elif self.selected_view_mode == "collapsed":
-                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}[Press [S] to show selected items]{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}[Press [V] to show selected items]{Colors.RESET}")
             elif not self.selected_items:
                 print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}[No items selected]{Colors.RESET}")
 
@@ -295,10 +347,23 @@ class FileSelector:
               f"[{Colors.SUCCESS}F{Colors.DIM}] Enter Folder{Colors.RESET}")
 
         print(f"\n{Colors.INFO}View:{Colors.RESET}")
-        items_status = "Collapse" if self.items_view_mode != "collapsed" else "Show Normal"
-        selected_status = "Collapse" if self.selected_view_mode != "collapsed" else "Show Normal"
-        print(f"{Colors.DIM}[{Colors.SUCCESS}I{Colors.DIM}] Items View ({items_status})  "
-              f"[{Colors.SUCCESS}S{Colors.DIM}] Selected View ({selected_status}){Colors.RESET}")
+        # Show current state and next action
+        if self.items_view_mode == "normal":
+            items_status = "Normal → Expand"
+        elif self.items_view_mode == "expanded":
+            items_status = "Expanded → Collapse"
+        else:
+            items_status = "Collapsed → Normal"
+            
+        if self.selected_view_mode == "normal":
+            selected_status = "Normal → Expand"
+        elif self.selected_view_mode == "expanded":
+            selected_status = "Expanded → Collapse"
+        else:
+            selected_status = "Collapsed → Normal"
+            
+        print(f"{Colors.DIM}[{Colors.SUCCESS}I{Colors.DIM}] Items ({items_status})  "
+              f"[{Colors.SUCCESS}V{Colors.DIM}] Selected ({selected_status}){Colors.RESET}")
 
         print(f"\n{Colors.INFO}Actions:{Colors.RESET}")
         print(f"{Colors.DIM}[{Colors.SUCCESS}Enter{Colors.DIM}] Confirm Selection  "
@@ -433,7 +498,7 @@ class FileSelector:
                 else:
                     self.items_view_mode = "normal"
 
-            elif key == 's':
+            elif key == 'v':
                 # Cycle through selected view modes: normal -> expanded -> collapsed -> normal
                 if self.selected_view_mode == "normal":
                     self.selected_view_mode = "expanded"
@@ -504,17 +569,11 @@ class FileSelector:
 
                 # Cursor indicator and background
                 if is_cursor:
-                    # Full line with red background, green arrow, red pipe
-                    # Build the line without color codes first for proper padding
-                    plain_text = f"│❯ {checkbox} {icon} {name}"
-                    # Pad to 80 chars
-                    padded_plain = f"{plain_text:<80}"
-                    # Apply colors: red background for entire line, red pipe, green arrow
-                    colored_line = f"\033[41m\033[31m│\033[32m❯\033[37m {checkbox} {icon} {name}"
-                    # Pad the colored version to match
-                    final_padding = 80 - len(plain_text)
-                    colored_padded = colored_line + (" " * final_padding)
-                    print(f"{colored_padded}\033[0m")
+                    # Red background covers content without excessive padding
+                    line_start = f"{Colors.BORDER}│{Colors.SUCCESS}❯{Colors.RESET} {checkbox} "
+                    line_content = f"{icon} {name}"
+                    # Apply red background only to content with one space padding
+                    print(f"{line_start}\033[41m{line_content} \033[0m")
                 else:
                     print(f"{Colors.BORDER}│{Colors.RESET}  {checkbox} {icon} "
                           f"{Colors.TEXT}{name}{Colors.RESET}")
@@ -591,7 +650,7 @@ class FileSelector:
                 else:
                     self.items_view_mode = "normal"
 
-            elif key == 's':
+            elif key == 'v':
                 # Cycle through selected view modes
                 if self.selected_view_mode == "normal":
                     self.selected_view_mode = "expanded"
