@@ -49,26 +49,26 @@ Source: "..\dist\FadCrypt\*"; DestDir: "{app}"; Flags: recursesubdirs ignorevers
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; WorkingDir: "{app}"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--gui"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--gui"; Tasks: desktopicon; WorkingDir: "{app}"
 
 [Run]
 ; Register context menu and add CLI PATH entry during install. We call the installed exe with
 ; --register-context so the app doesn't need to do first-run registry changes.
 ; This MUST run on every install to ensure context menu is registered.
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-context"; Flags: runhidden skipifsilent waituntilterminated
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-context --internal-auth"; Flags: runhidden skipifsilent waituntilterminated
 
 ; Install and start the elevated service for persistent admin rights
 ; Note: This runs with admin privileges since PrivilegesRequired=admin
 ; Service installation logs to user's temp directory automatically
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; Flags: runhidden waituntilterminated
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service --internal-auth"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
 ; Stop and uninstall the elevated service
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
 
 ; Run cleanup to restore system settings before uninstalling
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
 
 [Registry]
 ; Add FadCrypt to PATH for CLI access

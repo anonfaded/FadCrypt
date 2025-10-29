@@ -50,6 +50,35 @@ if hasattr(sys, '_MEIPASS'):
 # NOTE: Installer will perform context menu registration and PATH changes
 # Use --register-context to register context menu (this is invoked by installer)
 if '--register-context' in sys.argv:
+    # SECURITY: Require password UNLESS called with --internal-auth flag
+    # The --internal-auth flag is only used by GUI/installer after they've authenticated
+    if '--internal-auth' not in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import print_error
+        from core.password_manager import PasswordManager
+        from core.cli.password_prompt import PasswordPrompt
+        from core.crypto_manager import CryptoManager
+        
+        # Get config folder
+        if platform.system() == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Verify password before allowing registration
+        if not password_prompt.verify_password():
+            print_error("Authentication failed. Context menu registration cancelled.")
+            sys.exit(1)
+    
     import subprocess
     import platform
     print("[CONTEXT MENU] Registering FadCrypt context menu...", flush=True)
@@ -112,6 +141,34 @@ if '--register-context' in sys.argv:
 
 # Use --unregister-context to unregister context menu (this is invoked by uninstaller)
 if '--unregister-context' in sys.argv:
+    # SECURITY: Require password UNLESS called with --internal-auth flag
+    if '--internal-auth' not in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import print_error
+        from core.password_manager import PasswordManager
+        from core.cli.password_prompt import PasswordPrompt
+        from core.crypto_manager import CryptoManager
+        
+        # Get config folder
+        if platform.system() == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Verify password before allowing unregistration
+        if not password_prompt.verify_password():
+            print_error("Authentication failed. Context menu unregistration cancelled.")
+            sys.exit(1)
+    
     import subprocess
     import platform
     print("[CONTEXT MENU] Unregistering FadCrypt context menu...", flush=True)
@@ -254,6 +311,34 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
         sys.exit(1)
 
 if '--cleanup' in sys.argv:
+    # SECURITY: Require password UNLESS called with --internal-auth flag
+    if '--internal-auth' not in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import print_error
+        from core.password_manager import PasswordManager
+        from core.cli.password_prompt import PasswordPrompt
+        from core.crypto_manager import CryptoManager
+        
+        # Get config folder
+        if platform.system() == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Verify password before allowing cleanup
+        if not password_prompt.verify_password():
+            print_error("Authentication failed. Cleanup operation cancelled.")
+            sys.exit(1)
+    
     import subprocess
     import platform
     print("[CLEANUP] Starting FadCrypt cleanup...", flush=True)
@@ -595,6 +680,34 @@ sys.path.insert(0, str(project_root))
 
 # Handle --install-service and --uninstall-service flags (called by installer)
 if '--install-service' in sys.argv:
+    # SECURITY: Require password UNLESS called with --internal-auth flag
+    if '--internal-auth' not in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import print_error
+        from core.password_manager import PasswordManager
+        from core.cli.password_prompt import PasswordPrompt
+        from core.crypto_manager import CryptoManager
+        
+        # Get config folder
+        if platform.system() == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Verify password before allowing service installation
+        if not password_prompt.verify_password():
+            print_error("Authentication failed. Service installation cancelled.")
+            sys.exit(1)
+    
     # Create log file for service installation
     import tempfile
     log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_service_install.log')
@@ -677,6 +790,34 @@ if '--install-service' in sys.argv:
         sys.exit(1)
 
 if '--uninstall-service' in sys.argv:
+    # SECURITY: Require password UNLESS called with --internal-auth flag
+    if '--internal-auth' not in sys.argv:
+        from colorama import init
+        init()
+        from core.cli.colors import print_error
+        from core.password_manager import PasswordManager
+        from core.cli.password_prompt import PasswordPrompt
+        from core.crypto_manager import CryptoManager
+        
+        # Get config folder
+        if platform.system() == "Windows":
+            appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+            config_folder = os.path.join(appdata, 'FadCrypt', 'config')
+        else:
+            config_folder = os.path.join(os.path.expanduser('~'), '.config', 'FadCrypt')
+        
+        password_file = os.path.join(config_folder, "encrypted_password.bin")
+        recovery_codes_file = os.path.join(config_folder, "recovery_codes.json")
+        
+        crypto_manager = CryptoManager()
+        password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Verify password before allowing service uninstallation
+        if not password_prompt.verify_password():
+            print_error("Authentication failed. Service uninstallation cancelled.")
+            sys.exit(1)
+    
     # Create log file for service uninstallation
     import tempfile
     log_file = os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_service_uninstall.log')
@@ -870,8 +1011,62 @@ def launch_tui():
         traceback.print_exc()
 
 
+def is_installer_operation():
+    """
+    Check if this is a legitimate installer/uninstaller operation.
+    These operations should only be callable by the installer, not by users.
+    """
+    INSTALLER_OPERATIONS = [
+        '--register-context',
+        '--unregister-context',
+        '--cleanup',
+        '--install-service',
+        '--uninstall-service',
+        '--run-service'
+    ]
+    
+    # Check if any installer operation is present
+    for arg in sys.argv:
+        if arg in INSTALLER_OPERATIONS:
+            # These operations are already handled early in the script
+            # before this function is called, so this is just a safety check
+            return True
+    
+    return False
+
+
+def requires_password_protection():
+    """
+    Check if current command requires password protection.
+    
+    Returns True if password is needed, False for public/system operations.
+    """
+    # Public operations that don't need password
+    PUBLIC_OPERATIONS = [
+        '--help',
+        '-h',
+        '--version',
+        '-v'
+    ]
+    
+    # Operations with their own authentication
+    OWN_AUTH_OPERATIONS = [
+        '--gui',                   # GUI has own auth system
+        '--context-lock',          # Context menu has own auth
+        '--context-unlock'         # Context menu has own auth
+    ]
+    
+    # Check if any public or own-auth operation is present
+    for arg in sys.argv:
+        if arg in PUBLIC_OPERATIONS or arg in OWN_AUTH_OPERATIONS:
+            return False
+    
+    # All other CLI commands need password protection
+    return True
+
+
 def handle_direct_cli_commands():
-    """Handle direct CLI commands like --lock, --unlock, --list"""
+    """Handle direct CLI commands like --lock, --unlock, --list with password protection"""
     from colorama import init
     init()
     
@@ -908,18 +1103,20 @@ def handle_direct_cli_commands():
         print_error("Linux CLI support coming soon.")
         return False
     
-    # Ensure password exists
-    if not password_prompt.ensure_password_exists():
-        print_error("Cannot proceed without a master password.")
-        return False
-    
-    # Verify password for all operations
-    if not password_prompt.verify_password():
-        print_error("Authentication failed.")
-        return False
-    
-    # Clear screen after successful authentication
-    os.system('cls' if os.name == 'nt' else 'clear')
+    # Only require password for user-facing commands (not system operations)
+    if requires_password_protection():
+        # Ensure password exists
+        if not password_prompt.ensure_password_exists():
+            print_error("Cannot proceed without a master password.")
+            return False
+        
+        # Verify password for all operations
+        if not password_prompt.verify_password():
+            print_error("Authentication failed.")
+            return False
+        
+        # Clear screen after successful authentication
+        os.system('cls' if os.name == 'nt' else 'clear')
     
     # Handle --lock
     if '--lock' in sys.argv:

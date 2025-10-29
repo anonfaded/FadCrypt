@@ -3435,13 +3435,13 @@ class MainWindowBase(QMainWindow):
             # Run cleanup with same logic as installer
             if getattr(sys, 'frozen', False):
                 # PyInstaller bundle
-                result = subprocess.run([exec_path, '--cleanup'],
+                result = subprocess.run([exec_path, '--cleanup', '--internal-auth'],
                                       capture_output=True,
                                       text=True,
                                       timeout=60)
             else:
                 # Script mode - run python script --cleanup
-                result = subprocess.run([exec_path, script_path, '--cleanup'],
+                result = subprocess.run([exec_path, script_path, '--cleanup', '--internal-auth'],
                                       capture_output=True,
                                       text=True,
                                       timeout=60)
