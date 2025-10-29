@@ -36,16 +36,71 @@ def get_fadcrypt_logs_folder():
         os.makedirs(logs_dir, exist_ok=True)
         return logs_dir
 
+# Save the original working directory before any changes
+# This is important for CLI mode to work in user's current directory
+# CRITICAL: When launched from PATH, Windows sets CWD to exe location
+# We need to get the ACTUAL terminal directory from environment or parent process
+def get_actual_terminal_directory():
+    """
+    Get the actual terminal directory where user ran the command.
+    When launched from PATH, os.getcwd() returns exe location, not terminal location.
+    """
+    # Try to get from environment variable (we'll set this in a wrapper if needed)
+    if 'FADCRYPT_LAUNCH_DIR' in os.environ:
+        return os.environ['FADCRYPT_LAUNCH_DIR']
+    
+    # For Windows, try to get parent process (cmd/powershell) working directory
+    if platform.system() == 'Windows':
+        try:
+            import psutil
+            # Get parent process (cmd.exe or powershell.exe)
+            parent = psutil.Process(os.getppid())
+            # Get the current working directory of the parent process
+            parent_cwd = parent.cwd()
+            return parent_cwd
+        except (ImportError, Exception):
+            # If psutil not available or fails, fall back to os.getcwd()
+            pass
+    
+    # Fallback to os.getcwd()
+    return os.getcwd()
+
+ORIGINAL_CWD = get_actual_terminal_directory()
+
+# Global verbose flag - set to True if --verbose is in sys.argv
+VERBOSE_MODE = '--verbose' in sys.argv
+
 # CRITICAL FIX: Ensure working directory is correct for PyInstaller DLL loading
 # This fixes CMD/PowerShell working directory mismatch when launched from .lnk shortcuts
 if hasattr(sys, '_MEIPASS'):
-    # Running from PyInstaller bundle - set cwd to bundle directory
+    # Running from PyInstaller bundle - set cwd to bundle directory for DLL loading
     exe_dir = os.path.dirname(sys.executable)
     os.chdir(exe_dir)
     # Also ensure TMPDIR points to the correct temp location
     os.environ['TMPDIR'] = tempfile.gettempdir()
     os.environ['TEMP'] = tempfile.gettempdir()
     os.environ['TMP'] = tempfile.gettempdir()
+    
+    # IMPORTANT: Restore working directory immediately for CLI operations
+    # Check if this is a CLI operation (not GUI, not installer operations)
+    is_cli_operation = (
+        '--cli' in sys.argv or 
+        '--lock' in sys.argv or 
+        '--unlock' in sys.argv or 
+        '--list' in sys.argv or 
+        '--list-locked' in sys.argv or
+        (len(sys.argv) == 1)  # No arguments = TUI mode
+    )
+    
+    is_gui_operation = '--gui' in sys.argv or '--auto-monitor' in sys.argv
+    
+    # Restore original directory for CLI operations (but not for GUI)
+    if is_cli_operation and not is_gui_operation:
+        try:
+            os.chdir(ORIGINAL_CWD)
+        except (OSError, FileNotFoundError):
+            # If original directory no longer exists, stay in current directory
+            pass
 
 # NOTE: Installer will perform context menu registration and PATH changes
 # Use --register-context to register context menu (this is invoked by installer)
@@ -1238,11 +1293,17 @@ def main():
         handle_direct_cli_commands()
         return
     
-    # Check if CLI/TUI mode is requested
-    cli_mode = '--cli' in sys.argv or (len(sys.argv) == 1)
-    
-    # Check if GUI mode is requested
+    # Check if GUI mode is explicitly requested
     gui_mode = '--gui' in sys.argv or '--auto-monitor' in sys.argv
+    
+    # Check if CLI/TUI mode is requested
+    # CLI mode is default unless GUI is explicitly requested
+    # Filter out non-functional flags like --verbose, --windows
+    non_functional_flags = {'--verbose', '--windows'}
+    functional_args = [arg for arg in sys.argv[1:] if arg not in non_functional_flags]
+    
+    # CLI mode if: explicitly requested, no arguments (except non-functional flags), or not GUI mode
+    cli_mode = '--cli' in sys.argv or (len(functional_args) == 0) or not gui_mode
     
     # If CLI mode or no arguments, launch TUI
     if cli_mode and not gui_mode:

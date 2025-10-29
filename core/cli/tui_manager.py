@@ -110,7 +110,11 @@ class TUIManager:
             return
         elif choice == '1':
             # Interactive file selector
-            selected_paths = self.file_selector.select_files()
+            # Get currently locked items to show indicators
+            locked_items = self.cli_handler.list_locked_items()
+            locked_paths = {item['path'] for item in locked_items}
+            
+            selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
             
             if selected_paths:
                 self.show_header()

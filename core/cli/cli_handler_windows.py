@@ -37,19 +37,25 @@ class CLIHandlerWindows(CLIHandlerBase):
         if not self.validate_path(path):
             return False
         
+        # Convert to absolute path for consistency
+        abs_path = os.path.abspath(path)
+        
         # Determine type
-        item_type = "folder" if os.path.isdir(path) else "file"
+        item_type = "folder" if os.path.isdir(abs_path) else "file"
         
         # Add to locked items
-        return self.file_lock_manager.add_item(path, item_type)
+        return self.file_lock_manager.add_item(abs_path, item_type)
     
     def unlock_path(self, path: str) -> bool:
         """Unlock a file or folder"""
         if not self.file_lock_manager:
             return False
         
+        # Convert to absolute path to match stored paths
+        abs_path = os.path.abspath(path)
+        
         # Remove from locked items
-        return self.file_lock_manager.remove_item(path)
+        return self.file_lock_manager.remove_item(abs_path)
     
     def list_locked_items(self) -> List[Dict]:
         """List all locked items"""

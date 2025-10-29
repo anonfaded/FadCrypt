@@ -233,8 +233,17 @@ class FileSelector:
                 # Item text with file info
                 icon = item['icon']
                 name = item['name']
-                if len(name) > 35:  # Reduced to make room for file info
-                    name = name[:32] + '...'
+                
+                # Check if item is already locked
+                is_locked = hasattr(self, 'locked_paths') and item['path'] in self.locked_paths
+                locked_indicator = " 🔒" if is_locked else ""
+                
+                # Adjust name length to account for locked indicator
+                max_name_len = 33 if is_locked else 35
+                if len(name) > max_name_len:
+                    name = name[:max_name_len-3] + '...'
+                
+                name_with_indicator = f"{name}{locked_indicator}"
                 
                 # File info columns - consistent 8-character width
                 if item['type'] == 'folder':
@@ -266,11 +275,12 @@ class FileSelector:
                         else:
                             size_display = f"{item['size_mb']:6.2f}MB"
                     
-                    # Apply red background only to content, ending after time column with one space
-                    print(f"{line_start}\033[41m{icon} {name:<35} {size_display:>8} {item['modified']} \033[0m")
+                    # Apply red background with WHITE text for better contrast
+                    # \033[41m = red background, \033[97m = bright white text
+                    print(f"{line_start}\033[41m\033[97m{icon} {name_with_indicator:<37} {size_display:>8} {item['modified']} \033[0m")
                 else:
                     print(f"{Colors.BORDER}│{Colors.RESET}  {checkbox} {icon} "
-                          f"{Colors.TEXT}{name:<35}{Colors.RESET} {size_info} {date_info}")
+                          f"{Colors.TEXT}{name_with_indicator:<37}{Colors.RESET} {size_info} {date_info}")
 
             # Show scroll indicators - only show relevant direction
             max_items = 30 if self.items_view_mode == "expanded" else 10
@@ -406,13 +416,17 @@ class FileSelector:
             get_key()
         return False
 
-    def select_files(self) -> List[str]:
+    def select_files(self, locked_paths: set = None) -> List[str]:
         """
         Run interactive file selector.
+
+        Args:
+            locked_paths: Set of paths that are already locked (to show indicators)
 
         Returns:
             List of selected file paths
         """
+        self.locked_paths = locked_paths or set()
         self.items = self.scan_directory()
 
         if not self.items:
@@ -564,19 +578,41 @@ class FileSelector:
                 checkbox = Colors.CHECKBOX_CHECKED if is_selected else Colors.CHECKBOX_UNCHECKED
                 icon = Colors.ICON_FOLDER if item['type'] == 'folder' else Colors.ICON_FILE
                 name = item['name']
-                if len(name) > 50:
-                    name = name[:47] + '...'
+                if len(name) > 35:  # Reduced to make room for file info
+                    name = name[:32] + '...'
+                
+                # Get file info if available
+                try:
+                    path = item['path']
+                    if os.path.exists(path):
+                        stat_info = os.stat(path)
+                        size_mb = stat_info.st_size / (1024 * 1024)
+                        modified_time = datetime.fromtimestamp(stat_info.st_mtime)
+                        modified_str = modified_time.strftime("%d-%b-%Y %I:%M %p")
+                        
+                        if item['type'] == 'folder':
+                            size_display = "" if size_mb == 0 else f"{size_mb:6.2f}MB"
+                        else:
+                            size_display = f"{max(0.01, size_mb):6.2f}MB"
+                    else:
+                        size_display = ""
+                        modified_str = "N/A"
+                except:
+                    size_display = ""
+                    modified_str = "N/A"
 
                 # Cursor indicator and background
                 if is_cursor:
-                    # Red background covers content without excessive padding
+                    # Red background with WHITE text for better contrast
                     line_start = f"{Colors.BORDER}│{Colors.SUCCESS}❯{Colors.RESET} {checkbox} "
-                    line_content = f"{icon} {name}"
-                    # Apply red background only to content with one space padding
-                    print(f"{line_start}\033[41m{line_content} \033[0m")
+                    line_content = f"{icon} {name:<35} {size_display:>8} {modified_str}"
+                    # Apply red background with bright white text
+                    print(f"{line_start}\033[41m\033[97m{line_content} \033[0m")
                 else:
+                    size_info = f"{Colors.DIM}{size_display:>8}{Colors.RESET}" if size_display else " " * 8
+                    date_info = f"{Colors.DIM}{modified_str}{Colors.RESET}"
                     print(f"{Colors.BORDER}│{Colors.RESET}  {checkbox} {icon} "
-                          f"{Colors.TEXT}{name}{Colors.RESET}")
+                          f"{Colors.TEXT}{name:<35}{Colors.RESET} {size_info} {date_info}")
 
             # Add scroll indicators if needed
             if len(self.items) > 15:  # If more items than can fit

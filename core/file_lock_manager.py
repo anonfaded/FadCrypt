@@ -53,7 +53,8 @@ class FileLockManager(ABC):
                 with open(self.config_file, 'r') as f:
                     config = json.load(f)
                     self.locked_items = config.get("locked_files_and_folders", [])
-                    print(f"[FileLockManager] Loaded {len(self.locked_items)} locked items from file")
+                    from core.verbose_logger import vlog
+                    vlog(f"[FileLockManager] Loaded {len(self.locked_items)} locked items from file")
                     return
             except Exception as e:
                 print(f"[FileLockManager] Could not read locked items from file: {e}")
@@ -87,7 +88,8 @@ class FileLockManager(ABC):
             content = json.dumps(config, indent=2)
             success, error = safe_write_to_protected_file(self.config_file, content)
             if success:
-                print(f"💾 Saved {len(self.locked_items)} locked items to unified config")
+                from core.verbose_logger import vlog
+                vlog(f"💾 Saved {len(self.locked_items)} locked items to unified config")
                 # Update app_locker config if it exists
                 if self.app_locker and hasattr(self.app_locker, 'config'):
                     self.app_locker.config = config
@@ -130,7 +132,8 @@ class FileLockManager(ABC):
         
         self.locked_items.append(metadata)
         self._save_locked_items()
-        print(f"✅ Added to locked items: {os.path.basename(path)}")
+        from core.verbose_logger import vlog
+        vlog(f"✅ Added to locked items: {os.path.basename(path)}")
         return True
     
     def remove_item(self, path: str) -> bool:
@@ -143,15 +146,34 @@ class FileLockManager(ABC):
         Returns:
             True if removed successfully, False otherwise
         """
+        from core.verbose_logger import vlog
+        
+        # Find the item to unlock
+        item_to_unlock = None
+        for item in self.locked_items:
+            if item['path'] == path:
+                item_to_unlock = item
+                break
+        
+        if not item_to_unlock:
+            print(f"⚠️  Not found in locked items: {path}")
+            return False
+        
+        # First unlock the item
+        try:
+            self._unlock_item(item_to_unlock)
+        except Exception as e:
+            vlog(f"Warning: Error unlocking {path}: {e}")
+        
+        # Then remove from list
         original_count = len(self.locked_items)
         self.locked_items = [item for item in self.locked_items if item['path'] != path]
         
         if len(self.locked_items) < original_count:
             self._save_locked_items()
-            print(f"✅ Removed from locked items: {os.path.basename(path)}")
+            vlog(f"✅ Removed from locked items: {os.path.basename(path)}")
             return True
         else:
-            print(f"⚠️  Not found in locked items: {path}")
             return False
     
     def get_locked_items(self) -> List[Dict]:

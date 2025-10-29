@@ -30,6 +30,7 @@ class FileLockManagerWindows(FileLockManager):
     
     def _backup_acl(self, path: str) -> bool:
         """Backup ACL for path"""
+        from core.verbose_logger import vlog
         backup_path = self._get_acl_backup_path(path)
         
         try:
@@ -42,14 +43,14 @@ class FileLockManagerWindows(FileLockManager):
             )
             
             if result.returncode == 0:
-                print(f"  [ACL] Backed up to: {os.path.basename(backup_path)}")
+                vlog(f"  [ACL] Backed up to: {os.path.basename(backup_path)}")
                 return True
             else:
-                print(f"  [ACL] Backup warning: {result.stderr}")
+                vlog(f"  [ACL] Backup warning: {result.stderr}")
                 return False
                 
         except Exception as e:
-            print(f"  [ACL] Error backing up: {e}")
+            vlog(f"  [ACL] Error backing up: {e}")
             return False
     
     def _restore_acl(self, path: str) -> bool:
@@ -102,6 +103,8 @@ class FileLockManagerWindows(FileLockManager):
         
         Returns dict with: name, path, type, original_permissions (ACL backup path), filesystem, lock_method
         """
+        from core.verbose_logger import vlog
+        
         try:
             # Backup ACL first
             backup_path = self._get_acl_backup_path(path)
@@ -120,7 +123,7 @@ class FileLockManagerWindows(FileLockManager):
                 "locked_at": int(time.time())
             }
             
-            print(f"  [Item] Metadata: {metadata['name']} | ACL backed up | icacls")
+            vlog(f"  [Item] Metadata: {metadata['name']} | ACL backed up | icacls")
             return metadata
             
         except Exception as e:
@@ -143,30 +146,60 @@ class FileLockManagerWindows(FileLockManager):
         if not os.path.exists(path):
             print(f"[Item] Path no longer exists: {path}")
             return False
+        from core.verbose_logger import vlog
         
         # Just record that it's locked - actual monitoring done by ProcessMonitor
-        print(f"  [Item] Locked (monitored by ProcessMonitor): {path}")
+        vlog(f"  [Item] Locked (monitored by ProcessMonitor): {path}")
         return True
     
     def _unlock_item(self, item: Dict) -> bool:
         """
-        Unlock file or folder by removing monitoring.
+        Unlock file or folder by removing file attributes and ACL restrictions.
         
-        Since we're using ProcessMonitor (process-level interception) instead
-        of ACL deny rules, there are no ACL rules to remove. This just marks
-        the item as unlocked in the locked_items list.
-        
-        The ProcessMonitor will stop intercepting once the item is removed
-        from the locked_items list.
+        This removes:
+        1. File attributes (HIDDEN + SYSTEM + READONLY)
+        2. ACL deny rules (if any)
+        3. Stops ProcessMonitor interception
         """
+        from core.verbose_logger import vlog
         path = item['path']
         
         if not os.path.exists(path):
-            print(f"[Item] Path no longer exists: {path}")
+            vlog(f"[Item] Path no longer exists: {path}")
             return True  # Consider it "unlocked" if it doesn't exist
         
-        # Just log that it's unlocked - ProcessMonitor handles the rest
-        print(f"  [Item] Unlocked (stopped monitoring): {path}")
+        # Step 1: Remove file attributes (HIDDEN + SYSTEM + READONLY)
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['attrib', '-h', '-s', '-r', path],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                vlog(f"  [Item] Removed file attributes from: {os.path.basename(path)}")
+            else:
+                vlog(f"  [Item] Warning: Could not remove attributes: {result.stderr}")
+        except Exception as e:
+            vlog(f"  [Item] Warning: attrib command failed: {e}")
+        
+        # Step 2: Restore ACL from backup (if exists)
+        if self._restore_acl(path):
+            vlog(f"  [Item] Restored ACL from backup: {os.path.basename(path)}")
+        else:
+            # Fallback: Grant full control to Everyone
+            try:
+                subprocess.run(
+                    ['icacls', path, '/grant', 'Everyone:(F)', '/T'],
+                    capture_output=True,
+                    timeout=10
+                )
+                vlog(f"  [Item] Granted full control: {os.path.basename(path)}")
+            except:
+                pass
+        
+        vlog(f"  [Item] Unlocked (stopped monitoring): {os.path.basename(path)}")
         return True
     
     def _lock_config_file(self, path: str):

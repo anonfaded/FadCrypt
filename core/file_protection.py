@@ -11,6 +11,7 @@ import os
 import sys
 import stat
 from typing import List, Tuple, Optional, Union
+from core.verbose_logger import vlog
 
 # Platform detection
 IS_WINDOWS = sys.platform == 'win32'
@@ -54,9 +55,9 @@ class FileProtectionManager:
         self.original_attributes: dict = {}  # Store original attributes for restoration
         self.file_locks: dict = {}  # Store open file descriptors for locking (Linux)
         
-        print(f"[FileProtection] Initialized on {sys.platform}")
-        print(f"[FileProtection] Windows mode: {IS_WINDOWS}")
-        print(f"[FileProtection] Linux mode: {IS_LINUX}")
+        vlog(f"[FileProtection] Initialized on {sys.platform}")
+        vlog(f"[FileProtection] Windows mode: {IS_WINDOWS}")
+        vlog(f"[FileProtection] Linux mode: {IS_LINUX}")
     
     def protect_file(self, file_path: str) -> Tuple[bool, Optional[str]]:
         """
@@ -580,7 +581,7 @@ class FileProtectionManager:
             return False, f"File not found: {file_path}"
         
         filename = os.path.basename(file_path)
-        print(f"[FileProtection] 🔓 Temporarily unlocking {filename} for FadCrypt write...")
+        vlog(f"[FileProtection] 🔓 Temporarily unlocking {filename} for FadCrypt write...")
         
         try:
             if IS_LINUX:
@@ -591,10 +592,10 @@ class FileProtectionManager:
                     if not success:
                         return False, f"Failed to remove immutable flag: {error}"
                     
-                    print(f"[FileProtection] ✅ Removed immutable flag from {filename}")
+                    vlog(f"[FileProtection] ✅ Removed immutable flag from {filename}")
                     return True, None
                 else:
-                    print(f"[FileProtection] ℹ️  {filename} not immutable, no unlock needed")
+                    vlog(f"[FileProtection] ℹ️  {filename} not immutable, no unlock needed")
                     return True, None
                     
             elif IS_WINDOWS:
@@ -622,10 +623,10 @@ class FileProtectionManager:
                                         continue
                                     return False, f"Failed to remove protection attributes: {error_code}"
                                 
-                                print(f"[FileProtection] ✅ Removed protection attributes from {filename}")
+                                vlog(f"[FileProtection] ✅ Removed protection attributes from {filename}")
                                 return True, None
                             else:
-                                print(f"[FileProtection] ℹ️  {filename} not protected, no unlock needed")
+                                vlog(f"[FileProtection] ℹ️  {filename} not protected, no unlock needed")
                                 return True, None
                         except Exception as e:
                             if attempt < 4:
@@ -658,7 +659,7 @@ class FileProtectionManager:
             return False, f"File not found: {file_path}"
         
         filename = os.path.basename(file_path)
-        print(f"[FileProtection] 🔒 Re-locking {filename} after FadCrypt write...")
+        vlog(f"[FileProtection] 🔒 Re-locking {filename} after FadCrypt write...")
         
         try:
             if IS_LINUX:
@@ -667,7 +668,7 @@ class FileProtectionManager:
                 if not success:
                     return False, f"Failed to set immutable flag: {error}"
                 
-                print(f"[FileProtection] ✅ Re-applied immutable flag to {filename}")
+                vlog(f"[FileProtection] ✅ Re-applied immutable flag to {filename}")
                 return True, None
                 
             elif IS_WINDOWS:
@@ -691,7 +692,7 @@ class FileProtectionManager:
                                     continue
                                 return False, f"Failed to set protection attributes: {error_code}"
                             
-                            print(f"[FileProtection] ✅ Re-applied protection attributes to {filename}")
+                            vlog(f"[FileProtection] ✅ Re-applied protection attributes to {filename}")
                             return True, None
                         except Exception as e:
                             if attempt < 4:
@@ -732,7 +733,7 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
     manager = get_file_protection_manager()
     filename = os.path.basename(file_path)
     
-    print(f"[SafeWrite] 🔐 Starting safe write to protected file: {filename}")
+    vlog(f"[SafeWrite] 🔐 Starting safe write to protected file: {filename}")
     
     file_exists = os.path.exists(file_path)
     
@@ -741,30 +742,30 @@ def safe_write_to_protected_file(file_path: str, content: str, mode: str = 'w') 
         unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
         if not unlock_success:
             error_msg = f"Failed to unlock {filename}: {unlock_error}"
-            print(f"[SafeWrite] ❌ {error_msg}")
+            vlog(f"[SafeWrite] ❌ {error_msg}")
             return False, error_msg
     else:
-        print(f"[SafeWrite] ℹ️  {filename} doesn't exist yet, will create and protect")
+        vlog(f"[SafeWrite] ℹ️  {filename} doesn't exist yet, will create and protect")
     
     # Step 2: Write content
     try:
-        print(f"[SafeWrite] ✍️  Writing content to {filename}...")
+        vlog(f"[SafeWrite] ✍️  Writing content to {filename}...")
         with open(file_path, mode) as f:
             f.write(content)
-        print(f"[SafeWrite] ✅ Successfully wrote to {filename}")
+        vlog(f"[SafeWrite] ✅ Successfully wrote to {filename}")
     except Exception as e:
         error_msg = f"Failed to write to {filename}: {e}"
-        print(f"[SafeWrite] ❌ {error_msg}")
+        vlog(f"[SafeWrite] ❌ {error_msg}")
         return False, error_msg
     
     # Step 3: Re-lock (or initially protect)
     relock_success, relock_error = manager.relock_file(file_path)
     if not relock_success:
         error_msg = f"Failed to protect {filename}: {relock_error}"
-        print(f"[SafeWrite] ❌ {error_msg}")
+        vlog(f"[SafeWrite] ❌ {error_msg}")
         return False, error_msg
     
-    print(f"[SafeWrite] 🔒 Safe write completed successfully for {filename}")
+    vlog(f"[SafeWrite] 🔒 Safe write completed successfully for {filename}")
     return True, None
 
 
