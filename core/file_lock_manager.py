@@ -58,7 +58,8 @@ class FileLockManager(ABC):
             except Exception as e:
                 print(f"[FileLockManager] Could not read locked items from file: {e}")
         else:
-            print(f"[FileLockManager] Config file does not exist: {self.config_file}")
+            # Debug log (commented out for cleaner CLI)
+            pass  # print(f"[FileLockManager] Config file does not exist: {self.config_file}")
         
         # Fallback: use _get_config if file doesn't exist
         config = self._get_config()

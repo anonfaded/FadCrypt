@@ -5,6 +5,7 @@ Beautiful, categorized, platform-aware help system with modern rounded design.
 """
 
 import sys
+import os
 import platform
 from .colors import Colors
 
@@ -19,8 +20,9 @@ def show_help():
     RED = Colors.BORDER
     BRIGHT_RED = Colors.TITLE
     DIM = Colors.DIM
-    CYAN = Colors.INFO
+    CYAN = Colors.SECONDARY  # Changed from INFO (blue) to SECONDARY (light red)
     YELLOW = Colors.WARNING
+    GREEN = Colors.SUCCESS
     RESET = Colors.RESET
     
     # Header
@@ -44,9 +46,9 @@ def show_help():
     print(f"{RED}│{RESET}")
     print(f"{RED}│{RESET}   {CYAN}Examples:{RESET}")
     print(f"{RED}│{RESET}     fadcrypt                      {DIM}# Interactive menu{RESET}")
-    print(f"{RED}│{RESET}     fadcrypt --gui                {DIM}# Launch GUI{RESET}")
-    print(f"{RED}│{RESET}     fadcrypt --lock file.pdf      {DIM}# Lock a file{RESET}")
-    print(f"{RED}│{RESET}     fadcrypt --unlock folder/     {DIM}# Unlock a folder{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt {GREEN}--gui{RESET}                {DIM}# Launch GUI{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt {GREEN}--lock{RESET} file.pdf      {DIM}# Lock a file{RESET}")
+    print(f"{RED}│{RESET}     fadcrypt {GREEN}--unlock{RESET} folder/     {DIM}# Unlock a folder{RESET}")
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Main Commands
@@ -88,25 +90,74 @@ def show_help():
     print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--uninstall-service{RESET}  : Uninstall FadCrypt elevated service")
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    # Maintenance
-    print(f"{RED}╭─ 🔧 {BRIGHT_RED}MAINTENANCE{RESET}")
-    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--cleanup{RESET}        : Clean up temporary files and orphaned locks")
+    # Dangerous Operations
+    print(f"{RED}╭─ ⚠️  {YELLOW}DANGEROUS OPERATIONS (Use with Caution!){RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--cleanup{RESET}        : {YELLOW}Complete system cleanup and uninstall{RESET}")
+    
+    if system == "Windows":
+        print(f"{RED}│{RESET}   {DIM}This will:{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Restore Task Manager, Registry Editor, Control Panel{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Remove FadCrypt from Windows startup{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Remove context menu entries{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Delete config folder: %APPDATA%\\FadCrypt\\config{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Delete backup folder: %APPDATA%\\FadCrypt\\backup{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Restart File Explorer{RESET}")
+    else:
+        print(f"{RED}│{RESET}   {DIM}This will:{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Remove immutable flags from protected files{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Restore disabled system tools (terminal, system monitor, etc.){RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Delete config folder: ~/.config/FadCrypt{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Delete backup folder: ~/.local/share/FadCrypt/Backup{RESET}")
+        print(f"{RED}│{RESET}     {DIM}• Remove lock files{RESET}")
+    
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
+    
+    # File Locations
+    print(f"{RED}╭─ 📍 {BRIGHT_RED}FILE LOCATIONS{RESET}")
+    
+    if system == "Windows":
+        appdata = os.environ.get('APPDATA', 'C:\\Users\\YourUser\\AppData\\Roaming')
+        print(f"{RED}│{RESET} {CYAN}Config Folder:{RESET} {appdata}\\FadCrypt\\config")
+        print(f"{RED}│{RESET}   {DIM}• encrypted_password.bin - Your master password{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• recovery_codes.json - Recovery codes for password reset{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• apps_config.json - Application lock settings{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• settings.json - FadCrypt settings{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• monitoring_state.json - Monitoring status{RESET}")
+        print(f"{RED}│{RESET}")
+        print(f"{RED}│{RESET} {CYAN}Backup Folder:{RESET} {appdata}\\FadCrypt\\backup")
+        print(f"{RED}│{RESET}   {DIM}• Stores original files before encryption{RESET}")
+    else:
+        home = os.path.expanduser('~')
+        print(f"{RED}│{RESET} {CYAN}Config Folder:{RESET} {home}/.config/FadCrypt")
+        print(f"{RED}│{RESET}   {DIM}• encrypted_password.bin - Your master password{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• recovery_codes.json - Recovery codes for password reset{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• apps_config.json - Application lock settings{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• settings.json - FadCrypt settings{RESET}")
+        print(f"{RED}│{RESET}   {DIM}• monitoring_state.json - Monitoring status{RESET}")
+        print(f"{RED}│{RESET}")
+        print(f"{RED}│{RESET} {CYAN}Backup Folder:{RESET} {home}/.local/share/FadCrypt/Backup")
+        print(f"{RED}│{RESET}   {DIM}• Stores original files before encryption{RESET}")
+    
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Tips & Best Practices
     print(f"{RED}╭─ 💡 {BRIGHT_RED}TIPS & BEST PRACTICES{RESET}")
-    print(f"{RED}│{RESET} • Always remember your master password - it cannot be recovered!")
+    print(f"{RED}│{RESET} • Remember your master password or use recovery codes to reset it")
     print(f"{RED}│{RESET} • Keep your recovery codes in a safe place")
-    print(f"{RED}│{RESET} • Use --list to see what's currently locked")
-    print(f"{RED}│{RESET} • Locked files are encrypted and hidden from normal view")
+    print(f"{RED}│{RESET} • Use {DIM}--list{RESET} to see what's currently locked")
+    print(f"{RED}│{RESET} • Locked files are encrypted and protected")
     print(f"{RED}│{RESET} • The GUI {DIM}(--gui){RESET} provides a visual way to manage locks")
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # ASCII Art Footer
-    print(f"{RED}  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒{RESET}")
-    print(f"{RED}  ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒{RESET}")
-    print(f"{RED}  ▓    ▓▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒{RESET}")
-    print(f"{RED}  ▓ ▓▓ ▓▓▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒{RESET}\n")
+    print(f"""
+          {RED} 
+ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒
+ ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒      ▓    ▓
+ ▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒      ▓ ▓▓ ▓▓
+ ▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒
+          {RESET}
+          """)
     
     print(f"{YELLOW}Found an issue or have a feature request?{RESET}")
     print(f"{YELLOW}Please open an issue on GitHub:{RESET}")

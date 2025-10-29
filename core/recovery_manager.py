@@ -63,7 +63,8 @@ class RecoveryCodeManager:
             recovery_codes_file_path: Full path to recovery_codes.json file
         """
         self.recovery_codes_file = recovery_codes_file_path
-        print(f"[RecoveryCodeManager] Initialized with codes file: {recovery_codes_file_path}")
+        # Debug log (commented out for cleaner CLI)
+        # print(f"[RecoveryCodeManager] Initialized with codes file: {recovery_codes_file_path}")
     
     @staticmethod
     def generate_code() -> str:

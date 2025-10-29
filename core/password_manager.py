@@ -41,10 +41,11 @@ class PasswordManager:
         if recovery_codes_file_path:
             self.recovery_manager = RecoveryCodeManager(recovery_codes_file_path)
         
-        print(f"[PasswordManager] Initialized with password file: {password_file_path}")
-        print(f"[PasswordManager] Password file exists: {os.path.exists(password_file_path)}")
-        if self.recovery_manager:
-            print(f"[PasswordManager] Recovery codes available: {self.recovery_manager.has_recovery_codes()}")
+        # Debug logs (commented out for cleaner CLI)
+        # print(f"[PasswordManager] Initialized with password file: {password_file_path}")
+        # print(f"[PasswordManager] Password file exists: {os.path.exists(password_file_path)}")
+        # if self.recovery_manager:
+        #     print(f"[PasswordManager] Recovery codes available: {self.recovery_manager.has_recovery_codes()}")
     
     def create_password(self, password: str) -> bool:
         """

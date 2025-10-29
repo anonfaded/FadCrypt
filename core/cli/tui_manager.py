@@ -7,9 +7,8 @@ Main text-based user interface for FadCrypt CLI.
 import os
 import sys
 import platform
-from typing import Optional
 
-from .colors import Colors, BoxChars, print_colored, print_success, print_error, print_warning, print_info
+from .colors import Colors, print_colored, print_success, print_error, print_warning, print_info
 from .password_prompt import PasswordPrompt
 from .file_selector import FileSelector
 
@@ -36,28 +35,27 @@ class TUIManager:
     
     def show_header(self):
         """Display the FadCrypt header"""
+        from FadCrypt import __version__
+        
         self.clear_screen()
-        print_colored(f"{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-        print_colored(f"{BoxChars.VERTICAL}{Colors.ICON_LOCK} FadCrypt v2.0{' ' * 44}{BoxChars.VERTICAL}", Colors.TITLE)
-        print_colored(f"{BoxChars.VERTICAL}{'File & Folder Protection Suite':^61}{BoxChars.VERTICAL}", Colors.TITLE)
-        print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
+        print(f"{Colors.BORDER}╭─ {Colors.TITLE}🏴 FadCrypt v{__version__}{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TITLE}File, Folder & Application Protection Suite{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
     
     def show_main_menu(self):
         """Display the main menu"""
         self.show_header()
         
-        print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-        print_colored(f"{BoxChars.S_VERTICAL}{'MAIN MENU':^61}{BoxChars.S_VERTICAL}", Colors.TITLE)
-        print_colored(f"{BoxChars.S_T_RIGHT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_T_LEFT}", Colors.BORDER)
-        print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  1. {Colors.ICON_LOCK} Lock Files/Folders{' ' * 35}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  2. {Colors.ICON_UNLOCK} Unlock Files/Folders{' ' * 33}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  3. 📋 List Locked Items{' ' * 36}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  4. 🖥️  Open GUI Application{' ' * 33}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  5. ⚙️  Settings{' ' * 46}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}  6. ❌ Exit{' ' * 50}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
+        print(f"{Colors.BORDER}╭─ {Colors.TITLE}MAIN MENU{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} {Colors.ICON_LOCK} {Colors.TEXT}Lock Files/Folders{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} {Colors.ICON_UNLOCK} {Colors.TEXT}Unlock Files/Folders{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} 📋 {Colors.TEXT}List Locked Items{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}4.{Colors.RESET} 🖥️  {Colors.TEXT}Open GUI Application{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}5.{Colors.RESET} ⚙️  {Colors.TEXT}Settings{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}6.{Colors.RESET} ❌ {Colors.TEXT}Exit{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
     
     def run(self):
         """Run the main TUI loop"""
@@ -69,7 +67,8 @@ class TUIManager:
         while True:
             self.show_main_menu()
             
-            print_colored("Enter your choice (1-6): ", Colors.PRIMARY, end='')
+            print(f"{Colors.PRIMARY}Enter command:")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             try:
                 choice = input().strip()
             except KeyboardInterrupt:
@@ -87,7 +86,7 @@ class TUIManager:
             elif choice == '5':
                 self.settings_menu()
             elif choice == '6':
-                print_success("Goodbye!")
+                print_success("Goodbye! :)")
                 break
             else:
                 print_error("Invalid choice. Please enter a number between 1 and 6.")
@@ -108,7 +107,8 @@ class TUIManager:
         print_colored("2. Enter path manually", Colors.TEXT)
         print_colored("3. Back to main menu\n", Colors.TEXT)
         
-        print_colored("Enter your choice (1-3): ", Colors.PRIMARY, end='')
+        print(f"{Colors.PRIMARY}Enter command:")
+        print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
         choice = input().strip()
         
         if choice == '1':
@@ -130,7 +130,8 @@ class TUIManager:
         
         elif choice == '2':
             # Manual path entry
-            print_colored("\nEnter path to lock: ", Colors.PRIMARY, end='')
+            print(f"\n{Colors.PRIMARY}Enter path to lock:")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             path = input().strip()
             
             if path:
@@ -181,29 +182,28 @@ class TUIManager:
     def list_locked_items(self):
         """List all locked items"""
         self.show_header()
-        print_colored("Locked Items\n", Colors.TITLE)
+        print(f"{Colors.TITLE}Locked Items{Colors.RESET}\n")
         
         locked_items = self.cli_handler.list_locked_items()
         
         if not locked_items:
             print_warning("No locked items found.")
         else:
-            print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-            print_colored(f"{BoxChars.S_VERTICAL}{'Type':<8}{'Name':<50}{BoxChars.S_VERTICAL}", Colors.TITLE)
-            print_colored(f"{BoxChars.S_T_RIGHT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_T_LEFT}", Colors.BORDER)
+            print(f"{Colors.BORDER}╭─ {Colors.TITLE}LOCKED ITEMS{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}")
             
             for item in locked_items:
                 icon = Colors.ICON_FOLDER if item['type'] == 'folder' else Colors.ICON_FILE
                 name = item['name']
-                if len(name) > 48:
-                    name = name[:45] + '...'
+                if len(name) > 50:
+                    name = name[:47] + '...'
                 
                 item_type = item['type'].capitalize()
-                line = f"{BoxChars.S_VERTICAL} {icon} {item_type:<6}{name:<48}{BoxChars.S_VERTICAL}"
-                print_colored(line, Colors.TEXT)
+                print(f"{Colors.BORDER}│{Colors.RESET} {icon} {Colors.DIM}{item_type:<6}{Colors.RESET} {Colors.TEXT}{name}{Colors.RESET}")
             
-            print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
-            print_colored(f"\nTotal: {len(locked_items)} item(s)", Colors.INFO)
+            print(f"{Colors.BORDER}│{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            print(f"\n{Colors.INFO}Total: {len(locked_items)} item(s){Colors.RESET}")
         
         input("\nPress Enter to continue...")
     
@@ -211,18 +211,19 @@ class TUIManager:
         """Settings menu"""
         while True:
             self.show_header()
-            print_colored("Settings\n", Colors.TITLE)
+            print(f"{Colors.TITLE}Settings{Colors.RESET}\n")
             
-            print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-            print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_VERTICAL}  1. 🔑 Change Password{' ' * 38}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_VERTICAL}  2. 🔐 Generate Recovery Codes{' ' * 31}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_VERTICAL}  3. ℹ️  About FadCrypt{' ' * 39}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_VERTICAL}  4. ⬅️  Back to Main Menu{' ' * 36}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-            print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}\n", Colors.BORDER)
+            print(f"{Colors.BORDER}╭─ {Colors.TITLE}OPTIONS{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} 🔑 {Colors.TEXT}Change Password{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} 🔐 {Colors.TEXT}Generate Recovery Codes{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} ℹ️  {Colors.TEXT}About FadCrypt{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}4.{Colors.RESET} ⬅️  {Colors.TEXT}Back to Main Menu{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
             
-            print_colored("Enter your choice (1-4): ", Colors.PRIMARY, end='')
+            print(f"{Colors.PRIMARY}Enter command:")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             choice = input().strip()
             
             if choice == '1':
@@ -241,17 +242,17 @@ class TUIManager:
     def show_about(self):
         """Show about information"""
         self.show_header()
-        print_colored("About FadCrypt\n", Colors.TITLE)
+        print(f"{Colors.TITLE}About FadCrypt{Colors.RESET}\n")
         
-        print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-        print_colored(f"{BoxChars.S_VERTICAL} FadCrypt v2.0{' ' * 48}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL} Cross-platform File & Folder Protection{' ' * 21}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL} Platform: {platform.system()}{' ' * (50 - len(platform.system()))}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL} Python: {sys.version.split()[0]}{' ' * (52 - len(sys.version.split()[0]))}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL}{' ' * 61}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_VERTICAL} © 2024-2025 FadSec Lab{' ' * 37}{BoxChars.S_VERTICAL}", Colors.TEXT)
-        print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
+        print(f"{Colors.BORDER}╭─ {Colors.TITLE}INFORMATION{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}FadCrypt v2.0{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Cross-platform File & Folder Protection{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Platform:{Colors.RESET} {platform.system()}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Python:{Colors.RESET} {sys.version.split()[0]}")
+        print(f"{Colors.BORDER}│{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}© 2024-2025 FadSec Lab{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
         
         input("\nPress Enter to continue...")
     

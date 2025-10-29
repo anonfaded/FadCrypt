@@ -7,8 +7,7 @@ Uses getpass for masked input.
 
 import getpass
 import os
-import sys
-from typing import Optional, Tuple
+from typing import Optional
 
 from .colors import Colors, print_colored, print_error, print_success, print_warning
 
@@ -37,13 +36,15 @@ class PasswordPrompt:
             Password string or None if cancelled
         """
         try:
-            password = getpass.getpass(f"{Colors.PRIMARY}{prompt}{Colors.RESET}")
+            print(f"{Colors.PRIMARY}{prompt}")
+            password = getpass.getpass(f" {Colors.SUCCESS}❯{Colors.RESET} ")
             
             if not password:
                 return None
             
             if confirm:
-                confirm_password = getpass.getpass(f"{Colors.PRIMARY}Confirm password: {Colors.RESET}")
+                print(f"{Colors.PRIMARY}Confirm password:")
+                confirm_password = getpass.getpass(f" {Colors.SUCCESS}❯{Colors.RESET} ")
                 if password != confirm_password:
                     print_error("Passwords do not match!")
                     return None
@@ -85,12 +86,10 @@ class PasswordPrompt:
         Returns:
             True if password created successfully, False otherwise
         """
-        print_colored("\n╔═══════════════════════════════════════════════════════════╗", Colors.BORDER)
-        print_colored("║           Create Master Password                          ║", Colors.TITLE)
-        print_colored("╚═══════════════════════════════════════════════════════════╝\n", Colors.BORDER)
-        
-        print_colored("Your master password will be used to lock/unlock files.", Colors.INFO)
-        print_colored("Make sure to remember it - it cannot be recovered!\n", Colors.WARNING)
+        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}🔐 Create Master Password{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Your master password will be used to lock/unlock files.{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.WARNING}Remember it or use recovery codes to reset it!{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────{Colors.RESET}\n")
         
         while True:
             password = self.prompt_password("Create password: ", confirm=True)
@@ -99,17 +98,13 @@ class PasswordPrompt:
                 print_warning("Password creation cancelled.")
                 return False
             
-            # Validate password strength
-            if len(password) < 4:
-                print_error("Password must be at least 4 characters long!")
-                continue
-            
-            # Create password
+            # Create password (no length restriction to match GUI behavior)
             if self.password_manager.create_password(password):
                 print_success("Master password created successfully!")
                 
                 # Offer to create recovery codes
-                print_colored("\nWould you like to generate recovery codes? (y/n): ", Colors.INFO, end='')
+                print(f"\n{Colors.PRIMARY}Would you like to generate recovery codes? (y/n):")
+                print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
                 choice = input().strip().lower()
                 
                 if choice == 'y':
@@ -127,9 +122,9 @@ class PasswordPrompt:
         Returns:
             True if password changed successfully, False otherwise
         """
-        print_colored("\n╔═══════════════════════════════════════════════════════════╗", Colors.BORDER)
-        print_colored("║           Change Master Password                          ║", Colors.TITLE)
-        print_colored("╚═══════════════════════════════════════════════════════════╝\n", Colors.BORDER)
+        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}🔐 Change Master Password{Colors.RESET}")
+        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Enter your current password, then create a new one.{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────{Colors.RESET}\n")
         
         # Verify current password
         if not self.verify_password("Enter current password: "):
@@ -143,11 +138,7 @@ class PasswordPrompt:
                 print_warning("Password change cancelled.")
                 return False
             
-            if len(new_password) < 4:
-                print_error("Password must be at least 4 characters long!")
-                continue
-            
-            # Change password
+            # Change password (no length restriction to match GUI behavior)
             if self.password_manager.change_password(new_password):
                 print_success("Password changed successfully!")
                 return True
@@ -165,22 +156,65 @@ class PasswordPrompt:
         success, codes = self.password_manager.create_recovery_codes()
         
         if success and codes:
-            print_colored("\n╔═══════════════════════════════════════════════════════════╗", Colors.BORDER)
-            print_colored("║              Recovery Codes Generated                     ║", Colors.TITLE)
-            print_colored("╚═══════════════════════════════════════════════════════════╝\n", Colors.BORDER)
-            
-            print_colored("Save these codes in a secure place!", Colors.WARNING)
-            print_colored("You can use them to reset your password if you forget it.\n", Colors.INFO)
+            print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}🔑 Recovery Codes Generated{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.WARNING}Save these codes in a secure place!{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}You can use them to reset your password if you forget it.{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────{Colors.RESET}\n")
             
             for i, code in enumerate(codes, 1):
                 print_colored(f"  {i}. {code}", Colors.SUCCESS)
             
-            print_colored("\nPress Enter to continue...", Colors.DIM, end='')
+            # Ask if user wants to save to file
+            print(f"\n{Colors.PRIMARY}Would you like to save these codes to a file? (y/n):")
+            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
+            choice = input().strip().lower()
+            
+            if choice == 'y':
+                # Use the existing save method from recovery manager
+                if self.password_manager.recovery_manager:
+                    try:
+                        # Get default save location in Documents folder
+                        import platform
+                        if platform.system() == "Windows":
+                            # Windows: Documents folder
+                            documents = os.path.join(os.path.expanduser("~"), "Documents")
+                            default_path = os.path.join(documents, "FadCrypt_Recovery_Codes.txt")
+                        else:
+                            # Linux: Documents folder or home if it doesn't exist
+                            documents = os.path.join(os.path.expanduser("~"), "Documents")
+                            if not os.path.exists(documents):
+                                documents = os.path.expanduser("~")
+                            default_path = os.path.join(documents, "FadCrypt_Recovery_Codes.txt")
+                        
+                        print_colored("\nCodes will be saved to your Documents folder.", Colors.INFO)
+                        print_colored(f"Location: {default_path}", Colors.DIM)
+                        print(f"\n{Colors.PRIMARY}Press Enter to save, or type a custom path:")
+                        print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
+                        custom_path = input().strip()
+                        
+                        save_path = custom_path if custom_path else default_path
+                        
+                        # Save codes to file
+                        with open(save_path, 'w', encoding='utf-8') as f:
+                            f.write("FadCrypt Recovery Codes\n")
+                            f.write("=" * 50 + "\n\n")
+                            f.write("IMPORTANT: Keep these codes in a secure place!\n")
+                            f.write("You can use them to reset your password if you forget it.\n\n")
+                            for i, code in enumerate(codes, 1):
+                                f.write(f"{i}. {code}\n")
+                            f.write("\n" + "=" * 50 + "\n")
+                            f.write("Generated by FadCrypt\n")
+                        
+                        print_success(f"Recovery codes saved to: {save_path}")
+                    except Exception as e:
+                        print_error(f"Failed to save recovery codes: {e}")
+            
+            print(f"\n{Colors.DIM}Press Enter to continue...{Colors.RESET} ", end='')
             input()
             return True
-        else:
-            print_error("Failed to generate recovery codes.")
-            return False
+        
+        print_error("Failed to generate recovery codes.")
+        return False
     
     def ensure_password_exists(self) -> bool:
         """
