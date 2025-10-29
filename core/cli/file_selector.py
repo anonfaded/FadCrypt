@@ -193,6 +193,13 @@ class FileSelector:
               f"{Colors.HIGHLIGHT}{dir_name}{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Full Path: "
               f"{Colors.DIM}{self.current_dir}{Colors.RESET}")
+        
+        # Show info about locked items if any exist
+        if hasattr(self, 'locked_paths') and self.locked_paths:
+            locked_count = sum(1 for item in self.items if item['path'] in self.locked_paths)
+            if locked_count > 0:
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.WARNING}ℹ️  {locked_count} item(s) already locked (shown with 🔒, cannot be selected){Colors.RESET}")
+        
         print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
               f"─────────────────{Colors.RESET}\n")
 
@@ -227,23 +234,23 @@ class FileSelector:
                 is_selected = item['path'] in self.selected_items
                 is_cursor = i == self.cursor_pos
 
-                # Checkbox
-                checkbox = Colors.CHECKBOX_CHECKED if is_selected else Colors.CHECKBOX_UNCHECKED
+                # Check if item is already locked
+                is_locked = hasattr(self, 'locked_paths') and item['path'] in self.locked_paths
+                
+                # Checkbox - grayed out if locked, can't select locked items
+                if is_locked:
+                    checkbox = f"{Colors.DIM}□{Colors.RESET}"  # Grayed out checkbox
+                else:
+                    checkbox = Colors.CHECKBOX_CHECKED if is_selected else Colors.CHECKBOX_UNCHECKED
 
                 # Item text with file info
                 icon = item['icon']
                 name = item['name']
+                if len(name) > 30:  # Reduced to make room for lock column
+                    name = name[:27] + '...'
                 
-                # Check if item is already locked
-                is_locked = hasattr(self, 'locked_paths') and item['path'] in self.locked_paths
-                locked_indicator = " 🔒" if is_locked else ""
-                
-                # Adjust name length to account for locked indicator
-                max_name_len = 33 if is_locked else 35
-                if len(name) > max_name_len:
-                    name = name[:max_name_len-3] + '...'
-                
-                name_with_indicator = f"{name}{locked_indicator}"
+                # Lock indicator in its own column (before size)
+                lock_col = "🔒" if is_locked else "  "
                 
                 # File info columns - consistent 8-character width
                 if item['type'] == 'folder':
@@ -258,6 +265,9 @@ class FileSelector:
                         size_info = f"{Colors.DIM}{f'{item["size_mb"]:.2f}MB':>8}{Colors.RESET}"
                 
                 date_info = f"{Colors.DIM}{item['modified']}{Colors.RESET}"
+                
+                # Gray out locked items
+                text_color = Colors.DIM if is_locked else Colors.TEXT
 
                 # Cursor indicator and background
                 if is_cursor:
@@ -277,10 +287,10 @@ class FileSelector:
                     
                     # Apply red background with WHITE text for better contrast
                     # \033[41m = red background, \033[97m = bright white text
-                    print(f"{line_start}\033[41m\033[97m{icon} {name_with_indicator:<37} {size_display:>8} {item['modified']} \033[0m")
+                    print(f"{line_start}\033[41m\033[97m{icon} {name:<30} {lock_col} {size_display:>8} {item['modified']} \033[0m")
                 else:
                     print(f"{Colors.BORDER}│{Colors.RESET}  {checkbox} {icon} "
-                          f"{Colors.TEXT}{name_with_indicator:<37}{Colors.RESET} {size_info} {date_info}")
+                          f"{text_color}{name:<30}{Colors.RESET} {lock_col} {size_info} {date_info}")
 
             # Show scroll indicators - only show relevant direction
             max_items = 30 if self.items_view_mode == "expanded" else 10
@@ -473,10 +483,13 @@ class FileSelector:
                 # Toggle selection (stay on same line)
                 if 0 <= self.cursor_pos < len(self.items):
                     item_path = self.items[self.cursor_pos]['path']
-                    if item_path in self.selected_items:
-                        self.selected_items.remove(item_path)
-                    else:
-                        self.selected_items.add(item_path)
+                    # Don't allow selecting already-locked items
+                    is_locked = hasattr(self, 'locked_paths') and item_path in self.locked_paths
+                    if not is_locked:
+                        if item_path in self.selected_items:
+                            self.selected_items.remove(item_path)
+                        else:
+                            self.selected_items.add(item_path)
                     # Don't move cursor - stay on same line
 
             elif key in ['enter', 'e']:

@@ -201,6 +201,8 @@ class TUIManager:
     
     def list_locked_items(self):
         """List all locked items"""
+        from datetime import datetime
+        
         self.show_header()
         print(f"{Colors.TITLE}Locked Items{Colors.RESET}\n")
         
@@ -212,17 +214,46 @@ class TUIManager:
             print(f"{Colors.BORDER}╭─ {Colors.TITLE}LOCKED ITEMS{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET}")
             
+            # Header row
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{'Type':<6} {'Name':<30} {'Size':>8} {'Modified':<20} {'Path':<40}{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{'-'*6} {'-'*30} {'-'*8} {'-'*20} {'-'*40}{Colors.RESET}")
+            
             for item in locked_items:
                 icon = Colors.ICON_FOLDER if item['type'] == 'folder' else Colors.ICON_FILE
                 name = item['name']
-                if len(name) > 50:
-                    name = name[:47] + '...'
+                if len(name) > 30:
+                    name = name[:27] + '...'
                 
-                item_type = item['type'].capitalize()
-                print(f"{Colors.BORDER}│{Colors.RESET} {icon} {Colors.DIM}{item_type:<6}{Colors.RESET} {Colors.TEXT}{name}{Colors.RESET}")
+                # Get file info
+                try:
+                    path = item['path']
+                    if os.path.exists(path):
+                        stat_info = os.stat(path)
+                        size_mb = stat_info.st_size / (1024 * 1024)
+                        modified_time = datetime.fromtimestamp(stat_info.st_mtime)
+                        modified_str = modified_time.strftime("%d-%b-%Y %I:%M %p")
+                        
+                        if item['type'] == 'folder':
+                            size_display = "" if size_mb == 0 else f"{size_mb:6.2f}MB"
+                        else:
+                            size_display = f"{max(0.01, size_mb):6.2f}MB"
+                    else:
+                        size_display = "N/A"
+                        modified_str = "N/A"
+                except:
+                    size_display = "N/A"
+                    modified_str = "N/A"
+                
+                # Shorten path for display
+                display_path = path
+                if len(display_path) > 40:
+                    display_path = "..." + display_path[-37:]
+                
+                item_type = f"{icon} {item['type'].capitalize()}"
+                print(f"{Colors.BORDER}│{Colors.RESET} {item_type:<7} {Colors.TEXT}{name:<30}{Colors.RESET} {Colors.DIM}{size_display:>8} {modified_str:<20} {display_path:<40}{Colors.RESET}")
             
             print(f"{Colors.BORDER}│{Colors.RESET}")
-            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────{Colors.RESET}")
             print(f"\n{Colors.INFO}Total: {len(locked_items)} item(s){Colors.RESET}")
         
         input("\nPress Enter to continue...")

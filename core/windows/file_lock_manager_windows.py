@@ -71,16 +71,21 @@ class FileLockManagerWindows(FileLockManager):
                 return False
         
         try:
+            from core.verbose_logger import vlog
+            
             # Restore ACL from backup
+            # Note: icacls outputs to console even with capture_output=True
+            # We need to redirect to DEVNULL to suppress it completely
             result = subprocess.run(
                 ['icacls', os.path.dirname(path), '/restore', backup_path],
-                capture_output=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
                 timeout=30
             )
             
             if result.returncode == 0:
-                print(f"  [ACL] Restored from backup")
+                vlog(f"  [ACL] Restored from backup")
                 # Clean up backup file
                 try:
                     os.remove(backup_path)
@@ -88,13 +93,18 @@ class FileLockManagerWindows(FileLockManager):
                     pass
                 return True
             else:
-                print(f"  [ACL] Restore warning: {result.stderr}")
-                # Try fallback
-                subprocess.run(['icacls', path, '/grant', 'Everyone:(F)'], timeout=10)
+                vlog(f"  [ACL] Restore warning: {result.stderr}")
+                # Try fallback - also suppress output
+                subprocess.run(
+                    ['icacls', path, '/grant', 'Everyone:(F)'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10
+                )
                 return False
                 
         except Exception as e:
-            print(f"  [ACL] Error restoring: {e}")
+            vlog(f"  [ACL] Error restoring: {e}")
             return False
     
     def _get_item_metadata(self, path: str, item_type: str) -> Optional[Dict]:
@@ -173,7 +183,8 @@ class FileLockManagerWindows(FileLockManager):
             import subprocess
             result = subprocess.run(
                 ['attrib', '-h', '-s', '-r', path],
-                capture_output=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
                 timeout=5
             )
@@ -192,7 +203,8 @@ class FileLockManagerWindows(FileLockManager):
             try:
                 subprocess.run(
                     ['icacls', path, '/grant', 'Everyone:(F)', '/T'],
-                    capture_output=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     timeout=10
                 )
                 vlog(f"  [Item] Granted full control: {os.path.basename(path)}")
