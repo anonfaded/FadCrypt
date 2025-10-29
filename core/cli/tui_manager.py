@@ -11,6 +11,7 @@ import platform
 from .colors import Colors, print_colored, print_success, print_error, print_warning, print_info
 from .password_prompt import PasswordPrompt
 from .file_selector import FileSelector
+from .menu_navigator import MenuNavigator
 
 
 class TUIManager:
@@ -28,6 +29,7 @@ class TUIManager:
         self.cli_handler = cli_handler
         self.password_prompt = PasswordPrompt(password_manager)
         self.file_selector = FileSelector()
+        self.menu_navigator = MenuNavigator()
     
     def clear_screen(self):
         """Clear the terminal screen"""
@@ -43,19 +45,17 @@ class TUIManager:
         print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
     
     def show_main_menu(self):
-        """Display the main menu"""
-        self.show_header()
+        """Display the main menu with arrow navigation"""
+        main_menu_items = [
+            {'key': '1', 'icon': Colors.ICON_LOCK, 'text': 'Lock Files/Folders', 'action': 'lock'},
+            {'key': '2', 'icon': Colors.ICON_UNLOCK, 'text': 'Unlock Files/Folders', 'action': 'unlock'},
+            {'key': '3', 'icon': '📋', 'text': 'List Locked Items', 'action': 'list'},
+            {'key': '4', 'icon': '💻', 'text': 'Open GUI Application', 'action': 'gui'},
+            {'key': '5', 'icon': '🔧', 'text': 'Settings', 'action': 'settings'},
+            {'key': '6', 'icon': '❌', 'text': 'Exit', 'action': 'exit'}
+        ]
         
-        print(f"{Colors.BORDER}╭─ {Colors.TITLE}MAIN MENU{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} {Colors.ICON_LOCK} {Colors.TEXT}Lock Files/Folders{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} {Colors.ICON_UNLOCK} {Colors.TEXT}Unlock Files/Folders{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} 📋 {Colors.TEXT}List Locked Items{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}4.{Colors.RESET} 🖥️  {Colors.TEXT}Open GUI Application{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}5.{Colors.RESET} ⚙️  {Colors.TEXT}Settings{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}6.{Colors.RESET} ❌ {Colors.TEXT}Exit{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
+        return self.menu_navigator.show_menu("MAIN MENU", main_menu_items, self.show_header)
     
     def run(self):
         """Run the main TUI loop"""
@@ -65,32 +65,28 @@ class TUIManager:
             return
         
         while True:
-            self.show_main_menu()
-            
-            print(f"{Colors.PRIMARY}Enter command:")
-            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             try:
-                choice = input().strip()
+                choice = self.show_main_menu()
+                
+                if choice == 'quit' or choice == '6':
+                    print_success("Goodbye! :)")
+                    break
+                elif choice == '1':
+                    self.lock_files_menu()
+                elif choice == '2':
+                    self.unlock_files_menu()
+                elif choice == '3':
+                    self.list_locked_items()
+                elif choice == '4':
+                    self.launch_gui()
+                elif choice == '5':
+                    self.settings_menu()
+                elif choice == 'back':
+                    continue  # Stay in main menu
+                    
             except KeyboardInterrupt:
                 print()
                 break
-            
-            if choice == '1':
-                self.lock_files_menu()
-            elif choice == '2':
-                self.unlock_files_menu()
-            elif choice == '3':
-                self.list_locked_items()
-            elif choice == '4':
-                self.launch_gui()
-            elif choice == '5':
-                self.settings_menu()
-            elif choice == '6':
-                print_success("Goodbye! :)")
-                break
-            else:
-                print_error("Invalid choice. Please enter a number between 1 and 6.")
-                input("\nPress Enter to continue...")
     
     def lock_files_menu(self):
         """Lock files/folders menu"""
@@ -102,19 +98,17 @@ class TUIManager:
             input("\nPress Enter to continue...")
             return
         
-        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}SELECT FILES/FOLDERS TO LOCK{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} 📁 {Colors.TEXT}Browse current directory{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} ✏️  {Colors.TEXT}Enter path manually{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} ⬅️  {Colors.TEXT}Back to main menu{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
+        lock_menu_items = [
+            {'key': '1', 'icon': '📁', 'text': 'Browse current directory', 'action': 'browse'},
+            {'key': '2', 'icon': '📝', 'text': 'Enter path manually', 'action': 'manual'},
+            {'key': '3', 'icon': '🔙', 'text': 'Back to main menu', 'action': 'back'}
+        ]
         
-        print(f"{Colors.PRIMARY}Enter command:")
-        print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
-        choice = input().strip()
+        choice = self.menu_navigator.show_menu("SELECT FILES/FOLDERS TO LOCK", lock_menu_items, self.show_header)
         
-        if choice == '1':
+        if choice == '3' or choice == 'back' or choice == 'quit':
+            return
+        elif choice == '1':
             # Interactive file selector
             selected_paths = self.file_selector.select_files()
             
@@ -232,23 +226,22 @@ class TUIManager:
     def settings_menu(self):
         """Settings menu"""
         while True:
-            self.show_header()
-            print(f"{Colors.TITLE}Settings{Colors.RESET}\n")
+            settings_menu_items = [
+                {'key': '1', 'icon': '🔑', 'text': 'Change Password', 'action': 'password'},
+                {'key': '2', 'icon': '🔐', 'text': 'Generate Recovery Codes', 'action': 'recovery'},
+                {'key': '3', 'icon': '📖', 'text': 'About FadCrypt', 'action': 'about'},
+                {'key': '4', 'icon': '🔙', 'text': 'Back to Main Menu', 'action': 'back'}
+            ]
             
-            print(f"{Colors.BORDER}╭─ {Colors.TITLE}OPTIONS{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}1.{Colors.RESET} 🔑 {Colors.TEXT}Change Password{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}2.{Colors.RESET} 🔐 {Colors.TEXT}Generate Recovery Codes{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}3.{Colors.RESET} ℹ️  {Colors.TEXT}About FadCrypt{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.DIM}4.{Colors.RESET} ⬅️  {Colors.TEXT}Back to Main Menu{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET}")
-            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
+            def settings_header():
+                self.show_header()
+                print(f"{Colors.TITLE}Settings{Colors.RESET}\n")
             
-            print(f"{Colors.PRIMARY}Enter command:")
-            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
-            choice = input().strip()
+            choice = self.menu_navigator.show_menu("OPTIONS", settings_menu_items, settings_header)
             
-            if choice == '1':
+            if choice == '4' or choice == 'back' or choice == 'quit':
+                break
+            elif choice == '1':
                 self.password_prompt.change_password()
                 input("\nPress Enter to continue...")
             elif choice == '2':
@@ -259,11 +252,6 @@ class TUIManager:
                     input("\nPress Enter to continue...")
             elif choice == '3':
                 self.show_about()
-            elif choice == '4':
-                break
-            else:
-                print_error("Invalid choice.")
-                input("\nPress Enter to continue...")
     
     def show_about(self):
         """Show about information"""
