@@ -142,24 +142,52 @@ class FileLockManagerWindows(FileLockManager):
     
     def _lock_item(self, item: Dict) -> bool:
         """
-        Lock file or folder using ProcessMonitor (process-level interception).
+        Lock file or folder by applying file attributes and ACL restrictions.
         
-        Does NOT use ACL deny rules because:
-        1. ACL deny prevents file access completely
-        2. This prevents our app from intercepting and showing password dialog
-        3. Instead, ProcessMonitor scans for process access and intercepts
-        
-        This matches Linux behavior: monitor file access → show password dialog
+        This makes files:
+        1. Hidden (HIDDEN attribute)
+        2. System file (SYSTEM attribute)
+        3. Read-only (READONLY attribute)
+        4. Access denied via ACL (deny Everyone)
         """
+        from core.verbose_logger import vlog
         path = item['path']
         
         if not os.path.exists(path):
-            print(f"[Item] Path no longer exists: {path}")
+            vlog(f"[Item] Path no longer exists: {path}")
             return False
-        from core.verbose_logger import vlog
         
-        # Just record that it's locked - actual monitoring done by ProcessMonitor
-        vlog(f"  [Item] Locked (monitored by ProcessMonitor): {path}")
+        # Step 1: Apply file attributes (READONLY only - don't hide files)
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['attrib', '+r', path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                vlog(f"  [Item] Applied READONLY attribute to: {os.path.basename(path)}")
+            else:
+                vlog(f"  [Item] Warning: Could not apply attributes: {result.stderr}")
+        except Exception as e:
+            vlog(f"  [Item] Warning: attrib command failed: {e}")
+        
+        # Step 2: Apply ACL deny rules
+        try:
+            # Deny all access to Everyone
+            subprocess.run(
+                ['icacls', path, '/deny', 'Everyone:(F)', '/T'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10
+            )
+            vlog(f"  [Item] Applied ACL deny rules to: {os.path.basename(path)}")
+        except Exception as e:
+            vlog(f"  [Item] Warning: icacls deny failed: {e}")
+        
+        vlog(f"  [Item] Locked: {os.path.basename(path)}")
         return True
     
     def _unlock_item(self, item: Dict) -> bool:
@@ -178,18 +206,18 @@ class FileLockManagerWindows(FileLockManager):
             vlog(f"[Item] Path no longer exists: {path}")
             return True  # Consider it "unlocked" if it doesn't exist
         
-        # Step 1: Remove file attributes (HIDDEN + SYSTEM + READONLY)
+        # Step 1: Remove file attributes (READONLY only)
         try:
             import subprocess
             result = subprocess.run(
-                ['attrib', '-h', '-s', '-r', path],
+                ['attrib', '-r', path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=5
             )
             if result.returncode == 0:
-                vlog(f"  [Item] Removed file attributes from: {os.path.basename(path)}")
+                vlog(f"  [Item] Removed READONLY attribute from: {os.path.basename(path)}")
             else:
                 vlog(f"  [Item] Warning: Could not remove attributes: {result.stderr}")
         except Exception as e:

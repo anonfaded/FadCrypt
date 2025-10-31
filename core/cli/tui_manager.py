@@ -93,11 +93,6 @@ class TUIManager:
         self.show_header()
         print_colored("Lock Files/Folders\n", Colors.TITLE)
         
-        # Verify password first
-        if not self.password_prompt.verify_password():
-            input("\nPress Enter to continue...")
-            return
-        
         lock_menu_items = [
             {'key': '1', 'icon': '📁', 'text': 'Browse current directory', 'action': 'browse'},
             {'key': '2', 'icon': '📝', 'text': 'Enter path manually', 'action': 'manual'},
@@ -116,23 +111,40 @@ class TUIManager:
             
             selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
             
-            if selected_paths:
-                self.show_header()
-                print_colored(f"Locking {len(selected_paths)} item(s)...\n", Colors.INFO)
+            # Check if user wants to switch to unlock
+            if selected_paths and len(selected_paths) > 0 and selected_paths[0] == '__SWITCH_TO_UNLOCK__':
+                # Switch to unlock menu
+                self.unlock_files_menu()
+                return
+            
+            # Check if user wants to teleport
+            if selected_paths and len(selected_paths) > 0 and selected_paths[0] == '__TELEPORT__':
+                # Show teleport menu
+                locked_items = self.cli_handler.list_locked_items()
+                self.show_teleport_menu(locked_items)
+                return
+            
+            if selected_paths and len(selected_paths) > 0:
+                # Filter out special commands
+                actual_paths = [p for p in selected_paths if not p.startswith('__')]
                 
-                success, failed = self.cli_handler.lock_multiple(selected_paths)
-                
-                if success > 0:
-                    print_success(f"Successfully locked {success} item(s)!")
-                if failed > 0:
-                    print_error(f"Failed to lock {failed} item(s).")
-                
-                input("\nPress Enter to continue...")
+                if actual_paths:
+                    self.show_header()
+                    print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                    
+                    success, failed = self.cli_handler.lock_multiple(actual_paths)
+                    
+                    if success > 0:
+                        print_success(f"Successfully locked {success} item(s)!")
+                    if failed > 0:
+                        print_error(f"Failed to lock {failed} item(s).")
+                    
+                    input("\nPress Enter to continue...")
         
         elif choice == '2':
             # Manual path entry
             print(f"\n{Colors.PRIMARY}Enter path to lock:")
-            print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
+            print(f" {Colors.ERROR}❯{Colors.RESET} ", end='')
             path = input().strip()
             
             if path:
@@ -170,11 +182,6 @@ class TUIManager:
         self.show_header()
         print_colored("Unlock Files/Folders\n", Colors.TITLE)
         
-        # Verify password first
-        if not self.password_prompt.verify_password():
-            input("\nPress Enter to continue...")
-            return
-        
         # Get locked items
         locked_items = self.cli_handler.list_locked_items()
         
@@ -183,38 +190,133 @@ class TUIManager:
             input("\nPress Enter to continue...")
             return
         
-        # Show locked items for selection
-        selected_paths = self.file_selector.select_from_list(locked_items, "Select Items to Unlock")
+        # Filter items by current directory
+        current_dir = self.file_selector.current_dir
+        items_in_current_dir = [item for item in locked_items if os.path.dirname(item['path']) == current_dir]
         
-        if selected_paths:
-            self.show_header()
-            print_colored(f"Unlocking {len(selected_paths)} item(s)...\n", Colors.INFO)
+        # If no items in current directory, show all
+        items_to_show = items_in_current_dir if items_in_current_dir else locked_items
+        
+        # Show locked items for selection
+        selected_paths = self.file_selector.select_from_list(items_to_show, "Select Items to Unlock")
+        
+        # Check for special returns
+        if selected_paths and selected_paths[0] == '__SWITCH_TO_LOCK__':
+            # Switch to lock screen directly (not menu)
+            locked_paths = {item['path'] for item in locked_items}
+            selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
             
-            success, failed = self.cli_handler.unlock_multiple(selected_paths)
+            # Handle results from lock screen
+            if selected_paths and len(selected_paths) > 0:
+                # Check for switch back
+                if selected_paths[0] == '__SWITCH_TO_UNLOCK__':
+                    self.unlock_files_menu()
+                    return
+                elif selected_paths[0] == '__TELEPORT__':
+                    self.show_teleport_menu(locked_items)
+                    return
+                
+                # Normal lock operation
+                actual_paths = [p for p in selected_paths if not p.startswith('__')]
+                if actual_paths:
+                    self.show_header()
+                    print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                    success, failed = self.cli_handler.lock_multiple(actual_paths)
+                    if success > 0:
+                        print_success(f"Successfully locked {success} item(s)!")
+                    if failed > 0:
+                        print_error(f"Failed to lock {failed} item(s).")
+                    input("\nPress Enter to continue...")
+            return
+        
+        if selected_paths and selected_paths[0] == '__TELEPORT__':
+            # Show teleport menu
+            self.show_teleport_menu(locked_items)
+            return
+        
+        if selected_paths and len(selected_paths) > 0:
+            # Filter out special commands
+            actual_paths = [p for p in selected_paths if not p.startswith('__')]
             
-            if success > 0:
-                print_success(f"Successfully unlocked {success} item(s)!")
-            if failed > 0:
-                print_error(f"Failed to unlock {failed} item(s).")
-            
-            input("\nPress Enter to continue...")
+            if actual_paths:
+                self.show_header()
+                print_colored(f"Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                
+                success, failed = self.cli_handler.unlock_multiple(actual_paths)
+                
+                if success > 0:
+                    print_success(f"Successfully unlocked {success} item(s)!")
+                if failed > 0:
+                    print_error(f"Failed to unlock {failed} item(s).")
+                
+                input("\nPress Enter to continue...")
+    
+    def show_teleport_menu(self, locked_items):
+        """Show teleport menu for locked items"""
+        self.show_header()
+        print_colored("📍 Teleport to Location\n", Colors.TITLE)
+        
+        # Get unique directories
+        directories = {}
+        for item in locked_items:
+            dir_path = os.path.dirname(item['path'])
+            if dir_path not in directories:
+                directories[dir_path] = []
+            directories[dir_path].append(item['name'])
+        
+        # Show directories with item counts
+        print(f"{Colors.BORDER}╭─ 📍 {Colors.TITLE}LOCATIONS ({len(directories)} unique){Colors.RESET}")
+        for idx, (dir_path, items) in enumerate(directories.items(), 1):
+            dir_name = os.path.basename(dir_path) or dir_path
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}[{idx}]{Colors.RESET} {Colors.TEXT}{dir_name}{Colors.RESET} {Colors.DIM}({len(items)} item(s)){Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {dir_path}{Colors.RESET}")
+        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+        
+        # Ask if user wants to teleport - consistent input style
+        print(f"\n{Colors.INFO}Enter location number (or press Enter to go back):{Colors.RESET}")
+        print(f" {Colors.ERROR}❯{Colors.RESET} ", end='')
+        choice = input().strip()
+        
+        if choice.isdigit():
+            idx = int(choice) - 1
+            dir_list = list(directories.keys())
+            if 0 <= idx < len(dir_list):
+                target_dir = dir_list[idx]
+                self.file_selector.current_dir = target_dir
+                print_success(f"Teleported to: {target_dir}")
+                input("\nPress Enter to continue...")
+                # Go back to unlock menu with new directory
+                self.unlock_files_menu()
     
     def list_locked_items(self):
         """List all locked items"""
         from datetime import datetime
         
-        self.show_header()
-        print(f"{Colors.TITLE}Locked Items{Colors.RESET}\n")
+        # Clear screen first
+        self.clear_screen()
         
         locked_items = self.cli_handler.list_locked_items()
         
         if not locked_items:
+            self.show_header()
+            print(f"{Colors.TITLE}Locked Items{Colors.RESET}\n")
             print_warning("No locked items found.")
         else:
-            print(f"{Colors.BORDER}╭─ {Colors.TITLE}LOCKED ITEMS{Colors.RESET}")
+            # Show custom header with path
+            from FadCrypt import __version__
+            print(f"\n{Colors.BORDER}╭─ 🏴 {Colors.TITLE}FadCrypt v{__version__}{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}File, Folder & Application Protection Suite{Colors.RESET}")
+            # Show path of first item
+            first_item_path = locked_items[0]['path']
             print(f"{Colors.BORDER}│{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current Item Path:{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{first_item_path}{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
             
-            for item in locked_items:
+            # Display items without heading
+            print(f"{Colors.BORDER}╭─ 📋 {Colors.TITLE}Items{Colors.RESET}")
+            
+            for idx, item in enumerate(locked_items):
                 icon = Colors.ICON_FOLDER if item['type'] == 'folder' else Colors.ICON_FILE
                 name = item['name']
                 
@@ -238,20 +340,17 @@ class TUIManager:
                     size_display = "N/A"
                     modified_str = "N/A"
                 
-                # Display item with size and date
+                # Display item with size and date (no path below)
                 item_type = item['type'].capitalize()
                 size_date = f"{size_display:>8}  {modified_str}" if size_display != "N/A" else modified_str
                 print(f"{Colors.BORDER}│{Colors.RESET} {icon} {Colors.DIM}{item_type:<6}{Colors.RESET} {Colors.TEXT}{name:<40}{Colors.RESET} {Colors.DIM}{size_date}{Colors.RESET}")
-                # Show full path on next line
-                print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {path}{Colors.RESET}")
-                print(f"{Colors.BORDER}│{Colors.RESET}")
             
             print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            
             print(f"\n{Colors.INFO}Total: {len(locked_items)} item(s){Colors.RESET}")
             
             # Add teleport feature
             print(f"\n{Colors.WARNING}📍 Teleport to Location:{Colors.RESET}")
-            print(f"{Colors.DIM}Press [T] to teleport to a locked item's directory{Colors.RESET}")
             
             # Get unique directories
             directories = {}
@@ -262,15 +361,16 @@ class TUIManager:
                 directories[dir_path].append(item['name'])
             
             # Show directories with item counts
-            print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}LOCATIONS ({len(directories)} unique){Colors.RESET}")
+            print(f"\n{Colors.BORDER}╭─ 📍 {Colors.TITLE}LOCATIONS ({len(directories)} unique){Colors.RESET}")
             for idx, (dir_path, items) in enumerate(directories.items(), 1):
                 dir_name = os.path.basename(dir_path) or dir_path
                 print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}[{idx}]{Colors.RESET} {Colors.TEXT}{dir_name}{Colors.RESET} {Colors.DIM}({len(items)} item(s)){Colors.RESET}")
                 print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {dir_path}{Colors.RESET}")
             print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
             
-            # Ask if user wants to teleport
-            print(f"\n{Colors.INFO}Enter location number to teleport (or press Enter to skip): {Colors.RESET}", end='')
+            # Ask if user wants to teleport - consistent input style
+            print(f"\n{Colors.INFO}Enter location number to teleport (or press Enter to go back):{Colors.RESET}")
+            print(f" {Colors.ERROR}❯{Colors.RESET} ", end='')
             choice = input().strip()
             
             if choice.isdigit():
@@ -280,19 +380,50 @@ class TUIManager:
                     target_dir = dir_list[idx]
                     self.file_selector.current_dir = target_dir
                     print_success(f"Teleported to: {target_dir}")
-                    input("\nPress Enter to open file selector...")
-                    # Open file selector in that directory
-                    locked_paths = {item['path'] for item in locked_items}
-                    selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
+                    input("\nPress Enter to continue...")
                     
-                    if selected_paths:
-                        self.show_header()
-                        print_colored(f"Locking {len(selected_paths)} item(s)...\n", Colors.INFO)
-                        success, failed = self.cli_handler.lock_multiple(selected_paths)
-                        if success > 0:
-                            print_success(f"Successfully locked {success} item(s)!")
-                        if failed > 0:
-                            print_error(f"Failed to lock {failed} item(s).")
+                    # Go directly to unlock screen (user can switch to lock with [S])
+                    items_in_dir = [item for item in locked_items if os.path.dirname(item['path']) == target_dir]
+                    if items_in_dir:
+                        selected_paths = self.file_selector.select_from_list(items_in_dir, "Select Items to Unlock")
+                        
+                        # Check for special returns
+                        if selected_paths and len(selected_paths) > 0:
+                            if selected_paths[0] == '__SWITCH_TO_LOCK__':
+                                # Switch to lock menu
+                                locked_paths = {item['path'] for item in locked_items}
+                                selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
+                                
+                                if selected_paths and len(selected_paths) > 0:
+                                    actual_paths = [p for p in selected_paths if not p.startswith('__')]
+                                    if actual_paths:
+                                        self.show_header()
+                                        print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                                        success, failed = self.cli_handler.lock_multiple(actual_paths)
+                                        if success > 0:
+                                            print_success(f"Successfully locked {success} item(s)!")
+                                        if failed > 0:
+                                            print_error(f"Failed to lock {failed} item(s).")
+                                        input("\nPress Enter to continue...")
+                            elif selected_paths[0] == '__TELEPORT__':
+                                # Recursive teleport
+                                self.show_teleport_menu(locked_items)
+                                return
+                            else:
+                                # Normal unlock
+                                actual_paths = [p for p in selected_paths if not p.startswith('__')]
+                                if actual_paths:
+                                    self.show_header()
+                                    print_colored(f"Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                                    success, failed = self.cli_handler.unlock_multiple(actual_paths)
+                                    if success > 0:
+                                        print_success(f"Successfully unlocked {success} item(s)!")
+                                    if failed > 0:
+                                        print_error(f"Failed to unlock {failed} item(s).")
+                                    input("\nPress Enter to continue...")
+                    else:
+                        print_warning("No locked items in this directory.")
+                        input("\nPress Enter to continue...")
                     return
         
         input("\nPress Enter to continue...")

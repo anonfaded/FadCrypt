@@ -130,6 +130,11 @@ class FileLockManager(ABC):
         if not metadata:
             return False
         
+        # Actually lock the item
+        if not self._lock_item(metadata):
+            print(f"❌ Failed to lock: {path}")
+            return False
+        
         self.locked_items.append(metadata)
         self._save_locked_items()
         from core.verbose_logger import vlog

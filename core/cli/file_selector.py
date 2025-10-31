@@ -188,7 +188,7 @@ class FileSelector:
 
         # Header with full path
         dir_name = os.path.basename(self.current_dir) or self.current_dir
-        print(f"{Colors.BORDER}╭─ {Colors.TITLE}Select Files/Folders to Lock{Colors.RESET}")
+        print(f"{Colors.BORDER}╭─ 🔒 {Colors.TITLE}Select Files/Folders to Lock{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Directory: "
               f"{Colors.HIGHLIGHT}{dir_name}{Colors.RESET}")
         print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Full Path: "
@@ -364,7 +364,8 @@ class FileSelector:
 
         print(f"\n{Colors.INFO}Directory:{Colors.RESET}")
         print(f"{Colors.DIM}[{Colors.SUCCESS}B{Colors.DIM}] Back  "
-              f"[{Colors.SUCCESS}F{Colors.DIM}] Enter Folder{Colors.RESET}")
+              f"[{Colors.SUCCESS}F{Colors.DIM}] Enter Folder  "
+              f"[{Colors.SUCCESS}T{Colors.DIM}] Teleport{Colors.RESET}")
 
         print(f"\n{Colors.INFO}View:{Colors.RESET}")
         # Show current state and next action
@@ -387,6 +388,7 @@ class FileSelector:
 
         print(f"\n{Colors.INFO}Actions:{Colors.RESET}")
         print(f"{Colors.DIM}[{Colors.SUCCESS}Enter{Colors.DIM}] Confirm Selection  "
+              f"[{Colors.SUCCESS}S{Colors.DIM}] Switch to Unlock Screen  "
               f"[{Colors.SUCCESS}Q{Colors.DIM}] Quit{Colors.RESET}\n")
 
     def go_back(self) -> bool:
@@ -437,6 +439,7 @@ class FileSelector:
             List of selected file paths
         """
         self.locked_paths = locked_paths or set()
+        self.selected_items = set()  # Clear previous selections
         self.items = self.scan_directory()
 
         if not self.items:
@@ -472,6 +475,10 @@ class FileSelector:
                 else:
                     self.display_selector()
                 continue
+            
+            if key == 't':
+                # Teleport - return special value
+                return ['__TELEPORT__']
 
             if key in ['up', 'u']:
                 self.cursor_pos = max(0, self.cursor_pos - 1)
@@ -479,7 +486,7 @@ class FileSelector:
             elif key in ['down', 'd']:
                 self.cursor_pos = min(len(self.items) - 1, self.cursor_pos + 1)
 
-            elif key in ['space', 's']:
+            elif key == 'space':
                 # Toggle selection (stay on same line)
                 if 0 <= self.cursor_pos < len(self.items):
                     item_path = self.items[self.cursor_pos]['path']
@@ -507,10 +514,16 @@ class FileSelector:
                 self.display_selector()
                 continue
 
+            elif key == 's':
+                # Switch to unlock screen
+                return ['__SWITCH_TO_UNLOCK__']
+            
             elif key == 'a':
-                # Select all
+                # Select all (but not locked items)
                 for item in self.items:
-                    self.selected_items.add(item['path'])
+                    is_locked = hasattr(self, 'locked_paths') and item['path'] in self.locked_paths
+                    if not is_locked:
+                        self.selected_items.add(item['path'])
 
             elif key == 'n':
                 # Clear all selections
@@ -565,7 +578,7 @@ class FileSelector:
         """
         self.items = items
         self.cursor_pos = 0
-        self.selected_items = set()
+        self.selected_items = set()  # Always start fresh
 
         if not self.items:
             print_error("No items to select from.")
@@ -576,15 +589,21 @@ class FileSelector:
             # Clear screen
             os.system('cls' if os.name == 'nt' else 'clear')
 
-            # Header
-            print(f"{Colors.BORDER}╭─ {Colors.TITLE}{title}{Colors.RESET}")
+            # Header with emoji and current directory
+            print(f"{Colors.BORDER}╭─ 🔓 {Colors.TITLE}{title}{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Select items to unlock and restore access{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}Items will be removed from monitoring{Colors.RESET}")
+            # Show current directory if available
+            if hasattr(self, 'current_dir'):
+                dir_name = os.path.basename(self.current_dir) or self.current_dir
+                print(f"{Colors.BORDER}│{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Directory: {Colors.HIGHLIGHT}{dir_name}{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Full Path: {Colors.DIM}{self.current_dir}{Colors.RESET}")
             print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
                   f"─────────────────{Colors.RESET}\n")
 
             # Items
-            print(f"{Colors.BORDER}╭─ {Colors.TITLE}ITEMS{Colors.RESET}")
+            print(f"{Colors.BORDER}╭─ 📋 {Colors.TITLE}ITEMS{Colors.RESET}")
 
             for i, item in enumerate(self.items):
                 is_selected = item['path'] in self.selected_items
@@ -640,15 +659,22 @@ class FileSelector:
             print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
                   f"─────────────────{Colors.RESET}")
 
-            # Help
-            print(f"\n{Colors.INFO}Controls:{Colors.RESET}")
+            # Help - categorized like lock screen
+            print(f"\n{Colors.INFO}Navigation:{Colors.RESET}")
             print(f"{Colors.DIM}[{Colors.SUCCESS}↑↓{Colors.DIM}] Navigate  "
                   f"[{Colors.SUCCESS}Space{Colors.DIM}] Select  "
-                  f"[{Colors.SUCCESS}Enter{Colors.DIM}] Confirm  "
                   f"[{Colors.SUCCESS}A{Colors.DIM}] Select All  "
-                  f"[{Colors.SUCCESS}N{Colors.DIM}] Clear All  "
+                  f"[{Colors.SUCCESS}N{Colors.DIM}] Clear All{Colors.RESET}")
+            
+            print(f"\n{Colors.INFO}Directory:{Colors.RESET}")
+            print(f"{Colors.DIM}[{Colors.SUCCESS}T{Colors.DIM}] Teleport{Colors.RESET}")
+            
+            print(f"\n{Colors.INFO}Actions:{Colors.RESET}")
+            print(f"{Colors.DIM}[{Colors.SUCCESS}Enter{Colors.DIM}] Confirm  "
+                  f"[{Colors.SUCCESS}S{Colors.DIM}] Switch to Lock Screen  "
                   f"[{Colors.SUCCESS}Q{Colors.DIM}] Quit{Colors.RESET}")
-            print(f"{Colors.INFO}Selected: {Colors.HIGHLIGHT}{len(self.selected_items)} "
+            
+            print(f"\n{Colors.INFO}Selected: {Colors.HIGHLIGHT}{len(self.selected_items)} "
                   f"items{Colors.RESET}\n")
 
         display_list()  # Initial display
@@ -670,7 +696,7 @@ class FileSelector:
             elif key in ['down', 'd']:
                 self.cursor_pos = min(len(self.items) - 1, self.cursor_pos + 1)
 
-            elif key in ['space', 's']:
+            elif key == 'space':
                 if 0 <= self.cursor_pos < len(self.items):
                     item_path = self.items[self.cursor_pos]['path']
                     if item_path in self.selected_items:
@@ -678,6 +704,14 @@ class FileSelector:
                     else:
                         self.selected_items.add(item_path)
                     # Don't move cursor after selection
+            
+            elif key == 's':
+                # Switch to lock screen
+                return ['__SWITCH_TO_LOCK__']
+            
+            elif key == 't':
+                # Teleport to location
+                return ['__TELEPORT__']
 
             elif key in ['enter', 'e']:
                 if confirm_action(f"Confirm selection of {len(self.selected_items)} items?"):

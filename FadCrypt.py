@@ -1043,6 +1043,25 @@ def launch_tui():
         crypto_manager = CryptoManager()
         password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
         
+        # Verify password before launching TUI
+        from core.cli.password_prompt import PasswordPrompt
+        password_prompt = PasswordPrompt(password_manager)
+        
+        # Ensure password exists
+        if not password_prompt.ensure_password_exists():
+            from core.cli.colors import print_error
+            print_error("Cannot proceed without a master password.")
+            return
+        
+        # Verify password
+        if not password_prompt.verify_password():
+            from core.cli.colors import print_error
+            print_error("Authentication failed.")
+            return
+        
+        # Clear screen after successful authentication
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
         # Initialize CLI handler
         if system == "Windows":
             from core.cli.cli_handler_windows import CLIHandlerWindows
