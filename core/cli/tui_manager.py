@@ -190,15 +190,34 @@ class TUIManager:
             input("\nPress Enter to continue...")
             return
         
-        # Filter items by current directory
-        current_dir = self.file_selector.current_dir
-        items_in_current_dir = [item for item in locked_items if os.path.dirname(item['path']) == current_dir]
-        
-        # If no items in current directory, show all
-        items_to_show = items_in_current_dir if items_in_current_dir else locked_items
-        
-        # Show locked items for selection
-        selected_paths = self.file_selector.select_from_list(items_to_show, "Select Items to Unlock")
+        # Loop to handle refiltering
+        while True:
+            # Filter items based on filter mode
+            current_dir = self.file_selector.current_dir
+            items_in_current_dir = [item for item in locked_items if os.path.dirname(item['path']) == current_dir]
+            
+            # Determine what to show based on filter mode
+            if hasattr(self.file_selector, 'unlock_filter_mode') and self.file_selector.unlock_filter_mode == "all":
+                items_to_show = locked_items  # Show all locations
+            else:
+                # Show current directory only
+                items_to_show = items_in_current_dir
+                # If no items in current dir, show message and switch to all
+                if not items_to_show:
+                    print_warning(f"No locked items in current directory: {current_dir}")
+                    print_info("Switching to 'All Locations' mode...")
+                    self.file_selector.unlock_filter_mode = "all"
+                    input("\nPress Enter to continue...")
+                    continue  # Re-run with all locations
+            
+            # Show locked items for selection
+            selected_paths = self.file_selector.select_from_list(items_to_show, "Select Items to Unlock")
+            
+            # Check if refilter requested
+            if selected_paths and selected_paths[0] == '__REFILTER__':
+                continue  # Re-run the loop with new filter
+            else:
+                break  # Exit loop and process results
         
         # Check for special returns
         if selected_paths and selected_paths[0] == '__SWITCH_TO_LOCK__':

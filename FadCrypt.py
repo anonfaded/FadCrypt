@@ -1234,31 +1234,77 @@ def handle_direct_cli_commands():
     
     # Handle --list (or --list-locked for backwards compatibility)
     elif '--list' in sys.argv or '--list-locked' in sys.argv:
+        from datetime import datetime
         locked_items = cli_handler.list_locked_items()
         
         if not locked_items:
             print_info("No locked items found.")
         else:
-            print_colored(f"\n{BoxChars.TOP_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.TOP_RIGHT}", Colors.BORDER)
-            print_colored(f"{BoxChars.VERTICAL}{'Locked Items':^61}{BoxChars.VERTICAL}", Colors.TITLE)
-            print_colored(f"{BoxChars.BOTTOM_LEFT}{BoxChars.HORIZONTAL * 61}{BoxChars.BOTTOM_RIGHT}\n", Colors.BORDER)
+            # Show header with first item directory (matching TUI design)
+            from FadCrypt import __version__
+            print(f"\n{Colors.BORDER}╭─ 🏴 {Colors.TITLE}FadCrypt v{__version__}{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}File, Folder & Application Protection Suite{Colors.RESET}")
+            # Show current working directory
+            current_folder = os.getcwd()
+            print(f"{Colors.BORDER}│{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current Folder:{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{current_folder}{Colors.RESET}")
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
             
-            print_colored(f"{BoxChars.S_TOP_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_TOP_RIGHT}", Colors.BORDER)
-            print_colored(f"{BoxChars.S_VERTICAL}{'Type':<8}{'Name':<50}{BoxChars.S_VERTICAL}", Colors.TITLE)
-            print_colored(f"{BoxChars.S_T_RIGHT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_T_LEFT}", Colors.BORDER)
+            # Display items
+            print(f"{Colors.BORDER}╭─ 📋 {Colors.TITLE}Items{Colors.RESET}")
             
             for item in locked_items:
                 icon = '📁' if item['type'] == 'folder' else '📄'
                 name = item['name']
-                if len(name) > 48:
-                    name = name[:45] + '...'
                 
+                # Get file info
+                try:
+                    path = item['path']
+                    if os.path.exists(path):
+                        stat_info = os.stat(path)
+                        size_mb = stat_info.st_size / (1024 * 1024)
+                        modified_time = datetime.fromtimestamp(stat_info.st_mtime)
+                        modified_str = modified_time.strftime("%d-%b-%Y %I:%M %p")
+                        
+                        if item['type'] == 'folder':
+                            size_display = "" if size_mb == 0 else f"{size_mb:6.2f}MB"
+                        else:
+                            size_display = f"{max(0.01, size_mb):6.2f}MB"
+                    else:
+                        size_display = "N/A"
+                        modified_str = "N/A"
+                except:
+                    size_display = "N/A"
+                    modified_str = "N/A"
+                
+                # Display item with size and date
                 item_type = item['type'].capitalize()
-                line = f"{BoxChars.S_VERTICAL} {icon} {item_type:<6}{name:<48}{BoxChars.S_VERTICAL}"
-                print_colored(line, Colors.TEXT)
+                size_date = f"{size_display:>8}  {modified_str}" if size_display != "N/A" else modified_str
+                print(f"{Colors.BORDER}│{Colors.RESET} {icon} {Colors.DIM}{item_type:<6}{Colors.RESET} {Colors.TEXT}{name:<40}{Colors.RESET} {Colors.DIM}{size_date}{Colors.RESET}")
             
-            print_colored(f"{BoxChars.S_BOTTOM_LEFT}{BoxChars.S_HORIZONTAL * 61}{BoxChars.S_BOTTOM_RIGHT}", Colors.BORDER)
-            print_colored(f"\nTotal: {len(locked_items)} item(s)\n", Colors.INFO)
+            print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            print(f"\n{Colors.INFO}Total: {len(locked_items)} item(s){Colors.RESET}")
+            
+            # Add locations section (like teleport feature in TUI)
+            # Get unique directories
+            directories = {}
+            for item in locked_items:
+                dir_path = os.path.dirname(item['path'])
+                if dir_path not in directories:
+                    directories[dir_path] = []
+                directories[dir_path].append(item['name'])
+            
+            # Show directories with item counts if more than one location
+            if len(directories) > 1:
+                print(f"\n{Colors.BORDER}╭─ 📍 {Colors.TITLE}LOCATIONS ({len(directories)} unique){Colors.RESET}")
+                for idx, (dir_path, items) in enumerate(directories.items(), 1):
+                    dir_name = os.path.basename(dir_path) or dir_path
+                    print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}[{idx}]{Colors.RESET} {Colors.TEXT}{dir_name}{Colors.RESET} {Colors.DIM}({len(items)} item(s)){Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.DIM}└─ {dir_path}{Colors.RESET}")
+                print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
+            
+            print()  # Empty line at end
         
         return True
     

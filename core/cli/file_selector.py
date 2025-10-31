@@ -116,6 +116,7 @@ class FileSelector:
         self.max_visible_selected = 4  # Default selected display
         self.items_view_mode = "normal"  # "normal" (10) or "expanded" (30)
         self.selected_view_mode = "normal"  # "normal" (4) or "expanded" (30)
+        self.unlock_filter_mode = "current"  # "current" (current dir only) or "all" (all locations)
 
     def scan_directory(self) -> List[Dict]:
         """
@@ -483,7 +484,7 @@ class FileSelector:
             if key in ['up', 'u']:
                 self.cursor_pos = max(0, self.cursor_pos - 1)
 
-            elif key in ['down', 'd']:
+            elif key == 'down':
                 self.cursor_pos = min(len(self.items) - 1, self.cursor_pos + 1)
 
             elif key == 'space':
@@ -593,12 +594,11 @@ class FileSelector:
             print(f"{Colors.BORDER}╭─ 🔓 {Colors.TITLE}{title}{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Select items to unlock and restore access{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}Items will be removed from monitoring{Colors.RESET}")
-            # Show current directory if available
+            # Show current folder path
             if hasattr(self, 'current_dir'):
-                dir_name = os.path.basename(self.current_dir) or self.current_dir
                 print(f"{Colors.BORDER}│{Colors.RESET}")
-                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Directory: {Colors.HIGHLIGHT}{dir_name}{Colors.RESET}")
-                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Full Path: {Colors.DIM}{self.current_dir}{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current Folder:{Colors.RESET}")
+                print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{self.current_dir}{Colors.RESET}")
             print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
                   f"─────────────────{Colors.RESET}\n")
 
@@ -658,6 +658,11 @@ class FileSelector:
 
             print(f"{Colors.BORDER}╰─────────────────────────────────────────────"
                   f"─────────────────{Colors.RESET}")
+            
+            # Show current cursor item path
+            if self.items and 0 <= self.cursor_pos < len(self.items):
+                cursor_item_path = self.items[self.cursor_pos]['path']
+                print(f"\n{Colors.DIM}Current Item: {cursor_item_path}{Colors.RESET}")
 
             # Help - categorized like lock screen
             print(f"\n{Colors.INFO}Navigation:{Colors.RESET}")
@@ -667,7 +672,9 @@ class FileSelector:
                   f"[{Colors.SUCCESS}N{Colors.DIM}] Clear All{Colors.RESET}")
             
             print(f"\n{Colors.INFO}Directory:{Colors.RESET}")
-            print(f"{Colors.DIM}[{Colors.SUCCESS}T{Colors.DIM}] Teleport{Colors.RESET}")
+            filter_text = "Current Dir Only" if self.unlock_filter_mode == "current" else "All Locations"
+            print(f"{Colors.DIM}[{Colors.SUCCESS}D{Colors.DIM}] Filter: {filter_text}  "
+                  f"[{Colors.SUCCESS}T{Colors.DIM}] Teleport{Colors.RESET}")
             
             print(f"\n{Colors.INFO}Actions:{Colors.RESET}")
             print(f"{Colors.DIM}[{Colors.SUCCESS}Enter{Colors.DIM}] Confirm  "
@@ -693,7 +700,7 @@ class FileSelector:
             if key in ['up', 'u']:
                 self.cursor_pos = max(0, self.cursor_pos - 1)
 
-            elif key in ['down', 'd']:
+            elif key == 'down':
                 self.cursor_pos = min(len(self.items) - 1, self.cursor_pos + 1)
 
             elif key == 'space':
@@ -708,6 +715,11 @@ class FileSelector:
             elif key == 's':
                 # Switch to lock screen
                 return ['__SWITCH_TO_LOCK__']
+            
+            elif key == 'd':
+                # Toggle directory filter and return signal to re-filter
+                self.unlock_filter_mode = "all" if self.unlock_filter_mode == "current" else "current"
+                return ['__REFILTER__']
             
             elif key == 't':
                 # Teleport to location
