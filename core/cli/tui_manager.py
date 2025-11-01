@@ -152,16 +152,13 @@ class TUIManager:
 
     def lock_files_menu(self):
         """Lock files/folders menu"""
-        self.show_header()
-        print_colored("Lock Files/Folders\n", Colors.TITLE)
-        
         lock_menu_items = [
             {'key': '1', 'icon': '📁', 'text': 'Browse current directory', 'action': 'browse'},
             {'key': '2', 'icon': '📝', 'text': 'Enter path manually', 'action': 'manual'},
             {'key': '3', 'icon': '🔙', 'text': 'Back to main menu', 'action': 'back'}
         ]
         
-        choice = self.menu_navigator.show_menu("SELECT FILES/FOLDERS TO LOCK", lock_menu_items, self.show_header)
+        choice = show_curses_menu("SELECT FILES/FOLDERS TO LOCK", lock_menu_items, "Back")
         
         if choice == '3' or choice == 'back' or choice == 'quit':
             return
@@ -475,11 +472,7 @@ class TUIManager:
                 {'key': '4', 'icon': '🔙', 'text': 'Back to Main Menu', 'action': 'back'}
             ]
             
-            def settings_header():
-                self.show_header()
-                print(f"{Colors.TITLE}Settings{Colors.RESET}\n")
-            
-            choice = self.menu_navigator.show_menu("OPTIONS", settings_menu_items, settings_header)
+            choice = show_curses_menu("OPTIONS", settings_menu_items, "Back")
             
             if choice == '4' or choice == 'back' or choice == 'quit':
                 break
