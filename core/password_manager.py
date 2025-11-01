@@ -175,7 +175,8 @@ class PasswordManager:
                     print("[PasswordManager] Warning: Failed to re-encrypt some configs")
                     # Don't revert password change - user can manually re-encrypt
             
-            print("[PasswordManager] Password changed successfully")
+            from core.verbose_logger import vlog
+            vlog("[PasswordManager] Password changed successfully")
             return True
             
         except Exception as e:
@@ -294,34 +295,35 @@ class PasswordManager:
             if not self.recovery_manager.has_recovery_codes():
                 return False, "No recovery codes found. Please reset your password differently."
             
-            print("[PasswordManager] Starting password recovery process (hash-based)...")
+            from core.verbose_logger import vlog
+            vlog("[PasswordManager] Starting password recovery process (hash-based)...")
             
             # Step 1: Verify recovery code
-            print("[PasswordManager] Verifying recovery code against stored hashes...")
+            vlog("[PasswordManager] Verifying recovery code against stored hashes...")
             is_valid, error_msg = self.recovery_manager.verify_recovery_code(recovery_code)
             
             if not is_valid:
                 print(f"[PasswordManager] Recovery code verification failed: {error_msg}")
                 return False, f"Invalid recovery code: {error_msg}"
             
-            print("[PasswordManager] Recovery code verified successfully")
+            vlog("[PasswordManager] Recovery code verified successfully")
             
             # Step 2: Consume (mark as used) the recovery code immediately
             print("[PasswordManager] Marking recovery code as used...")
             consumed, consume_error = self.recovery_manager.consume_recovery_code(recovery_code)
             
             if not consumed:
-                print(f"[PasswordManager] Failed to mark code as used: {consume_error}")
+                vlog(f"[PasswordManager] Failed to mark code as used: {consume_error}")
             else:
-                print("[PasswordManager] Recovery code marked as used")
+                vlog("[PasswordManager] Recovery code marked as used")
             
             # Step 3: Delete old password file (cannot be recovered)
             if os.path.exists(self.password_file):
                 try:
                     os.remove(self.password_file)
-                    print("[PasswordManager] [OK] Deleted old password file")
+                    vlog("[PasswordManager] [OK] Deleted old password file")
                 except Exception as e:
-                    print(f"[PasswordManager] ⚠️  Failed to delete old password: {e}")
+                    vlog(f"[PasswordManager] ⚠️  Failed to delete old password: {e}")
             
             # Note: Recovery codes are kept - only the used code is marked as consumed
             # Remaining unused codes can still be used for future password resets
@@ -336,7 +338,7 @@ class PasswordManager:
             if not self.create_password(new_password):
                 return False, "Failed to create new password"
             
-            print("[PasswordManager] Password recovered and reset successfully")
+            vlog("[PasswordManager] Password recovered and reset successfully")
             
             return True, None
             

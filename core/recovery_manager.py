@@ -255,14 +255,16 @@ class RecoveryCodeManager:
                         return False, "This recovery code has already been used"
                     
                     # Code is valid and unused
-                    print("[RecoveryCodeManager] Recovery code verified")
+                    from core.verbose_logger import vlog
+                    vlog("[RecoveryCodeManager] Recovery code verified")
                     return True, None
             
             # Code not found in any hash
             return False, "Recovery code not found or incorrect"
             
         except Exception as e:
-            print(f"[RecoveryCodeManager] ❌ Error verifying recovery code: {e}")
+            from core.verbose_logger import vlog
+            vlog(f"[RecoveryCodeManager] ❌ Error verifying recovery code: {e}")
             import traceback
             traceback.print_exc()
             return False, f"Error verifying code: {str(e)}"
@@ -321,7 +323,8 @@ class RecoveryCodeManager:
             with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
                 json.dump(recovery_data, f, indent=2)
             
-            print("[RecoveryCodeManager] Recovery code marked as used")
+            from core.verbose_logger import vlog
+            vlog("[RecoveryCodeManager] Recovery code marked as used")
             return True, None
             
         except Exception as e:

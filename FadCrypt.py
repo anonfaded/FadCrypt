@@ -1053,8 +1053,8 @@ def launch_tui():
             print_error("Cannot proceed without a master password.")
             return
         
-        # Verify password
-        if not password_prompt.verify_password():
+        # Verify password (with recovery option)
+        if not password_prompt.verify_password_with_recovery():
             from core.cli.colors import print_error
             print_error("Authentication failed.")
             return
@@ -1182,8 +1182,8 @@ def handle_direct_cli_commands():
             print_error("Cannot proceed without a master password.")
             return False
         
-        # Verify password for all operations
-        if not password_prompt.verify_password():
+        # Verify password for all operations (with recovery option)
+        if not password_prompt.verify_password_with_recovery():
             print_error("Authentication failed.")
             return False
         

@@ -486,8 +486,8 @@ class TUIManager:
             elif choice == '1':
                 self.password_prompt.change_password()
             elif choice == '2':
-                # Verify password before generating recovery codes
-                if self.password_prompt.verify_password():
+                # Verify password before generating recovery codes (with recovery option)
+                if self.password_prompt.verify_password_with_recovery():
                     self.password_prompt.generate_recovery_codes()
             elif choice == '3':
                 self.show_about()

@@ -105,12 +105,48 @@ class AnimatedPasswordInput:
         
         # Help text
         help_row = input_row + 2
-        self.stdscr.addstr(help_row, start_col, "┃ ", curses.color_pair(1))
-        self.stdscr.addstr(help_row, start_col + 2, "[", curses.color_pair(4))
-        self.stdscr.addstr(help_row, start_col + 3, "Enter", curses.color_pair(2))
-        self.stdscr.addstr(help_row, start_col + 8, "] Submit  [", curses.color_pair(4))
-        self.stdscr.addstr(help_row, start_col + 19, "Esc", curses.color_pair(2))
-        self.stdscr.addstr(help_row, start_col + 22, "] Cancel", curses.color_pair(4))
+        
+        # Check if this is a recovery code prompt
+        is_recovery_code = "recovery code" in prompt.lower()
+        
+        # Check if this is a context where F1 recovery should be available
+        # F1 should be available for: verification, current password entry
+        # F1 should NOT be available for: new password, confirm password, recovery code, create password
+        show_forgot_option = (
+            not is_recovery_code and 
+            not "new password" in prompt.lower() and 
+            not "confirm" in prompt.lower() and
+            not "create" in prompt.lower() and
+            ("password" in prompt.lower() or "fadcrypt" in prompt.lower())
+        )
+        
+        if is_recovery_code:
+            # Show recovery code format info
+            self.stdscr.addstr(help_row, start_col, "┃ ", curses.color_pair(1))
+            self.stdscr.addstr(help_row, start_col + 2, "Format: XXXX-XXXX-XXXX-XXXX (or spaces)", curses.color_pair(4))
+            
+            # Controls on next line
+            help_row += 1
+            self.stdscr.addstr(help_row, start_col, "┃ ", curses.color_pair(1))
+            self.stdscr.addstr(help_row, start_col + 2, "[", curses.color_pair(4))
+            self.stdscr.addstr(help_row, start_col + 3, "Enter", curses.color_pair(2))
+            self.stdscr.addstr(help_row, start_col + 8, "] Submit  [", curses.color_pair(4))
+            self.stdscr.addstr(help_row, start_col + 19, "Esc", curses.color_pair(2))
+            self.stdscr.addstr(help_row, start_col + 22, "] Cancel", curses.color_pair(4))
+        else:
+            # Regular password prompt
+            self.stdscr.addstr(help_row, start_col, "┃ ", curses.color_pair(1))
+            self.stdscr.addstr(help_row, start_col + 2, "[", curses.color_pair(4))
+            self.stdscr.addstr(help_row, start_col + 3, "Enter", curses.color_pair(2))
+            self.stdscr.addstr(help_row, start_col + 8, "] Submit  [", curses.color_pair(4))
+            self.stdscr.addstr(help_row, start_col + 19, "Esc", curses.color_pair(2))
+            
+            if show_forgot_option:
+                self.stdscr.addstr(help_row, start_col + 22, "] Cancel  [", curses.color_pair(4))
+                self.stdscr.addstr(help_row, start_col + 33, "F1", curses.color_pair(2))
+                self.stdscr.addstr(help_row, start_col + 35, "] Forgot?", curses.color_pair(4))
+            else:
+                self.stdscr.addstr(help_row, start_col + 22, "] Cancel", curses.color_pair(4))
         
         password = ""
         
@@ -213,6 +249,8 @@ class AnimatedPasswordInput:
             
             if key == 27:  # ESC
                 return None
+            elif key == curses.KEY_F1 and show_forgot_option:  # F1 - Forgot Password (only if allowed)
+                return "FORGOT_PASSWORD"  # Special return value
             elif key == ord('\n') or key == ord('\r'):  # Enter
                 if password:
                     if confirm:
