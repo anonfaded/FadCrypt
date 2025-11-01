@@ -148,6 +148,39 @@ class AnimatedPasswordInput:
             else:
                 self.stdscr.addstr(help_row, start_col + 22, "] Cancel", curses.color_pair(4))
         
+        # Add footer branding near bottom of screen (with safety check)
+        height, width = self.stdscr.getmaxyx()
+        min_footer_space = 6  # Need 4 lines for logo + 1 for branding + 1 spacing
+        footer_row = max(help_row + 3, height - min_footer_space)  # Don't go below help, don't go out of bounds
+        
+        # Logo lines definition
+        logo_lines = [
+            " ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒",
+            " ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒      ▓    ▓",
+            " ▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒      ▓ ▓▓ ▓▓",
+            " ▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒"
+        ]
+        
+        # Only draw footer if there's enough space
+        if footer_row + min_footer_space <= height:
+            # Calculate box dimensions for footer positioning
+            box_width = min(60, width - 4)
+            box_start_col = (width - box_width) // 2
+            
+            # Position ASCII block slightly left of center within the box
+            ascii_block_width = len(logo_lines[0])  # Width of the ASCII art
+            # Start 1 character from box left edge instead of centering
+            ascii_start_col = box_start_col + 1
+            
+            for i, logo_line in enumerate(logo_lines):
+                self.stdscr.addstr(footer_row + i, ascii_start_col, logo_line, curses.color_pair(1))
+            
+            # Website and license info below the logo (centered within the box)
+            branding_row = footer_row + 4
+            branding_text = "https://faded.dev · © 2024–2025 · GPLv3 License"
+            branding_col = box_start_col + (box_width - len(branding_text)) // 2
+            self.stdscr.addstr(branding_row, branding_col, branding_text, curses.color_pair(4))
+        
         password = ""
         
         while True:
@@ -222,14 +255,30 @@ class AnimatedPasswordInput:
             # Clear input line
             self.stdscr.addstr(input_row, start_col, " " * box_width)
             
-            # Format: ┃ [0xABCD] ❯ ****▌
+            # Format: ┃ [0xABCD] ❯ ────────────────▌
             self.stdscr.addstr(input_row, start_col, "┃ ", curses.color_pair(1))
             self.stdscr.addstr(input_row, start_col + 2, "[", curses.color_pair(4))
             self.stdscr.addstr(input_row, start_col + 3, f"0x{hex_prefix}", curses.color_pair(1))
             self.stdscr.addstr(input_row, start_col + 9, "]", curses.color_pair(4))
             self.stdscr.addstr(input_row, start_col + 11, "❯", curses.color_pair(3) | curses.A_BOLD)
-            self.stdscr.addstr(input_row, start_col + 13, f"{masked}{cursor}", curses.color_pair(2))
             
+            # Draw dark red underscore line for input field (starting right after arrow)
+            underscore_length = 8  # Short underscore line
+            self.stdscr.addstr(input_row, start_col + 12, "_" * underscore_length, curses.color_pair(1) | curses.A_DIM)
+            
+            # Draw dark red underscore line for input field (starting right after arrow)
+            underscore_length = 8  # Short underscore line
+            self.stdscr.addstr(input_row, start_col + 12, "_" * underscore_length, curses.color_pair(1) | curses.A_DIM)
+            
+            # Draw password (can extend beyond underscores)
+            if masked:
+                self.stdscr.addstr(input_row, start_col + 12, masked, curses.color_pair(2))
+            
+            # Draw cursor at the end
+            cursor_pos = start_col + 12 + len(masked)
+            self.stdscr.addstr(input_row, cursor_pos, cursor, curses.color_pair(2))
+            
+            # Remove the separate underline row since it's now inline
             # Move cursor off-screen to hide it
             self.stdscr.move(0, 0)
             
