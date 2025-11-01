@@ -52,6 +52,8 @@
     - [How to Contribute](#how-to-contribute)
 - [Install Dependencies \& Build](#install-dependencies--build)
 - [Reset Password](#reset-password)
+  - [1. Terminate the app processes (if running)](#1-terminate-the-app-processes-if-running)
+  - [2. Delete the password binary file](#2-delete-the-password-binary-file)
 </details>
 
 ---
@@ -209,11 +211,15 @@ We look forward to your contributions!
 
 **Linux Prerequisites:**
 
-First, install the Tkinter library (required for GUI):
+**Note for Emoji Rendering:** If emojis appear as white outline glyphs instead of colored emojis in your terminal, install GNOME Terminal and set it as the default:
 
 ```bash
-sudo apt-get install python3-tk
+sudo apt install gnome-terminal
+sudo update-alternatives --config x-terminal-emulator
+# Select gnome-terminal from the list
 ```
+
+This ensures proper color emoji rendering in CLI verbose output.
 
 **Install Python Dependencies:**
 
