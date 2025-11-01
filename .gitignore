@@ -18,4 +18,4 @@ fadcrypt-deb/
 *.pkg
 
 TASKS.md
-.stfolder/syncthing-folder-4b0bbd.txt
+.stfolder/*
