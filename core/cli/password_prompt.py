@@ -2,14 +2,14 @@
 CLI Password Prompt
 
 Secure password input for CLI without GUI dialogs.
-Uses getpass for masked input.
+Uses curses for animated input.
 """
 
-import getpass
 import os
 from typing import Optional
 
 from .colors import Colors, print_colored, print_error, print_success, print_warning
+from .curses_password import prompt_password_curses
 
 
 class PasswordPrompt:
@@ -26,7 +26,7 @@ class PasswordPrompt:
     
     def prompt_password(self, prompt: str = "Enter password: ", confirm: bool = False) -> Optional[str]:
         """
-        Prompt for password with masked input.
+        Prompt for password with masked input using curses animated input.
         
         Args:
             prompt: Prompt text to display
@@ -35,28 +35,9 @@ class PasswordPrompt:
         Returns:
             Password string or None if cancelled
         """
-        try:
-            print(f"{Colors.PRIMARY}{prompt}")
-            password = getpass.getpass(f" {Colors.SUCCESS}❯{Colors.RESET} ")
-            
-            if not password:
-                return None
-            
-            if confirm:
-                print(f"{Colors.PRIMARY}Confirm password:")
-                confirm_password = getpass.getpass(f" {Colors.SUCCESS}❯{Colors.RESET} ")
-                if password != confirm_password:
-                    print_error("Passwords do not match!")
-                    return None
-            
-            return password
-            
-        except KeyboardInterrupt:
-            print()
-            return None
-        except Exception as e:
-            print_error(f"Error reading password: {e}")
-            return None
+        # Remove trailing colon and "Enter" prefix for cleaner curses display
+        clean_prompt = prompt.replace("Enter ", "").replace(":", "").strip()
+        return prompt_password_curses(clean_prompt, confirm)
     
     def verify_password(self, prompt: str = "Enter your FadCrypt password: ") -> bool:
         """
