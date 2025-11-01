@@ -56,17 +56,8 @@ class TUIManager:
             {'key': '6', 'icon': '❌', 'text': 'Exit', 'action': 'exit'}
         ]
         
-        # Try curses menu first (with animation)
-        if CURSES_AVAILABLE:
-            try:
-                choice = show_curses_menu("MAIN MENU", main_menu_items)
-                if choice:
-                    return choice
-            except Exception:
-                pass  # Fall back to regular menu
-        
-        # Fallback to regular menu
-        return self.menu_navigator.show_menu("MAIN MENU", main_menu_items, self.show_header)
+        # Use curses menu with animation
+        return show_curses_menu("MAIN MENU", main_menu_items)
     
     def run(self):
         """Run the main TUI loop"""
