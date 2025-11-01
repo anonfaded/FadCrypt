@@ -263,7 +263,8 @@ class FileSelector:
                     if item['size_mb'] < 0.01:
                         size_info = f"{Colors.DIM}{'0.01MB':>8}{Colors.RESET}"
                     else:
-                        size_info = f"{Colors.DIM}{f'{item["size_mb"]:.2f}MB':>8}{Colors.RESET}"
+                        size_str = f'{item["size_mb"]:.2f}MB'
+                        size_info = f"{Colors.DIM}{size_str:>8}{Colors.RESET}"
                 
                 date_info = f"{Colors.DIM}{item['modified']}{Colors.RESET}"
                 
