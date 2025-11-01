@@ -12,6 +12,7 @@ from .colors import Colors, print_colored, print_success, print_error, print_war
 from .password_prompt import PasswordPrompt
 from .file_selector import FileSelector
 from .menu_navigator import MenuNavigator
+from .curses_menu import show_curses_menu, CURSES_AVAILABLE
 
 
 class TUIManager:
@@ -47,14 +48,24 @@ class TUIManager:
     def show_main_menu(self):
         """Display the main menu with arrow navigation"""
         main_menu_items = [
-            {'key': '1', 'icon': Colors.ICON_LOCK, 'text': 'Lock Files/Folders', 'action': 'lock'},
-            {'key': '2', 'icon': Colors.ICON_UNLOCK, 'text': 'Unlock Files/Folders', 'action': 'unlock'},
+            {'key': '1', 'icon': '🔒', 'text': 'Lock Files/Folders', 'action': 'lock'},
+            {'key': '2', 'icon': '🔓', 'text': 'Unlock Files/Folders', 'action': 'unlock'},
             {'key': '3', 'icon': '📋', 'text': 'List Locked Items', 'action': 'list'},
             {'key': '4', 'icon': '💻', 'text': 'Open GUI Application', 'action': 'gui'},
             {'key': '5', 'icon': '🔧', 'text': 'Settings', 'action': 'settings'},
             {'key': '6', 'icon': '❌', 'text': 'Exit', 'action': 'exit'}
         ]
         
+        # Try curses menu first (with animation)
+        if CURSES_AVAILABLE:
+            try:
+                choice = show_curses_menu("MAIN MENU", main_menu_items)
+                if choice:
+                    return choice
+            except Exception:
+                pass  # Fall back to regular menu
+        
+        # Fallback to regular menu
         return self.menu_navigator.show_menu("MAIN MENU", main_menu_items, self.show_header)
     
     def run(self):

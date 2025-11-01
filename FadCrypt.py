@@ -1067,10 +1067,8 @@ def launch_tui():
             from core.cli.cli_handler_windows import CLIHandlerWindows
             cli_handler = CLIHandlerWindows(config_folder)
         else:
-            # Linux handler will be implemented later
-            from core.cli.colors import print_error
-            print_error("Linux CLI support coming soon. Use --gui to launch the GUI.")
-            return
+            from core.cli.cli_handler_linux import CLIHandlerLinux
+            cli_handler = CLIHandlerLinux(config_folder)
         
         # Launch TUI
         from core.cli.tui_manager import TUIManager
@@ -1174,8 +1172,8 @@ def handle_direct_cli_commands():
         from core.cli.cli_handler_windows import CLIHandlerWindows
         cli_handler = CLIHandlerWindows(config_folder)
     else:
-        print_error("Linux CLI support coming soon.")
-        return False
+        from core.cli.cli_handler_linux import CLIHandlerLinux
+        cli_handler = CLIHandlerLinux(config_folder)
     
     # Only require password for user-facing commands (not system operations)
     if requires_password_protection():
