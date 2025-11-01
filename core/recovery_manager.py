@@ -18,6 +18,7 @@ import string
 import hashlib
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
+from .verbose_logger import vlog
 
 
 class RecoveryCodeManager:
@@ -194,9 +195,9 @@ class RecoveryCodeManager:
             with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
                 json.dump(recovery_data, f, indent=2)
             
-            print(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
-            print(f"[RecoveryCodeManager] Hash algorithm: PBKDF2-HMAC-SHA256 ({self.HASH_ITERATIONS} iterations)")
-            print(f"[RecoveryCodeManager] File now exists: {os.path.exists(self.recovery_codes_file)}")
+            vlog(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
+            vlog(f"[RecoveryCodeManager] Hash algorithm: PBKDF2-HMAC-SHA256 ({self.HASH_ITERATIONS} iterations)")
+            vlog(f"[RecoveryCodeManager] File now exists: {os.path.exists(self.recovery_codes_file)}")
             return True, codes
                 
         except Exception as e:

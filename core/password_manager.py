@@ -7,6 +7,7 @@ import os
 from typing import Optional, Callable, List, Tuple
 from .crypto_manager import CryptoManager
 from .recovery_manager import RecoveryCodeManager
+from .verbose_logger import vlog
 
 
 class PasswordManager:
@@ -63,7 +64,7 @@ class PasswordManager:
         try:
             password_bytes = password.encode('utf-8')
             
-            print(f"[PasswordManager] Creating password at: {self.password_file}")
+            vlog(f"[PasswordManager] Creating password at: {self.password_file}")
             
             # Encrypt the password with itself
             success = self.crypto.encrypt_password_hash(
@@ -74,8 +75,8 @@ class PasswordManager:
             
             if success:
                 self.cached_password = password_bytes
-                print(f"[PasswordManager] [OK] Master password created successfully")
-                print(f"[PasswordManager] File now exists: {os.path.exists(self.password_file)}")
+                vlog(f"[PasswordManager] [OK] Master password created successfully")
+                vlog(f"[PasswordManager] File now exists: {os.path.exists(self.password_file)}")
                 return True
             else:
                 print("[PasswordManager] [ERROR] Failed to create master password")
