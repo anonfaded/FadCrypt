@@ -35,9 +35,9 @@ class AnimatedPasswordInput:
         # Blocking input for password entry
         self.stdscr.nodelay(False)
         
-        # Binary rain columns (60 columns for animation area)
+        # Binary rain columns (will be initialized in prompt_password based on terminal width)
         # Each column tracks its current position (0-3, or -1 if inactive)
-        self.rain_columns = [random.randint(-1, 3) for _ in range(60)]
+        self.rain_columns = []
     
 
     
@@ -55,17 +55,24 @@ class AnimatedPasswordInput:
         """
         self.stdscr.clear()
         
-        # Left-aligned, hacker-style design
-        start_col = 2
-        start_row = 2
+        # Get terminal dimensions for responsive centering
+        height, width = self.stdscr.getmaxyx()
         
-        # Initialize binary rain display (3 rows x 60 columns)
+        # Calculate centered position
+        box_width = min(60, width - 4)  # Responsive width, max 60 chars
+        start_col = (width - box_width) // 2
+        start_row = (height - 10) // 2  # Center vertically with some padding
+        
+        # Initialize binary rain display (3 rows x box_width columns)
         # Store the character and its age for gradient effect
-        rain_display = [[{'char': ' ', 'age': 0} for _ in range(60)] for _ in range(3)]
+        rain_display = [[{'char': ' ', 'age': 0} for _ in range(box_width)] for _ in range(3)]
+        
+        # Update rain columns for responsive width
+        self.rain_columns = [random.randint(-1, 3) for _ in range(box_width)]
         
         # Separator line
         separator_row = start_row + 3
-        self.stdscr.addstr(separator_row, start_col, "─" * 60, curses.color_pair(1))
+        self.stdscr.addstr(separator_row, start_col, "─" * box_width, curses.color_pair(1))
         
         # Prompt row - capitalize and format properly
         prompt_row = separator_row + 1
@@ -110,7 +117,7 @@ class AnimatedPasswordInput:
         while True:
             # Age all existing characters
             for row in range(3):
-                for col in range(60):
+                for col in range(box_width):
                     if rain_display[row][col]['char'] != ' ':
                         rain_display[row][col]['age'] += 1
                         # Remove old characters
@@ -118,7 +125,7 @@ class AnimatedPasswordInput:
                             rain_display[row][col] = {'char': ' ', 'age': 0}
             
             # Update binary rain (Matrix-style falling effect)
-            for i in range(60):
+            for i in range(box_width):
                 # Random chance to start new drop
                 if random.random() > 0.95:
                     self.rain_columns[i] = 0
@@ -139,7 +146,7 @@ class AnimatedPasswordInput:
             
             # Draw binary rain with red gradient using curses colors
             for row_offset in range(3):
-                for col in range(60):
+                for col in range(box_width):
                     cell = rain_display[row_offset][col]
                     char = cell['char']
                     age = cell['age']
@@ -177,7 +184,7 @@ class AnimatedPasswordInput:
             cursor = "▌" if self.animation_frame % 2 == 0 else " "
             
             # Clear input line
-            self.stdscr.addstr(input_row, start_col, " " * 60)
+            self.stdscr.addstr(input_row, start_col, " " * box_width)
             
             # Format: ┃ [0xABCD] ❯ ****▌
             self.stdscr.addstr(input_row, start_col, "┃ ", curses.color_pair(1))
