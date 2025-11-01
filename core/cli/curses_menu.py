@@ -161,15 +161,33 @@ class AnimatedCursesMenu:
     
     def draw_menu(self):
         """Draw the menu - styled exactly like file selector"""
-        start_row = 5  # Start after animation (rows 0-2), author info (row 3), and blank row 4
+        current_row = 5  # Start after animation (rows 0-2), author info (row 3), and blank row 4
         
         try:
+            # Draw app header for non-main menus
+            if self.title != "MAIN MENU":
+                # App header
+                self.stdscr.addstr(current_row, 2, "╭─ ", curses.color_pair(1))
+                self.stdscr.addstr(current_row, 5, "FadCrypt v2.0.0", curses.color_pair(1) | curses.A_BOLD)
+                current_row += 1
+                
+                self.stdscr.addstr(current_row, 2, "│ ", curses.color_pair(1))
+                self.stdscr.addstr(current_row, 4, "File, Folder & Application Protection Suite", 
+                                 curses.color_pair(2))
+                current_row += 1
+                
+                self.stdscr.addstr(current_row, 2, "╰" + "─" * 60, curses.color_pair(1))
+                current_row += 1
+                
+                # Blank line
+                current_row += 1
+            
             # Menu header - BOLD RED with emoji
+            start_row = current_row
             self.stdscr.addstr(start_row, 2, "╭─ ", curses.color_pair(1))
             # Add emoji before title if it's MAIN MENU
             if self.title == "MAIN MENU":
-                self.stdscr.addstr(start_row, 5, "📋 ", curses.color_pair(1))
-                self.stdscr.addstr(start_row, 8, self.title, curses.color_pair(1) | curses.A_BOLD)
+                self.stdscr.addstr(start_row, 5, self.title, curses.color_pair(1) | curses.A_BOLD)
             else:
                 self.stdscr.addstr(start_row, 5, self.title, curses.color_pair(1) | curses.A_BOLD)
             self.stdscr.addstr(start_row + 1, 2, "│", curses.color_pair(1))
@@ -181,15 +199,24 @@ class AnimatedCursesMenu:
                 text = item.get('text', '')
                 key = item.get('key', str(i + 1))
                 
+                # Clear the row first
+                try:
+                    self.stdscr.addstr(row, 0, " " * 80)
+                except:
+                    pass
+                
                 if i == self.cursor_pos:
-                    # Highlighted item - GREEN arrow, white text on red background
-                    # Format: │❯ [content with white text on red background]
+                    # Highlighted item - GREEN arrow (❯), white text on red background
                     self.stdscr.addstr(row, 2, "│", curses.color_pair(1))
                     self.stdscr.addstr(row, 3, "❯", curses.color_pair(6) | curses.A_BOLD)
                     self.stdscr.addstr(row, 4, " ")
-                    # White text on red background for the content
-                    content = f"{key}. {icon} {text}".ljust(57)
-                    self.stdscr.addstr(row, 5, content, curses.color_pair(3) | curses.A_BOLD)
+                    # Number and dot with red background - same position as non-selected
+                    self.stdscr.addstr(row, 5, f"{key}.", curses.color_pair(3) | curses.A_BOLD)
+                    # Space with red background to fill gap
+                    self.stdscr.addstr(row, 7, " ", curses.color_pair(3) | curses.A_BOLD)
+                    # Icon and text with red background - same position as non-selected
+                    content = f" {icon} {text}".ljust(54)
+                    self.stdscr.addstr(row, 8, content, curses.color_pair(3) | curses.A_BOLD)
                 else:
                     # Normal item - RED pipes, GRAY numbers/dots, white icon/text
                     self.stdscr.addstr(row, 2, "│", curses.color_pair(1))
@@ -197,11 +224,14 @@ class AnimatedCursesMenu:
                     # Number and dot in gray
                     self.stdscr.addstr(row, 5, f"{key}.", curses.color_pair(7))
                     # Icon and text in default white
-                    self.stdscr.addstr(row, 7, f" {icon} {text}")
+                    self.stdscr.addstr(row, 8, f" {icon} {text}")
             
             # Menu footer - RED color
-            self.stdscr.addstr(start_row + 2 + len(self.menu_items), 2, "│", curses.color_pair(1))
-            self.stdscr.addstr(start_row + 3 + len(self.menu_items), 2, "╰" + "─" * 60, curses.color_pair(1))
+            footer_row1 = start_row + 2 + len(self.menu_items)
+            footer_row2 = start_row + 3 + len(self.menu_items)
+            
+            self.stdscr.addstr(footer_row1, 2, "│", curses.color_pair(1))
+            self.stdscr.addstr(footer_row2, 2, "╰" + "─" * 60, curses.color_pair(1))
             
             # Help text - RED heading, GRAY brackets/labels, WHITE commands
             help_row = start_row + 5 + len(self.menu_items)
@@ -292,18 +322,14 @@ class AnimatedCursesMenu:
                 
                 if key == curses.KEY_UP:
                     self.cursor_pos = max(0, self.cursor_pos - 1)
-                    # Clear menu area and redraw (start from row 4)
-                    for row in range(4, 25):
-                        self.stdscr.addstr(row, 0, " " * 100)
+                    # Only redraw menu area, not animation
                     self.draw_menu()
                     self.stdscr.noutrefresh()
                     curses.doupdate()
                     
                 elif key == curses.KEY_DOWN:
                     self.cursor_pos = min(len(self.menu_items) - 1, self.cursor_pos + 1)
-                    # Clear menu area and redraw (start from row 4)
-                    for row in range(4, 25):
-                        self.stdscr.addstr(row, 0, " " * 100)
+                    # Only redraw menu area, not animation
                     self.draw_menu()
                     self.stdscr.noutrefresh()
                     curses.doupdate()
