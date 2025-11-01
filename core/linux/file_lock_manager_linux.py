@@ -261,11 +261,13 @@ class FileLockManagerLinux(FileLockManager):
         Files are protected by permissions and immutable flags, not runtime monitoring.
         """
         if not self.locked_items:
-            print("[FileLockManager] No locked files to protect")
+            from core.verbose_logger import vlog
+            vlog("No locked files to protect")
             return False
         
-        print(f"[FileLockManager] Static file protection active for {len(self.locked_items)} items")
-        print("[FileLockManager] OK: File protection via chmod+chattr active")
+        from core.verbose_logger import vlog
+        vlog(f"Static file protection active for {len(self.locked_items)} items")
+        vlog("OK: File protection via chmod+chattr active")
         return True
     
     def stop_monitoring(self):

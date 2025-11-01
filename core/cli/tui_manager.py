@@ -44,7 +44,7 @@ class TUIManager:
     
     def show_header(self):
         """Display the FadCrypt header"""
-        from FadCrypt import __version__
+        from ..version import __version__
         
         self.clear_screen()
         print(f"{Colors.BORDER}╭─ {Colors.TITLE}🏴 FadCrypt v{__version__}{Colors.RESET}")
@@ -486,37 +486,171 @@ class TUIManager:
                 self.show_about()
     
     def show_about(self):
-        """Show about information"""
-        from FadCrypt import __version__
+        """Show about information with menu navigation at bottom"""
+        from ..version import __version__
         
-        self.show_header()
-        print(f"{Colors.TITLE}About FadCrypt{Colors.RESET}\n")
+        # Custom menu that displays about info
+        class AboutMenu:
+            def __init__(self):
+                self.cursor_pos = 0
+                self.running = True
+                self.menu_items = [
+                    {'key': '1', 'icon': '⬅️', 'text': 'Back to Settings', 'action': 'back'}
+                ]
+            
+            def run(self, stdscr):
+                import curses
+                import time
+                
+                self.stdscr = stdscr
+                self.stdscr.keypad(True)
+                curses.curs_set(0)
+                
+                # Setup colors
+                curses.start_color()
+                try:
+                    curses.use_default_colors()
+                except AttributeError:
+                    pass
+                
+                curses.init_pair(1, curses.COLOR_RED, -1)
+                curses.init_pair(2, curses.COLOR_WHITE, -1)
+                curses.init_pair(3, curses.COLOR_GREEN, -1)
+                curses.init_pair(4, 8, -1)
+                curses.init_pair(7, 8, -1)
+                
+                while self.running:
+                    try:
+                        self.stdscr.clear()
+                        height, width = self.stdscr.getmaxyx()
+                        
+                        # Calculate centering
+                        box_width = min(70, width - 4)
+                        start_col = (width - box_width) // 2
+                        
+                        # Draw header
+                        header_y = 1
+                        try:
+                            self.stdscr.addstr(header_y, start_col, "╭─ ", curses.color_pair(1))
+                            self.stdscr.addstr(header_y, start_col + 3, f"🏴 FadCrypt v{__version__}", curses.color_pair(1) | curses.A_BOLD)
+                            self.stdscr.addstr(header_y + 1, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(header_y + 1, start_col + 2, "File, Folder & Application Protection Suite", curses.color_pair(2))
+                            self.stdscr.addstr(header_y + 2, start_col, "╰" + "─" * (box_width - 2), curses.color_pair(1))
+                        except curses.error:
+                            pass
+                        
+                        # Draw "About FadCrypt" title
+                        title_y = header_y + 4
+                        title_text = "About FadCrypt"
+                        title_col = (width - len(title_text)) // 2
+                        try:
+                            self.stdscr.addstr(title_y, title_col, title_text, curses.color_pair(1) | curses.A_BOLD)
+                        except curses.error:
+                            pass
+                        
+                        # Draw INFORMATION box
+                        info_y = title_y + 2
+                        try:
+                            self.stdscr.addstr(info_y, start_col, "╭─ ℹ️ INFORMATION", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 1, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 2, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 2, start_col + 2, f"FadCrypt v{__version__}", curses.color_pair(2))
+                            self.stdscr.addstr(info_y + 3, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 3, start_col + 2, "Cross-platform File, Folder & Application Protection", curses.color_pair(2))
+                            self.stdscr.addstr(info_y + 4, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 5, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 5, start_col + 2, f"Platform: {platform.system()}", curses.color_pair(4))
+                            self.stdscr.addstr(info_y + 6, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 6, start_col + 2, f"Python: {sys.version.split()[0]}", curses.color_pair(4))
+                            self.stdscr.addstr(info_y + 7, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 8, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 8, start_col + 2, "FadSec Lab", curses.color_pair(2))
+                            self.stdscr.addstr(info_y + 9, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(info_y + 9, start_col + 2, "https://faded.dev · © 2024–2025 · GPLv3 License", curses.color_pair(3))
+                            self.stdscr.addstr(info_y + 10, start_col, "╰" + "─" * (box_width - 2), curses.color_pair(1))
+                        except curses.error:
+                            pass
+                        
+                        # Draw LINKS & SUPPORT box
+                        links_y = info_y + 12
+                        try:
+                            self.stdscr.addstr(links_y, start_col, "╭─ 🔗 LINKS & SUPPORT", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 1, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 2, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 2, start_col + 2, "🌐 ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 2, start_col + 5, "GitHub: ", curses.color_pair(2))
+                            self.stdscr.addstr(links_y + 2, start_col + 13, "https://github.com/anonfaded/FadCrypt", curses.color_pair(3))
+                            self.stdscr.addstr(links_y + 3, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 4, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 4, start_col + 2, "💬 ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 4, start_col + 5, "Discord: ", curses.color_pair(2))
+                            self.stdscr.addstr(links_y + 4, start_col + 14, "https://discord.gg/kvAZvdkuuN", curses.color_pair(3))
+                            self.stdscr.addstr(links_y + 5, start_col, "│", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 6, start_col, "│ ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 6, start_col + 2, "☕ ", curses.color_pair(1))
+                            self.stdscr.addstr(links_y + 6, start_col + 5, "Ko-fi: ", curses.color_pair(2))
+                            self.stdscr.addstr(links_y + 6, start_col + 12, "https://ko-fi.com/fadedx", curses.color_pair(3))
+                            self.stdscr.addstr(links_y + 7, start_col, "╰" + "─" * (box_width - 2), curses.color_pair(1))
+                        except curses.error:
+                            pass
+                        
+                        # Draw menu items at bottom
+                        menu_y = links_y + 9
+                        try:
+                            self.stdscr.addstr(menu_y, start_col, "╭─ 📋 NAVIGATION", curses.color_pair(1))
+                            for idx, item in enumerate(self.menu_items):
+                                menu_y += 1
+                                if idx == self.cursor_pos:
+                                    self.stdscr.addstr(menu_y, start_col, "│ ", curses.color_pair(1))
+                                    self.stdscr.addstr(menu_y, start_col + 2, "► ", curses.color_pair(3) | curses.A_BOLD)
+                                    self.stdscr.addstr(menu_y, start_col + 4, f"[{item['key']}] {item['icon']} {item['text']}", curses.color_pair(3) | curses.A_BOLD)
+                                else:
+                                    self.stdscr.addstr(menu_y, start_col, "│ ", curses.color_pair(1))
+                                    self.stdscr.addstr(menu_y, start_col + 2, f"[{item['key']}] {item['icon']} {item['text']}", curses.color_pair(2))
+                            
+                            menu_y += 1
+                            self.stdscr.addstr(menu_y, start_col, "╰" + "─" * (box_width - 2), curses.color_pair(1))
+                        except curses.error:
+                            pass
+                        
+                        self.stdscr.refresh()
+                        
+                        key = self.stdscr.getch()
+                        
+                        if key == curses.KEY_UP:
+                            self.cursor_pos = max(0, self.cursor_pos - 1)
+                        elif key == curses.KEY_DOWN:
+                            self.cursor_pos = min(len(self.menu_items) - 1, self.cursor_pos + 1)
+                        elif key == ord('\n') or key == ord('\r'):
+                            self.running = False
+                            return self.menu_items[self.cursor_pos]['key']
+                        elif key == ord('b') or key == ord('B'):
+                            self.running = False
+                            return 'back'
+                        elif key == ord('q') or key == ord('Q'):
+                            self.running = False
+                            return 'quit'
+                        elif key >= ord('1') and key <= ord('9'):
+                            for item in self.menu_items:
+                                if item['key'] == chr(key):
+                                    self.running = False
+                                    return item['key']
+                    
+                    except:
+                        pass
+                    
+                    time.sleep(0.05)
         
-        print(f"{Colors.BORDER}╭─ {Colors.TITLE}INFORMATION{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}FadCrypt v{__version__}{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Cross-platform File, Folder & Application Protection{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Platform:{Colors.RESET} {platform.system()}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Python:{Colors.RESET} {sys.version.split()[0]}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}© 2024-2025 FadSec Lab{Colors.RESET}")
-        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
-        
-        # Add links section
-        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}LINKS & SUPPORT{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}🌐 GitHub:{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://github.com/anonfaded/FadCrypt{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}💬 Discord Community:{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://discord.gg/kvAZvdkuuN{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.SUCCESS}☕ Support Development (Ko-fi):{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}   {Colors.HIGHLIGHT}https://ko-fi.com/fadedx{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET}")
-        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}")
-        
-        input("\nPress Enter to continue...")
+        # Run the about menu
+        try:
+            import curses
+            def _about_wrapper(stdscr):
+                menu = AboutMenu()
+                return menu.run(stdscr)
+            
+            curses.wrapper(_about_wrapper)
+        except Exception:
+            pass
     
     def launch_gui(self):
         """Launch the GUI application"""

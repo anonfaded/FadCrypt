@@ -273,22 +273,26 @@ class FileLockManagerWindows(FileLockManager):
             log_activity_func: Function to log activity events
         """
         if hasattr(self, '_monitor') and self._monitor is not None:
-            print("[FileLockManager] Monitoring already started")
+            from core.verbose_logger import vlog
+            vlog("Monitoring already started")
             return False
         
         try:
             # Windows uses context menu approach for file locking
             # No additional monitoring needed - files are locked via shell extension
             if not self.locked_items:
-                print("[FileLockManager] No locked files to monitor")
+                from core.verbose_logger import vlog
+                vlog("No locked files to monitor")
                 return False
             
-            print(f"[FileLockManager] Context menu monitoring ready for {len(self.locked_items)} items")
-            print("[FileLockManager] OK: File locking via context menu active")
+            from core.verbose_logger import vlog
+            vlog(f"Context menu monitoring ready for {len(self.locked_items)} items")
+            vlog("OK: File locking via context menu active")
             return True
             
         except Exception as e:
-            print(f"[FileLockManager] Error starting monitor: {e}")
+            from core.verbose_logger import vlog
+            vlog(f"Error starting monitor: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -301,7 +305,8 @@ class FileLockManagerWindows(FileLockManager):
                 self._monitor = None
                 return True
             except Exception as e:
-                print(f"[FileLockManager] Error stopping monitor: {e}")
+                from core.verbose_logger import vlog
+                vlog(f"Error stopping monitor: {e}")
                 self._monitor = None
                 return False
         return False

@@ -6,8 +6,11 @@ Provides smooth continuous animation with menu navigation
 import curses
 import time
 import random
+import locale
+import os
 from threading import Thread
 from typing import List, Dict, Optional
+from ..version import __version__
 
 
 class AnimatedCursesMenu:
@@ -21,6 +24,20 @@ class AnimatedCursesMenu:
         self.menu_items = []
         self.title = ""
         self.quit_text = quit_text
+        
+        # Set up proper encoding for emoji support
+        try:
+            locale.setlocale(locale.LC_ALL, '')
+            os.environ.setdefault('LANG', 'en_US.UTF-8')
+        except:
+            pass
+        
+        # Force UTF-8 mode for the terminal
+        try:
+            curses.curs_set(0)
+            self.stdscr.keypad(True)
+        except:
+            pass
         
         # Setup colors
         curses.start_color()
@@ -128,47 +145,38 @@ class AnimatedCursesMenu:
                     # Normal characters in WHITE
                     self.stdscr.addstr(row, padding + i, char, curses.color_pair(2) | curses.A_BOLD)
             
-            # Author info below hex animation
-            author_row = vertical_start + 3
-            author_name = "Author: Faded"
-            separator = " | "
-            author_link = "github.com/anonfaded"
+            # Add footer branding near bottom of screen (with safety check)
+            height, width = self.stdscr.getmaxyx()
+            min_footer_space = 6  # Need 4 lines for logo + 1 for branding + 1 spacing
+            footer_row = max(vertical_start + 6, height - min_footer_space)  # Don't go below animation, don't go out of bounds
             
-            # Apply glitch effect to author name only
-            glitched_author = ""
-            for char in author_name:
-                if char not in ['A', 'u', 't', 'h', 'o', 'r', ':', ' '] and random.random() > 0.92:
-                    glitched_author += random.choice(glitch_chars)
-                else:
-                    glitched_author += char
+            # Logo lines definition
+            logo_lines = [
+                " ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒",
+                " ▓▓▓▓▓▓▓ ▓▓   ▓▓▓▓    ▓▓▒▒▒▒▒▒       ▒▒ ▒▒      ▓    ▓",
+                " ▓▓      ▓▓▓▓▓▓▓▓▓    ▓▓      ▒▒     ▒▒ ▒▒      ▓ ▓▓ ▓▓",
+                " ▓▓      ▓▓   ▓▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒"
+            ]
             
-            # Calculate total length and center it
-            full_text = glitched_author + separator + author_link
-            author_padding = (width - len(full_text)) // 2
-            
-            # Draw glitched author name
-            col_offset = 0
-            for char in glitched_author:
-                if char in glitch_chars:
-                    # Glitch in green
-                    self.stdscr.addstr(author_row, author_padding + col_offset, char, curses.color_pair(6) | curses.A_BOLD)
-                else:
-                    # Normal text in white
-                    self.stdscr.addstr(author_row, author_padding + col_offset, char, curses.color_pair(2))
-                col_offset += 1
-            
-            # Draw separator in gray
-            self.stdscr.addstr(author_row, author_padding + col_offset, separator, curses.color_pair(7))
-            col_offset += len(separator)
-            
-            # Draw link in gray
-            self.stdscr.addstr(author_row, author_padding + col_offset, author_link, curses.color_pair(7))
-            
-            # Separator line
-            separator_row = vertical_start + 4
-            separator = "─" * (width - 4)
-            sep_padding = (width - len(separator)) // 2
-            self.stdscr.addstr(separator_row, sep_padding, separator, curses.color_pair(1))
+            # Only draw footer if there's enough space
+            if footer_row + min_footer_space <= height:
+                # Calculate box dimensions for footer positioning
+                box_width = min(60, width - 4)
+                box_start_col = (width - box_width) // 2
+                
+                # Position ASCII block slightly left of center within the box
+                ascii_block_width = len(logo_lines[0])  # Width of the ASCII art
+                # Start 1 character from box left edge instead of centering
+                ascii_start_col = box_start_col + 1
+                
+                for i, logo_line in enumerate(logo_lines):
+                    self.stdscr.addstr(footer_row + i, ascii_start_col, logo_line, curses.color_pair(1))
+                
+                # Website and license info below the logo (centered within the box)
+                branding_row = footer_row + 4
+                branding_text = "https://faded.dev · © 2024–2025 · GPLv3 License"
+                branding_col = box_start_col + (box_width - len(branding_text)) // 2
+                self.stdscr.addstr(branding_row, branding_col, branding_text, curses.color_pair(7))
             
             self.animation_frame += 1
         except curses.error:
@@ -183,8 +191,8 @@ class AnimatedCursesMenu:
         # Get terminal dimensions for responsive centering
         height, width = self.stdscr.getmaxyx()
         
-        # Calculate responsive dimensions
-        box_width = min(70, width - 4)  # Max 70 chars, with padding
+        # Calculate responsive dimensions - increase max box width to 75 for better text display
+        box_width = min(75, width - 4)  # Increased from 70 to 75
         start_col = (width - box_width) // 2
         
         # For main menu, start after animation (which is vertically centered)
@@ -200,17 +208,15 @@ class AnimatedCursesMenu:
         try:
             # Draw app header for non-main menus
             if self.title != "MAIN MENU":
-                # App header - centered
-                header_text = "FadCrypt v2.0.0"
-                header_padding = (box_width - len(header_text) - 3) // 2
+                # App header - near pipe (not centered)
+                header_text = f"🏴 FadCrypt v{__version__}"
                 self.stdscr.addstr(current_row, start_col, "╭─ ", curses.color_pair(1))
-                self.stdscr.addstr(current_row, start_col + 3 + header_padding, header_text, curses.color_pair(1) | curses.A_BOLD)
+                self.stdscr.addstr(current_row, start_col + 3, header_text, curses.color_pair(1) | curses.A_BOLD)
                 current_row += 1
                 
                 subtitle = "File, Folder & Application Protection Suite"
-                subtitle_padding = (box_width - len(subtitle) - 2) // 2
                 self.stdscr.addstr(current_row, start_col, "│ ", curses.color_pair(1))
-                self.stdscr.addstr(current_row, start_col + 2 + subtitle_padding, subtitle, curses.color_pair(2))
+                self.stdscr.addstr(current_row, start_col + 2, subtitle, curses.color_pair(2))
                 current_row += 1
                 
                 self.stdscr.addstr(current_row, start_col, "╰" + "─" * (box_width - 2), curses.color_pair(1))
@@ -227,11 +233,22 @@ class AnimatedCursesMenu:
                 self.stdscr.addstr(menu_start_row, start_col, "╭─ ", curses.color_pair(1))
                 self.stdscr.addstr(menu_start_row, start_col + 3, title_text, curses.color_pair(1) | curses.A_BOLD)
             else:
-                # For sub-menus, center the title
-                title_text = f" {self.title}"
-                title_padding = (box_width - len(title_text) - 3) // 2
+                # For sub-menus, title near the pipe with appropriate emoji
+                if "LOCK" in self.title or "PROTECT" in self.title:
+                    emoji = "🔒"
+                elif "UNLOCK" in self.title or "RELEASE" in self.title:
+                    emoji = "🔓"
+                elif "BROWSE" in self.title or "SELECT" in self.title:
+                    emoji = "📁"
+                elif "SETTINGS" in self.title or "CONFIG" in self.title:
+                    emoji = "⚙️"
+                elif "HELP" in self.title:
+                    emoji = "❓"
+                else:
+                    emoji = "📋"
+                title_text = f"{emoji} {self.title}"
                 self.stdscr.addstr(menu_start_row, start_col, "╭─ ", curses.color_pair(1))
-                self.stdscr.addstr(menu_start_row, start_col + 3 + title_padding, title_text, curses.color_pair(1) | curses.A_BOLD)
+                self.stdscr.addstr(menu_start_row, start_col + 3, title_text, curses.color_pair(1) | curses.A_BOLD)
             self.stdscr.addstr(menu_start_row + 1, start_col, "│", curses.color_pair(1))
             
             # Menu items
@@ -241,32 +258,60 @@ class AnimatedCursesMenu:
                 text = item.get('text', '')
                 key = item.get('key', str(i + 1))
                 
-                # Clear the row first - clear from start_col to end
-                try:
-                    self.stdscr.addstr(row, start_col, " " * box_width)
-                except:
-                    pass
-                
                 if i == self.cursor_pos:
-                    # Highlighted item - GREEN arrow (❯), white text on red background
-                    self.stdscr.addstr(row, start_col, "│", curses.color_pair(1))
-                    self.stdscr.addstr(row, start_col + 1, "❯", curses.color_pair(6) | curses.A_BOLD)
-                    self.stdscr.addstr(row, start_col + 2, " ")
-                    # Number and dot with red background
-                    self.stdscr.addstr(row, start_col + 3, f"{key}.", curses.color_pair(3) | curses.A_BOLD)
-                    # Space with red background
-                    self.stdscr.addstr(row, start_col + 5, " ", curses.color_pair(3) | curses.A_BOLD)
-                    # Icon and text with red background
-                    content = f" {icon} {text}".ljust(box_width - 7)
-                    self.stdscr.addstr(row, start_col + 6, content, curses.color_pair(3) | curses.A_BOLD)
+                    # Highlighted item - fill entire row with background color first
+                    padding_width = max(1, box_width - 3)
+                    try:
+                        self.stdscr.addstr(row, start_col, "│" + " " * padding_width, curses.color_pair(3))
+                    except curses.error:
+                        pass
+                    # Redraw the text elements on top of the red background
+                    try:
+                        self.stdscr.addstr(row, start_col, "│", curses.color_pair(1))
+                        self.stdscr.addstr(row, start_col + 1, "❯", curses.color_pair(6) | curses.A_BOLD)
+                        self.stdscr.addstr(row, start_col + 2, " ")
+                        self.stdscr.addstr(row, start_col + 3, f"{key}.", curses.color_pair(3) | curses.A_BOLD)
+                        self.stdscr.addstr(row, start_col + 5, " ", curses.color_pair(3) | curses.A_BOLD)
+                        # Write emoji and space, then text separately
+                        col_pos = start_col + 6
+                        if col_pos < width - 1:
+                            self.stdscr.addstr(row, col_pos, f"{icon} ", curses.color_pair(3) | curses.A_BOLD)
+                        # Text goes right after - emoji (2 cols) + space (1 col) = 3 total
+                        col_pos = start_col + 6 + 3
+                        if col_pos < width - 1:
+                            remaining = width - col_pos - 1
+                            text_truncated = text[:remaining] if len(text) > remaining else text
+                            self.stdscr.addstr(row, col_pos, text_truncated, curses.color_pair(3) | curses.A_BOLD)
+                    except curses.error:
+                        pass
                 else:
-                    # Normal item - RED pipes, GRAY numbers/dots, white icon/text
-                    self.stdscr.addstr(row, start_col, "│", curses.color_pair(1))
-                    self.stdscr.addstr(row, start_col + 1, "  ")
-                    # Number and dot in gray
-                    self.stdscr.addstr(row, start_col + 3, f"{key}.", curses.color_pair(7))
-                    # Icon and text in default white
-                    self.stdscr.addstr(row, start_col + 6, f" {icon} {text}")
+                    # Normal item - clear entire row first
+                    padding_width = max(1, box_width - 1)
+                    try:
+                        self.stdscr.addstr(row, start_col, "│" + " " * padding_width, curses.color_pair(1))
+                    except curses.error:
+                        pass
+                    # Now redraw the text
+                    try:
+                        self.stdscr.addstr(row, start_col, "│", curses.color_pair(1))
+                        self.stdscr.addstr(row, start_col + 1, "  ")
+                        # Number and dot in gray
+                        self.stdscr.addstr(row, start_col + 3, f"{key}.", curses.color_pair(7))
+                        # Write emoji and space, then text separately
+                        col_pos = start_col + 6
+                        if col_pos < width - 1:
+                            self.stdscr.addstr(row, col_pos, f"{icon} ", curses.color_pair(2))
+                        # Text goes right after - emoji (2 cols) + space (1 col) = 3 total
+                        col_pos = start_col + 6 + 3
+                        if col_pos < width - 1:
+                            remaining = width - col_pos - 1
+                            text_truncated = text[:remaining] if len(text) > remaining else text
+                            self.stdscr.addstr(row, col_pos, text_truncated, curses.color_pair(2))
+                    except curses.error:
+                        pass
+
+            # Single refresh call at the end to ensure proper emoji rendering
+            self.stdscr.noutrefresh()
             
             # Menu footer - RED color
             footer_row1 = menu_start_row + 2 + len(self.menu_items)
@@ -303,6 +348,9 @@ class AnimatedCursesMenu:
                 col += len(label) + 3
         except curses.error:
             pass
+        
+        # Final refresh to ensure emojis display properly
+        self.stdscr.noutrefresh()
     
     def animation_loop(self):
         """Continuous animation loop in background"""
@@ -402,6 +450,16 @@ def has_curses_support() -> bool:
 try:
     import curses
     CURSES_AVAILABLE = True
+    
+    # Set up UTF-8 encoding for emoji support
+    try:
+        import locale
+        import os
+        locale.setlocale(locale.LC_ALL, '')
+        os.environ.setdefault('LANG', 'en_US.UTF-8')
+    except:
+        pass
+        
 except ImportError:
     CURSES_AVAILABLE = False
 

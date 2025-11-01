@@ -54,13 +54,14 @@ class FileLockManager(ABC):
                     config = json.load(f)
                     self.locked_items = config.get("locked_files_and_folders", [])
                     from core.verbose_logger import vlog
-                    vlog(f"[FileLockManager] Loaded {len(self.locked_items)} locked items from file")
+                    vlog(f"Loaded {len(self.locked_items)} locked items from file")
                     return
             except Exception as e:
-                print(f"[FileLockManager] Could not read locked items from file: {e}")
+                from core.verbose_logger import vlog
+                vlog(f"Could not read locked items from file: {e}")
         else:
             # Debug log (commented out for cleaner CLI)
-            pass  # print(f"[FileLockManager] Config file does not exist: {self.config_file}")
+            pass  # vlog(f"Config file does not exist: {self.config_file}")
         
         # Fallback: use _get_config if file doesn't exist
         config = self._get_config()
