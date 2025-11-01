@@ -13,13 +13,14 @@ from typing import List, Dict, Optional
 class AnimatedCursesMenu:
     """Animated menu using curses"""
     
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, quit_text: str = "Quit"):
         self.stdscr = stdscr
         self.cursor_pos = 0
         self.running = True
         self.animation_frame = 0
         self.menu_items = []
         self.title = ""
+        self.quit_text = quit_text
         
         # Setup colors
         curses.start_color()
@@ -274,7 +275,7 @@ class AnimatedCursesMenu:
             col += 1
             self.stdscr.addstr(help_row, col, "]", curses.color_pair(7))
             col += 1
-            self.stdscr.addstr(help_row, col, " Quit", curses.color_pair(7))
+            self.stdscr.addstr(help_row, col, f" {self.quit_text}", curses.color_pair(7))
         except curses.error:
             pass
     
@@ -380,13 +381,14 @@ except ImportError:
     CURSES_AVAILABLE = False
 
 
-def show_curses_menu(title: str, items: List[Dict]) -> Optional[str]:
+def show_curses_menu(title: str, items: List[Dict], quit_text: str = "Quit") -> Optional[str]:
     """
     Show curses menu with animation (wrapper function)
     
     Args:
         title: Menu title
         items: List of menu items
+        quit_text: Text for Q key ("Quit" for main menu, "Back" for sub-menus)
         
     Returns:
         Selected action or None
@@ -395,7 +397,7 @@ def show_curses_menu(title: str, items: List[Dict]) -> Optional[str]:
         return None
     
     def _menu_wrapper(stdscr):
-        menu = AnimatedCursesMenu(stdscr)
+        menu = AnimatedCursesMenu(stdscr, quit_text=quit_text)
         return menu.show_menu(title, items)
     
     try:

@@ -103,24 +103,26 @@ class PasswordPrompt:
         Returns:
             True if password changed successfully, False otherwise
         """
-        print(f"\n{Colors.BORDER}╭─ {Colors.TITLE}🔐 Change Master Password{Colors.RESET}")
-        print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}Enter your current password, then create a new one.{Colors.RESET}")
-        print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────{Colors.RESET}\n")
+        # Get current password
+        current_password = self.prompt_password("Enter current password")
+        if not current_password:
+            return False
         
         # Verify current password
-        if not self.verify_password("Enter current password: "):
+        if not self.password_manager.verify_password(current_password):
+            print_error("Incorrect current password!")
             return False
         
         # Get new password
         while True:
-            new_password = self.prompt_password("Enter new password: ", confirm=True)
+            new_password = self.prompt_password("Enter new password", confirm=True)
             
             if not new_password:
                 print_warning("Password change cancelled.")
                 return False
             
-            # Change password (no length restriction to match GUI behavior)
-            if self.password_manager.change_password(new_password):
+            # Change password with both old and new passwords
+            if self.password_manager.change_password(current_password, new_password):
                 print_success("Password changed successfully!")
                 return True
             else:
@@ -190,8 +192,6 @@ class PasswordPrompt:
                     except Exception as e:
                         print_error(f"Failed to save recovery codes: {e}")
             
-            print(f"\n{Colors.DIM}Press Enter to continue...{Colors.RESET} ", end='')
-            input()
             return True
         
         print_error("Failed to generate recovery codes.")

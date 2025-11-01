@@ -10,9 +10,15 @@ import platform
 
 from .colors import Colors, print_colored, print_success, print_error, print_warning, print_info
 from .password_prompt import PasswordPrompt
-from .file_selector import FileSelector
+from .curses_file_browser import show_file_browser as show_file_selector, show_unlock_browser as show_unlock_selector
 from .menu_navigator import MenuNavigator
 from .curses_menu import show_curses_menu, CURSES_AVAILABLE
+
+
+class DirectoryTracker:
+    """Simple class to track current directory for navigation"""
+    def __init__(self, current_dir: str = None):
+        self.current_dir = current_dir or os.getcwd()
 
 
 class TUIManager:
@@ -29,7 +35,7 @@ class TUIManager:
         self.password_manager = password_manager
         self.cli_handler = cli_handler
         self.password_prompt = PasswordPrompt(password_manager)
-        self.file_selector = FileSelector()
+        self.directory_tracker = DirectoryTracker()
         self.menu_navigator = MenuNavigator()
     
     def clear_screen(self):
@@ -71,8 +77,19 @@ class TUIManager:
                 choice = self.show_main_menu()
                 
                 if choice == 'quit' or choice == '6':
-                    print_success("Goodbye! :)")
-                    break
+                    # Ask for confirmation before quitting
+                    self.show_header()
+                    print_colored("Exit FadCrypt?\n", Colors.TITLE)
+                    print_colored("Are you sure you want to exit FadCrypt?", Colors.INFO)
+                    confirm = input(f"\n{Colors.DIM}[Y/N]: {Colors.RESET}").strip().lower()
+                    
+                    if confirm in ['y', 'yes']:
+                        print_success("Goodbye! :)")
+                        break
+                    else:
+                        print_info("Returning to main menu...")
+                        input("\nPress Enter to continue...")
+                        continue
                 elif choice == '1':
                     self.lock_files_menu()
                 elif choice == '2':
@@ -90,6 +107,49 @@ class TUIManager:
                 print()
                 break
     
+    def lock_files_browser(self):
+        """Direct lock files browser (used for switching from unlock)"""
+        # Interactive file selector using curses with locked paths info
+        locked_items = self.cli_handler.list_locked_items()
+        locked_paths = {item['path'] for item in locked_items}
+        selected_paths = show_file_selector(self.directory_tracker.current_dir, mode="lock", locked_paths=locked_paths)
+        
+        # Check if user wants to switch back to unlock
+        if selected_paths and len(selected_paths) > 0 and selected_paths[0] == '__SWITCH_TO_UNLOCK__':
+            # Switch back to unlock menu
+            self.unlock_files_menu()
+            return
+        
+        # Check if user wants to teleport
+        if selected_paths and len(selected_paths) > 0 and selected_paths[0] == '__TELEPORT__':
+            # Show teleport menu
+            locked_items = self.cli_handler.list_locked_items()
+            self.show_teleport_menu(locked_items)
+            return
+        
+        # Process selected files for locking
+        if selected_paths and len(selected_paths) > 0:
+            # Filter out special commands
+            actual_paths = [p for p in selected_paths if not p.startswith('__')]
+            
+            if actual_paths:
+                self.show_header()
+                print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                
+                success_count = 0
+                for path in actual_paths:
+                    try:
+                        if self.cli_handler.lock_item(path):
+                            print_success(f"✓ Locked: {os.path.basename(path)}")
+                            success_count += 1
+                        else:
+                            print_error(f"✗ Failed to lock: {os.path.basename(path)}")
+                    except Exception as e:
+                        print_error(f"✗ Error locking {os.path.basename(path)}: {str(e)}")
+                
+                print_colored(f"\nLocked {success_count}/{len(actual_paths)} item(s) successfully.", Colors.SUCCESS)
+                input("\nPress Enter to continue...")
+
     def lock_files_menu(self):
         """Lock files/folders menu"""
         self.show_header()
@@ -106,12 +166,10 @@ class TUIManager:
         if choice == '3' or choice == 'back' or choice == 'quit':
             return
         elif choice == '1':
-            # Interactive file selector
-            # Get currently locked items to show indicators
+            # Interactive file selector using curses with locked paths info
             locked_items = self.cli_handler.list_locked_items()
             locked_paths = {item['path'] for item in locked_items}
-            
-            selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
+            selected_paths = show_file_selector(self.directory_tracker.current_dir, mode="lock", locked_paths=locked_paths)
             
             # Check if user wants to switch to unlock
             if selected_paths and len(selected_paths) > 0 and selected_paths[0] == '__SWITCH_TO_UNLOCK__':
@@ -179,7 +237,7 @@ class TUIManager:
                 
                 input("\nPress Enter to continue...")
     
-    def unlock_files_menu(self):
+    def unlock_files_menu(self, filter_mode: str = "current"):
         """Unlock files/folders menu"""
         self.show_header()
         print_colored("Unlock Files/Folders\n", Colors.TITLE)
@@ -192,62 +250,20 @@ class TUIManager:
             input("\nPress Enter to continue...")
             return
         
-        # Loop to handle refiltering
-        while True:
-            # Filter items based on filter mode
-            current_dir = self.file_selector.current_dir
-            items_in_current_dir = [item for item in locked_items if os.path.dirname(item['path']) == current_dir]
-            
-            # Determine what to show based on filter mode
-            if hasattr(self.file_selector, 'unlock_filter_mode') and self.file_selector.unlock_filter_mode == "all":
-                items_to_show = locked_items  # Show all locations
-            else:
-                # Show current directory only
-                items_to_show = items_in_current_dir
-                # If no items in current dir, show message and switch to all
-                if not items_to_show:
-                    print_warning(f"No locked items in current directory: {current_dir}")
-                    print_info("Switching to 'All Locations' mode...")
-                    self.file_selector.unlock_filter_mode = "all"
-                    input("\nPress Enter to continue...")
-                    continue  # Re-run with all locations
-            
-            # Show locked items for selection
-            selected_paths = self.file_selector.select_from_list(items_to_show, "Select Items to Unlock")
-            
-            # Check if refilter requested
-            if selected_paths and selected_paths[0] == '__REFILTER__':
-                continue  # Re-run the loop with new filter
-            else:
-                break  # Exit loop and process results
+        # Show locked items for selection using enhanced curses interface
+        current_dir = self.directory_tracker.current_dir
+        selected_paths = show_unlock_selector(locked_items, "Select Items to Unlock", current_dir, filter_mode)
         
         # Check for special returns
         if selected_paths and selected_paths[0] == '__SWITCH_TO_LOCK__':
-            # Switch to lock screen directly (not menu)
-            locked_paths = {item['path'] for item in locked_items}
-            selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
-            
-            # Handle results from lock screen
-            if selected_paths and len(selected_paths) > 0:
-                # Check for switch back
-                if selected_paths[0] == '__SWITCH_TO_UNLOCK__':
-                    self.unlock_files_menu()
-                    return
-                elif selected_paths[0] == '__TELEPORT__':
-                    self.show_teleport_menu(locked_items)
-                    return
-                
-                # Normal lock operation
-                actual_paths = [p for p in selected_paths if not p.startswith('__')]
-                if actual_paths:
-                    self.show_header()
-                    print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
-                    success, failed = self.cli_handler.lock_multiple(actual_paths)
-                    if success > 0:
-                        print_success(f"Successfully locked {success} item(s)!")
-                    if failed > 0:
-                        print_error(f"Failed to lock {failed} item(s).")
-                    input("\nPress Enter to continue...")
+            # Switch directly to lock file browser (not the menu)
+            self.lock_files_browser()
+            return
+        
+        if selected_paths and selected_paths[0] == '__REFILTER__':
+            # Refilter requested - toggle filter mode and restart unlock menu
+            new_filter_mode = "all" if filter_mode == "current" else "current"
+            self.unlock_files_menu(new_filter_mode)
             return
         
         if selected_paths and selected_paths[0] == '__TELEPORT__':
@@ -303,7 +319,7 @@ class TUIManager:
             dir_list = list(directories.keys())
             if 0 <= idx < len(dir_list):
                 target_dir = dir_list[idx]
-                self.file_selector.current_dir = target_dir
+                self.directory_tracker.current_dir = target_dir
                 print_success(f"Teleported to: {target_dir}")
                 input("\nPress Enter to continue...")
                 # Go back to unlock menu with new directory
@@ -327,11 +343,11 @@ class TUIManager:
             from FadCrypt import __version__
             print(f"\n{Colors.BORDER}╭─ 🏴 {Colors.TITLE}FadCrypt v{__version__}{Colors.RESET}")
             print(f"{Colors.BORDER}│{Colors.RESET} {Colors.TEXT}File, Folder & Application Protection Suite{Colors.RESET}")
-            # Show path of first item
-            first_item_path = locked_items[0]['path']
+            # Show current directory path
+            current_dir = self.directory_tracker.current_dir
             print(f"{Colors.BORDER}│{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current Item Path:{Colors.RESET}")
-            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{first_item_path}{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.INFO}Current Directory:{Colors.RESET}")
+            print(f"{Colors.BORDER}│{Colors.RESET} {Colors.DIM}{current_dir}{Colors.RESET}")
             print(f"{Colors.BORDER}╰──────────────────────────────────────────────────────────────{Colors.RESET}\n")
             
             # Display items without heading
@@ -399,21 +415,21 @@ class TUIManager:
                 dir_list = list(directories.keys())
                 if 0 <= idx < len(dir_list):
                     target_dir = dir_list[idx]
-                    self.file_selector.current_dir = target_dir
+                    self.directory_tracker.current_dir = target_dir
                     print_success(f"Teleported to: {target_dir}")
                     input("\nPress Enter to continue...")
                     
                     # Go directly to unlock screen (user can switch to lock with [S])
                     items_in_dir = [item for item in locked_items if os.path.dirname(item['path']) == target_dir]
                     if items_in_dir:
-                        selected_paths = self.file_selector.select_from_list(items_in_dir, "Select Items to Unlock")
+                        selected_paths = show_unlock_selector(items_in_dir, "Select Items to Unlock", target_dir)
                         
                         # Check for special returns
                         if selected_paths and len(selected_paths) > 0:
                             if selected_paths[0] == '__SWITCH_TO_LOCK__':
                                 # Switch to lock menu
                                 locked_paths = {item['path'] for item in locked_items}
-                                selected_paths = self.file_selector.select_files(locked_paths=locked_paths)
+                                selected_paths = show_file_selector(target_dir, mode="lock", locked_paths=locked_paths)
                                 
                                 if selected_paths and len(selected_paths) > 0:
                                     actual_paths = [p for p in selected_paths if not p.startswith('__')]
@@ -469,13 +485,10 @@ class TUIManager:
                 break
             elif choice == '1':
                 self.password_prompt.change_password()
-                input("\nPress Enter to continue...")
             elif choice == '2':
                 # Verify password before generating recovery codes
                 if self.password_prompt.verify_password():
                     self.password_prompt.generate_recovery_codes()
-                else:
-                    input("\nPress Enter to continue...")
             elif choice == '3':
                 self.show_about()
     

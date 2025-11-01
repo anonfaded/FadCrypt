@@ -38,5 +38,5 @@ class MenuNavigator:
             except:
                 pass
         
-        # Use curses menu
-        return show_curses_menu(title, items)
+        # Use curses menu with "Back" for sub-menus
+        return show_curses_menu(title, items, "Back")
