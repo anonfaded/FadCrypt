@@ -178,15 +178,15 @@ class FileLockManagerLinux(FileLockManager):
         has_manager = self.encryption_manager is not None
         has_password = self.password_bytes is not None
         
-        print(f"[DEBUG] Config dangerous_ops: {dangerous_ops}")
-        print(f"[DEBUG] encryption_enabled={encryption_enabled}, has_manager={has_manager}, has_password={has_password}")
+        vlog(f"[DEBUG] Config dangerous_ops: {dangerous_ops}")
+        vlog(f"[DEBUG] encryption_enabled={encryption_enabled}, has_manager={has_manager}, has_password={has_password}")
         
         if encryption_enabled:
             vlog(f"[Item] Encryption feature ENABLED")
             vlog(f"[Item] Has manager: {has_manager}, Has password: {has_password}")
         
         if encryption_enabled and has_manager and has_password:
-            print(f"🔐 Encrypting: {os.path.basename(path)}")
+            vlog(f"🔐 Encrypting: {os.path.basename(path)}")
             vlog(f"[Item] Encryption enabled - encrypting before lock...")
             item_type = item.get('type', 'file')
             success, encrypted_path, error = self.encryption_manager.encrypt_item(
@@ -196,7 +196,7 @@ class FileLockManagerLinux(FileLockManager):
             )
             
             if success:
-                print(f"✓ Encrypted successfully: {os.path.basename(encrypted_path)}")
+                vlog(f"✓ Encrypted successfully: {os.path.basename(encrypted_path)}")
                 vlog(f"  [Encrypt] ✓ Successfully encrypted to .fadcrypt")
                 # Update item metadata to track encryption
                 item['is_encrypted'] = True
@@ -204,7 +204,7 @@ class FileLockManagerLinux(FileLockManager):
                 # Now lock the encrypted file instead of original
                 path = encrypted_path
             else:
-                print(f"❌ Encryption failed: {error}")
+                vlog(f"❌ Encryption failed: {error}")
                 vlog(f"  [Encrypt] ❌ Encryption failed: {error}")
                 return False
         else:
@@ -238,6 +238,8 @@ class FileLockManagerLinux(FileLockManager):
         """
         Unlock file or folder using daemon for elevated operations.
         
+        If item was encrypted, decrypt it first before unlocking.
+        
         This removes:
         1. Immutable attribute via daemon chattr -i
         2. Restores original permissions from backup via daemon
@@ -245,6 +247,78 @@ class FileLockManagerLinux(FileLockManager):
         from core.verbose_logger import vlog
         path = item['path']
         
+        # CRITICAL: Handle encrypted items first
+        is_encrypted = item.get('is_encrypted', False)
+        encrypted_path = item.get('encrypted_path', f"{path}.fadcrypt")
+        
+        if is_encrypted:
+            # File was encrypted - the actual file is now .fadcrypt
+            if not os.path.exists(encrypted_path):
+                vlog(f"[Item] Encrypted file not found: {encrypted_path}")
+            else:
+                vlog(f"[Item] Item is encrypted - decrypting first: {os.path.basename(encrypted_path)}")
+                
+                # Step 1: Remove immutable attribute first (if exists)
+                client = self._get_daemon_client()
+                if client and client.is_available():
+                    success, msg = client.chattr([encrypted_path], set_immutable=False)
+                    if success:
+                        vlog(f"  [Item] Removed immutable attribute from encrypted file")
+                    else:
+                        vlog(f"  [Item] Warning: Could not remove immutable from encrypted file: {msg}")
+                
+                # Step 2: Restore permissions on encrypted file so we can decrypt it
+                if self._restore_permissions(encrypted_path):
+                    vlog(f"  [Item] Restored permissions on encrypted file")
+                else:
+                    # Set reasonable permissions via daemon
+                    if client and client.is_available():
+                        mode = 0o644  # Read/write for owner, read for group/others
+                        success, _ = client.chmod([encrypted_path], mode)
+                        if success:
+                            vlog(f"  [Item] Granted access on encrypted file")
+                        else:
+                            vlog(f"  [Item] Warning: Could not grant access to encrypted file")
+                
+                # Step 3: Try to decrypt the file
+                # If password not cached, try to load it from encrypted_password.bin
+                if not self.password_bytes and self.encryption_manager:
+                    vlog(f"  [Item] Password not cached - attempting to load from encrypted_password.bin")
+                    try:
+                        from core.password_manager import PasswordManager
+                        from core.crypto_manager import CryptoManager
+                        from core.cli.password_prompt import PasswordPrompt
+                        
+                        config_dir = os.path.dirname(self.config_file) if self.config_file else None
+                        if config_dir:
+                            password_file = os.path.join(config_dir, "encrypted_password.bin")
+                            if os.path.exists(password_file):
+                                crypto_manager = CryptoManager()
+                                password_manager = PasswordManager(password_file, crypto_manager)
+                                
+                                # Try to prompt for password
+                                password_prompt = PasswordPrompt(password_manager)
+                                if password_prompt.verify_password():
+                                    self.password_bytes = password_manager.get_password_bytes()
+                                    vlog(f"  [Item] ✓ Password loaded from encrypted_password.bin")
+                                else:
+                                    vlog(f"  [Item] ⚠ Password prompt cancelled or failed")
+                    except Exception as e:
+                        vlog(f"  [Item] Warning: Could not load password: {e}")
+                
+                if self.encryption_manager and self.password_bytes:
+                    success, error = self.encryption_manager.decrypt_item(encrypted_path, self.password_bytes, path)
+                    if success:
+                        vlog(f"✓ Decrypted successfully: {os.path.basename(path)}")
+                        vlog(f"  [Item] ✓ Decrypted and restored: {os.path.basename(path)}")
+                        # Decryption automatically deletes the .fadcrypt file
+                        # Continue to unlock the restored original file
+                    else:
+                        vlog(f"  [Item] ⚠ Decryption failed: {error}")
+                else:
+                    vlog(f"  [Item] ⚠ Cannot decrypt - missing encryption manager or password")
+        
+        # Now unlock the item (whether originally locked or just decrypted)
         if not os.path.exists(path):
             vlog(f"[Item] Path no longer exists: {path}")
             return True  # Consider it "unlocked" if it doesn't exist
@@ -271,7 +345,13 @@ class FileLockManagerLinux(FileLockManager):
             if success:
                 vlog(f"  [Item] Set default permissions via daemon: {os.path.basename(path)}")
             else:
-                vlog(f"  [Item] Error: Failed to set default permissions: {os.path.basename(path)}")
+                vlog(f"  [Item] Error: Failed to set default permissions via daemon: {os.path.basename(path)}")
+                # Fallback to os.chmod
+                try:
+                    os.chmod(path, mode)
+                    vlog(f"  [Item] Set default permissions via os.chmod: {os.path.basename(path)}")
+                except Exception as e:
+                    vlog(f"  [Item] Error: os.chmod also failed: {e}")
         
         vlog(f"  [Item] Unlocked: {os.path.basename(path)}")
         return True
@@ -291,9 +371,9 @@ class FileLockManagerLinux(FileLockManager):
         if client and client.is_available():
             success, msg = client.chmod([path], 0o444)
             if not success:
-                print(f"⚠️  Error locking config {path} via daemon: {msg}")
+                vlog(f"⚠️  Error locking config {path} via daemon: {msg}")
         else:
-            print(f"⚠️  Error: Daemon not available for config locking: {path}")
+            vlog(f"⚠️  Error: Daemon not available for config locking: {path}")
     
     def _unlock_config_file(self, path: str):
         """Unlock config file using daemon"""
@@ -301,9 +381,9 @@ class FileLockManagerLinux(FileLockManager):
         if client and client.is_available():
             success, msg = client.chmod([path], 0o644)
             if not success:
-                print(f"⚠️  Error unlocking config {path} via daemon: {msg}")
+                vlog(f"⚠️  Error unlocking config {path} via daemon: {msg}")
         else:
-            print(f"⚠️  Error: Daemon not available for config unlocking: {path}")
+            vlog(f"⚠️  Error: Daemon not available for config unlocking: {path}")
     
     def start_monitoring(self):
         """

@@ -517,6 +517,28 @@ class TUIManager:
                 else:
                     with open(config_file, 'r') as f:
                         config = json.load(f)
+                    
+                    # Merge with default structure to ensure all required keys exist
+                    default_config = {
+                        "applications": [],
+                        "locked_files_and_folders": [],
+                        "dangerous_operations": {
+                            "encryption": False
+                        }
+                    }
+                    # Deep merge: preserve existing values, add missing keys
+                    for key, default_value in default_config.items():
+                        if key not in config:
+                            config[key] = default_value
+                        elif isinstance(default_value, dict) and isinstance(config[key], dict):
+                            # Merge nested dicts
+                            for nested_key, nested_default in default_value.items():
+                                if nested_key not in config[key]:
+                                    config[key][nested_key] = nested_default
+                
+                # Ensure dangerous_operations key exists
+                if "dangerous_operations" not in config:
+                    config["dangerous_operations"] = {"encryption": False}
                 
                 dangerous_ops = config.get("dangerous_operations", {})
                 encryption_enabled = dangerous_ops.get("encryption", False)

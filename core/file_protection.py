@@ -791,39 +791,39 @@ def safe_read_from_protected_file(file_path: str, mode: str = 'r') -> Tuple[bool
     manager = get_file_protection_manager()
     filename = os.path.basename(file_path)
     
-    print(f"[SafeRead] 🔓 Starting safe read from protected file: {filename}")
+    vlog(f"[SafeRead] 🔓 Starting safe read from protected file: {filename}")
     
     if not os.path.exists(file_path):
         error_msg = f"File does not exist: {filename}"
-        print(f"[SafeRead] ❌ {error_msg}")
+        vlog(f"[SafeRead] ❌ {error_msg}")
         return False, error_msg
     
     # Step 1: Temporarily unlock file
     unlock_success, unlock_error = manager.temporarily_unlock_file(file_path)
     if not unlock_success:
         error_msg = f"Failed to unlock {filename}: {unlock_error}"
-        print(f"[SafeRead] ❌ {error_msg}")
+        vlog(f"[SafeRead] ❌ {error_msg}")
         return False, error_msg
     
     # Step 2: Read content
     try:
-        print(f"[SafeRead] 📖 Reading content from {filename}...")
+        vlog(f"[SafeRead] 📖 Reading content from {filename}...")
         with open(file_path, mode) as f:
             content = f.read()
-        print(f"[SafeRead] ✅ Successfully read from {filename}")
+        vlog(f"[SafeRead] ✅ Successfully read from {filename}")
     except Exception as e:
         error_msg = f"Failed to read from {filename}: {e}"
-        print(f"[SafeRead] ❌ {error_msg}")
+        vlog(f"[SafeRead] ❌ {error_msg}")
         return False, error_msg
     
     # Step 3: Re-lock file
     relock_success, relock_error = manager.relock_file(file_path)
     if not relock_success:
         error_msg = f"Failed to re-protect {filename}: {relock_error}"
-        print(f"[SafeRead] ❌ {error_msg}")
+        vlog(f"[SafeRead] ❌ {error_msg}")
         return False, error_msg
     
-    print(f"[SafeRead] 🔒 Safe read completed successfully for {filename}")
+    vlog(f"[SafeRead] 🔒 Safe read completed successfully for {filename}")
     return True, content
 
 

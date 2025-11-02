@@ -22,6 +22,9 @@ class CLIHandlerBase(ABC):
         """
         self.config_folder = config_folder
         self.config_file = os.path.join(config_folder, 'apps_config.json')
+        
+        # Ensure config file exists with proper structure
+        self._ensure_config_initialized()
     
     @abstractmethod
     def lock_path(self, path: str) -> bool:
@@ -132,12 +135,17 @@ class CLIHandlerBase(ABC):
         """
         Unlock multiple paths.
         
+        Before unlocking, ensure encryption password is set if enabled.
+        
         Args:
             paths: List of absolute paths
         
         Returns:
             Tuple of (success_count, failure_count)
         """
+        # CRITICAL: Set password for decryption if enabled
+        self._ensure_password_for_encryption()
+        
         success_count = 0
         failure_count = 0
         
@@ -178,3 +186,70 @@ class CLIHandlerBase(ABC):
             return True
         except (PermissionError, OSError):
             return False
+    
+    def _ensure_config_initialized(self):
+        """
+        Ensure the config file exists with all required keys.
+        This prevents KeyError exceptions when accessing config values.
+        """
+        import json
+        from core.file_protection import safe_write_to_protected_file
+        
+        # Default config structure
+        default_config = {
+            "applications": [],
+            "locked_files_and_folders": [],
+            "dangerous_operations": {
+                "encryption": False
+            }
+        }
+        
+        try:
+            # Check if config file exists
+            if os.path.exists(self.config_file):
+                # Load existing config
+                with open(self.config_file, 'r') as f:
+                    existing_config = json.load(f)
+                
+                # Deep merge with defaults to ensure all keys exist
+                merged_config = self._deep_merge_configs(default_config, existing_config)
+                
+                # Save merged config if different
+                if merged_config != existing_config:
+                    content = json.dumps(merged_config, indent=2)
+                    success, error = safe_write_to_protected_file(self.config_file, content)
+                    if not success:
+                        print(f"Warning: Could not update config file: {error}")
+            else:
+                # Create new config file with defaults
+                content = json.dumps(default_config, indent=2)
+                success, error = safe_write_to_protected_file(self.config_file, content)
+                if not success:
+                    print(f"Warning: Could not create config file: {error}")
+                    
+        except Exception as e:
+            print(f"Warning: Could not initialize config: {e}")
+    
+    def _deep_merge_configs(self, default_config: dict, existing_config: dict) -> dict:
+        """
+        Deep merge default config into existing config, preserving existing values.
+        
+        Args:
+            default_config: Default configuration structure
+            existing_config: Existing configuration from file
+            
+        Returns:
+            Merged configuration dict
+        """
+        merged = existing_config.copy()
+        
+        for key, default_value in default_config.items():
+            if key not in merged:
+                # Key missing, add default
+                merged[key] = default_value
+            elif isinstance(default_value, dict) and isinstance(merged[key], dict):
+                # Both are dicts, recursively merge
+                merged[key] = self._deep_merge_configs(default_value, merged[key])
+            # If key exists and is not a dict, preserve existing value
+            
+        return merged
