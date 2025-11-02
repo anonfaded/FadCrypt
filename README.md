@@ -15,7 +15,31 @@
 
 # FadCrypt
 
-**Advanced and elegant cross-platform app encryption – powerful, customizable, open-source, and completely free!**
+**Advanced and elegant cross-platform encryption tool – files, folders, and applications all protected with military-grade AES-256-GCM encryption. Open-source, completely free, no telemetry!**
+
+## 🎯 What is FadCrypt?
+
+**FadCrypt** is a comprehensive dual-mode security solution that protects both your files and your applications:
+
+### 🖥️ **GUI Mode: Application Locking**
+Protect your installed applications (Firefox, Chrome, Brave, VS Code, etc.) with encrypted password locks. Once locked, the app cannot be launched without your master password. FadCrypt continuously monitors your system in the background and:
+- **Scans for running processes** matching your protected applications (e.g., firefox.exe, chrome.exe, brave.exe)
+- **Terminates processes instantly** if an app is launched without permission
+- **Auto-locks after inactivity:** Once you unlock an app and provide the correct password, it stays unlocked for **10 seconds of inactivity**, then automatically re-locks for security
+- Logs all access attempts and lock/unlock events for your activity dashboard
+
+### 💾 **CLI Mode: File & Folder Encryption**
+Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM encryption**. All data is encrypted before storage:
+- **Encryption Process:** Master password → PBKDF2 key derivation (100,000 iterations) → AES-256-GCM encryption → `.fadcrypt` file
+- **Decryption Process:** Provide password → Derive key from stored salt → Verify authentication tag → Decrypt data → Restore original file
+- **File Protection:** Windows uses ACL (Access Control Lists), Linux uses chmod + immutability flags
+- Perfect for protecting documents, photos, archives, source code, and other sensitive data
+
+**Key Highlights:**
+- **Cross-Platform:** Windows and Linux with unified CLI and separate optimized GUIs
+- **Military-Grade Encryption:** AES-256-GCM with PBKDF2 key derivation (100,000 iterations)
+- **Fully Encrypted:** Configuration, passwords, and recovery codes are all encrypted
+- **No External Dependencies:** Open-source and completely free with no cloud sync or telemetry
 
 [![GitHub all releases](https://img.shields.io/github/downloads/anonfaded/FadCrypt/total?label=Downloads&logo=github)](https://github.com/anonfaded/FadCrypt/releases/)
 
@@ -89,30 +113,214 @@
     
 ## How FadCrypt Works:
 
-1. **Password Creation:** When you set a password, it's encrypted and saved with the configuration file of locked apps. During monitoring, these files are backed up to a separate location:
+### File & Folder Encryption (CLI Mode)
 
-   - **Windows:** `C:\ProgramData\FadCrypt\Backup\`
-   - **Linux:** `~/.local/share/FadCrypt/Backup/`
+**Encryption Process:**
+1. You provide a file/folder path and your master password via the CLI (`fadcrypt --lock <path>`)
+2. FadCrypt derives a unique encryption key from your password using PBKDF2-SHA256 (100,000 iterations)
+3. The file content is encrypted using AES-256-GCM (authenticated encryption)
+4. The encrypted data is written to a new `.fadcrypt` file with metadata and authentication tag
+5. Original file is securely overwritten and deleted
+6. File protection rules are applied (Windows ACL or Linux chmod/chattr) to prevent unauthorized access
 
-   If detected as deleted, they are automatically recovered and restored.
+**Decryption Process:**
+1. You run `fadcrypt --unlock <path.fadcrypt>` and provide your master password
+2. FadCrypt derives the same encryption key from your password using the stored salt
+3. The authentication tag is verified to ensure file integrity and authenticity
+4. AES-256-GCM decrypts the file content back to its original form
+5. The decrypted data is written back to the original file
+6. The `.fadcrypt` file is deleted after successful decryption
+7. File protection is removed, returning full access to the decrypted file
 
-2. **Elevated Daemon Service (Linux):** FadCrypt uses a systemd service that runs with root privileges to handle file protection operations seamlessly:
+**File Format (.fadcrypt):**
+- Header: Custom format identifier and version
+- Metadata: Original filename, file size, timestamps
+- Salt: Random salt for PBKDF2 key derivation (unique per file)
+- IV: Initialization vector for AES-256-GCM
+- Encrypted Data: Actual file content encrypted with AES-256-GCM
+- Auth Tag: GCM authentication tag for integrity verification
 
-   - **Daemon Operations:** The daemon (`fadcrypt-elevated.service`) provides root-level file operations via Unix socket communication
-   - **Capabilities:** File immutability (chattr +i/-i), permission changes, backup restoration, and kernel-level file monitoring (fanotify)
-   - **Automatic Setup:** The daemon is installed and started automatically when you install the .deb package
+### Application Locking (GUI Mode)
 
-3. **Monitoring Mode:** Press "Start Monitoring" to set FadCrypt as a startup app. It will automatically activate every time your PC starts, and will persistently run unless you press "Stop Monitoring."
+**Lock Process:**
+1. Select applications from your system in the GUI interface (e.g., Firefox, Chrome, Brave, VS Code)
+2. FadCrypt registers these applications in its configuration database (stored in plain JSON for easy access by the GUI)
+3. **Process Monitoring:** FadCrypt scans system processes in real-time to detect if any registered app is launched
+   - For browsers: Detects Firefox, Chrome, Brave, Edge, and other Chromium-based browsers by scanning process names and command lines
+   - For standard apps: Matches by executable path and process name
+   - System processes are filtered out to prevent accidental termination
+4. **Process Termination:** When a protected app is detected running:
+   - The app process is immediately terminated (killed) and cannot execute
+   - User sees a lock notification with a password prompt
+   - The app remains locked until password is verified
 
-4. **Security Features:** When monitoring is active, FadCrypt can't be stopped without the correct password. Optionally, users can enable system tool disabling to prevent tampering (Control Panel, Registry Editor, Task Manager, msconfig on Windows; terminal emulators and system monitors on Linux). Recovery codes provide a secure backup method to reset forgotten passwords.
+**Unlock & Session Timeout Process:**
+1. User runs the protected app → FadCrypt detects the launch attempt
+2. Password dialog appears; user must enter the master password
+3. **Session Grant:** If password is correct, the app is temporarily unlocked
+4. **Auto-Lock on Inactivity:** The app stays unlocked for **10 seconds with no activity**
+5. **Re-lock:** After 10 seconds of inactivity, FadCrypt automatically re-locks the app
+6. On next launch attempt, password is required again
+7. Note: Session timeout is based on inactivity of the process; actual app usage continues normally
 
-5. **Mutex Protection:** FadCrypt uses mutual exclusion to ensure only one instance runs at a time, blocking new instances until the current one is closed with the password. This prevents bypass attempts.
+### Core Encryption Technology (Both Modes)
 
-**Note:** The password recovery feature is not available yet.
+**1. Encryption Algorithm: AES-256-GCM**
+- **Security Level:** 256-bit keys providing military-grade encryption resistant to all known attacks
+- **Authentication:** GCM (Galois/Counter Mode) provides authenticated encryption with built-in integrity checking
+  - Every decryption attempt verifies the authentication tag
+  - Tampering detection: If file is modified, decryption fails and returns error
+  - Cannot decrypt without the exact original password
+
+**2. Key Derivation: PBKDF2-SHA256**
+- **Iterations:** 100,000 iterations (slow-by-design to prevent brute-force attacks)
+- **Process:** Your master password → PBKDF2-SHA256 (100K iterations) + random salt → 256-bit key
+- **Purpose:** Converts human-readable password into cryptographic key
+- **Rainbow Table Prevention:** Unique salt per file/config prevents pre-computed hash attacks
+- **Computational Cost:** Even with modern GPUs, brute-forcing a strong password would take centuries
+
+**3. Encryption Process (CLI Mode - File/Folder):**
+1. User selects file/folder and provides master password via CLI (`fadcrypt --lock <path>`)
+2. Random salt is generated and stored in file header
+3. Master password + salt → PBKDF2 derives 256-bit encryption key
+4. File content is read into memory
+5. AES-256-GCM encrypts file content with the derived key
+6. Authentication tag is computed (ensures data integrity)
+7. New `.fadcrypt` file created with:
+   - Header: Format identifier and version info
+   - Metadata: Original filename, file size, timestamps
+   - Salt: Random salt for this file (unique per file)
+   - IV (Initialization Vector): Random nonce for AES-GCM
+   - Encrypted Data: The encrypted file content
+   - Auth Tag: GCM authentication tag for integrity verification
+8. Original file is securely overwritten with random data and deleted
+9. File protection rules applied (Windows ACL or Linux chmod/chattr)
+
+**4. Decryption Process (CLI Mode - File/Folder):**
+1. User runs `fadcrypt --unlock <path.fadcrypt>` and provides master password
+2. `.fadcrypt` file is read and parsed:
+   - Salt is extracted from file
+   - IV is extracted from file
+   - Encrypted data is extracted
+   - Auth tag is extracted
+3. Master password + extracted salt → PBKDF2 derives the same 256-bit key
+4. AES-256-GCM decryption:
+   - Verifies authentication tag first (aborts if tampering detected)
+   - Decrypts data using derived key and IV
+   - Returns original file content
+5. Decrypted content written back to original filename
+6. `.fadcrypt` file deleted
+7. File protection removed (original permissions restored)
+8. Lock event logged to activity history
+
+**5. Data Integrity & Atomicity:**
+- **Atomic Operations:** Temporary file pattern + atomic move (no partial writes on failure)
+- **Rollback on Error:** If encryption/decryption fails at any step, original file unchanged
+- **Verification:** Authentication tag ensures no tampering or corruption
+- **No Plaintext on Disk:** Original plaintext never remains on disk after encryption
+
+**6. Configuration Storage (Both Modes):**
+- **Windows:**
+  - Config: `%APPDATA%\FadCrypt\config\apps_config.json` (plain JSON, readable by GUI)
+  - Password: `encrypted_password.bin` (AES-256 encrypted master password)
+  - Backup: `C:\ProgramData\FadCrypt\Backup\` (encrypted backups)
+- **Linux:**
+  - Config: `~/.config/FadCrypt/config/apps_config.json` (plain JSON, readable by GUI)
+  - Password: `~/.config/FadCrypt/encrypted_password.bin` (AES-256 encrypted master password)
+  - Backup: `~/.local/share/FadCrypt/Backup\` (encrypted backups)
+
+### Platform-Specific Implementation
+
+#### Windows
+- **File Protection:** ACL (Access Control List) via `icacls` command
+  - Backs up original ACLs before locking
+  - Denies all access to locked files/folders
+  - Restores ACLs atomically on unlock
+- **Elevation / Service:** Windows service installed by the Inno Setup installer (service is the recommended elevation mechanism)
+- **Autostart:** Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`)
+- **Installation:** Inno Setup installer with context menu integration
+
+#### Linux
+- **File Protection:** Permission-based via `chmod` + immutability flags via `chattr`
+  - Backs up original permissions before locking
+  - Sets `chmod 000` to deny all access
+  - Sets `chattr +i` to make files immutable (requires root)
+  - Restores permissions atomically on unlock
+- **Elevation:** Root daemon service with Unix socket communication
+  - `fadcrypt-elevated.service` (systemd service)
+  - Seamless root operations via socket IPC
+  - No password prompts during normal operation
+- **Autostart:** `.desktop` file in `~/.config/autostart/`
+- **Installation:** Debian package (`.deb`) with automatic daemon setup
+
+### Unified CLI Interface (Both Platforms)
+
+```bash
+# Lock files/folders (requires master password)
+fadcrypt --lock ./file.txt ./folder/
+
+# Unlock files/folders (requires master password)
+fadcrypt --unlock ./file.txt ./folder/
+
+# List locked items
+fadcrypt --list
+
+# Start TUI (interactive menu)
+fadcrypt
+
+# Start GUI application
+fadcrypt --gui
+
+# Auto-monitor mode (startup daemon)
+fadcrypt --auto-monitor
+```
+
+### Password & Recovery System (Both Platforms)
+
+- **Master Password:** Securely encrypted using PBKDF2 key derivation
+- **Recovery Codes:** Generate 10 one-time recovery codes for password reset
+  - Stored encrypted in `recovery_codes.json`
+  - Each code can be used once; remaining codes stay valid until used or until you choose to regenerate a fresh set
+- **Password Reset:** Use recovery code to set new master password
+- **Cache:** Password cached in memory during session for seamless operations
+
+### Monitoring Mode (Both Platforms)
+
+When monitoring (auto-monitor) is enabled:
+1. **Auto-startup:** Launches automatically on system boot with the `--auto-monitor` flag or via the installed autostart entry
+2. **UI-less Auto-Monitor:** Runs without showing the GUI when configured (the app continues to operate without a visible window)
+3. **Scope:** Real-time monitoring primarily applies to applications managed by FadCrypt (the "Applications" protection features). File and folder locking/encryption is performed manually via the CLI or context menu (Windows) and is not automatically recovered by the monitor.
+4. **Statistics & Logs:** Activity logs and statistics are stored locally for the user's dashboard only; no external telemetry is collected.
+5. **Password Security:** Monitoring control requires the master password to stop or alter protection settings
+
+### Security Features (Both Platforms)
+
+**Mutex Protection:** Single instance enforcement prevents multiple instances
+
+**Monitoring Control:** When monitoring is active, control operations that stop monitoring or alter protection require the master password.
+
+**Optional System Tool Lockdown:** (User-configurable) Prevent access to certain system tools while protection is active.
+  - **Windows:** Task Manager, Registry Editor, Command Prompt, Control Panel, msconfig
+  - **Linux:** Terminal emulators (gnome-terminal, konsole, xterm), system monitors (htop, top, gnome-system-monitor)
+
+**Config Protection:** Critical config files are backed up and protected; the daemon manages file immutability and restoration where applicable.
+
+## Password Creation & Setup
+
+When you first run FadCrypt:
+
+1. **Password Creation:** Set a strong master password
+2. **Recovery Codes:** Generate 10 emergency recovery codes and store them securely
+3. **Configuration:** Choose preferences (UI theme, dialog style, etc.)
+4. **Ready:** FadCrypt is now ready to lock files/folders
+
+If you forget your password:
+- Use one of the recovery codes to set a new password
+- Each recovery code is single-use; other codes remain valid until used or until you regenerate a fresh set
 
 ## ⬇️ Download
 
-Download the latest `windows setup installer` file directly from the [releases page](https://github.com/anonfaded/FadCrypt/releases).
+Download the latest installers from the [releases page](https://github.com/anonfaded/FadCrypt/releases/).
 
 [<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/FadCrypt/releases)
 
@@ -171,6 +379,105 @@ FadCrypt uses a client-daemon architecture for maximum security:
 ✅ Windows: Task Scheduler-based privilege elevation (UAC caching)
 ✅ Linux: Root daemon service with Unix socket communication (systemd)
 ✅ Cross-platform (Windows + Linux)
+
+## Command-Line Interface (CLI)
+
+FadCrypt provides a complete CLI interface for automation and scripting on both platforms:
+
+### Usage Examples
+
+```bash
+# Lock a file or folder
+fadcrypt --lock ./sensitive_file.txt
+fadcrypt --lock /path/to/folder1 /path/to/folder2
+
+# Unlock files/folders
+fadcrypt --unlock ./sensitive_file.txt
+fadcrypt --unlock /path/to/folder1 /path/to/folder2
+# Note: You can also unlock using the encrypted .fadcrypt filename; it will be mapped to the same file
+fadcrypt --unlock ./sensitive_file.txt.fadcrypt
+
+# List all locked items with details
+fadcrypt --list
+
+# Start interactive TUI (Text User Interface)
+fadcrypt
+
+# Start GUI application
+fadcrypt --gui
+
+# Auto-monitor mode (runs at startup)
+fadcrypt --auto-monitor
+
+# Show version information
+fadcrypt --version
+
+# Show help
+fadcrypt --help
+
+# Enable verbose logging (shows all operations)
+fadcrypt --lock ./file.txt --verbose
+```
+
+### CLI Features
+
+**Cross-Platform Compatibility:**
+- Identical command syntax on Windows and Linux
+- Automatic platform detection for ACL (Windows) or chmod (Linux) operations
+- Unified error messages and user feedback
+
+**Password Management:**
+- First run prompts for master password creation
+- Subsequent operations require password authentication
+- Recovery code support for password resets
+- Password caching during session to prevent repeated prompts
+
+**Encryption Features:**
+- Files: AES-256-GCM stream encryption
+- Folders: Tar archive + AES-256-GCM encryption (preserves structure)
+- Metadata: Automatic hash verification and integrity checks
+- Atomic Operations: Safe temporary file handling with automatic rollback on errors
+
+**Error Handling:**
+- Detailed error messages for troubleshooting
+- Prevents locking of system paths
+- Detects already-locked items and prevents double-locking
+- Automatic recovery on interrupted operations
+
+### Installation & Setup
+
+#### Windows
+
+1. **Download:** Get the installer from the [releases page](https://github.com/anonfaded/FadCrypt/releases)
+2. **Install:** Run `FadCrypt-Setup.exe` and follow the wizard
+3. **Run:** After installation you can run `fadcrypt` from Command Prompt or PowerShell, or search for "FadCrypt" in the Start menu and launch the GUI app
+4. **Context Menu:** Right-click files/folders to lock/unlock directly (installed by the installer)
+
+#### Linux
+
+1. **Install Package:** `sudo apt install ./fadcrypt_X.Y.Z_amd64.deb` (or use your distribution's package manager for the release package)
+   - The `.deb` package installs and enables the elevated daemon service automatically; no separate manual enable steps are required
+2. **Command:** Run `fadcrypt` from terminal (also available from your desktop launcher after installation)
+3. **First Run:** Set master password and generate recovery codes
+
+### Linux-Specific Notes
+
+**Daemon Service:**
+- **Name:** `fadcrypt-elevated.service`
+- **Status:** Check with `systemctl status fadcrypt-elevated.service`
+- **Logs:** View with `journalctl -u fadcrypt-elevated.service -f`
+- **Manual Start:** `sudo systemctl start fadcrypt-elevated.service`
+- **Manual Stop:** `sudo systemctl stop fadcrypt-elevated.service`
+
+**File Operations:**
+- Lock operations use `chmod 000` + `chattr +i` (managed by daemon)
+- Unlock operations restore original permissions
+- All operations logged to `~/.config/FadCrypt/logs/`
+
+**Socket Communication:**
+- Client-server via Unix socket: `/run/fadcrypt/elevated.sock`
+- Automatic retry on connection failure
+- Timeout: 30 seconds per operation
 
 ## Featured On
 
