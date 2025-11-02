@@ -420,6 +420,72 @@ class SettingsPanel(QWidget):
             
             bottom_frame.addSpacing(20)
         
+        # Dangerous Operations Section - Encryption
+        separator_dangerous = QFrame()
+        separator_dangerous.setFrameShape(QFrame.Shape.HLine)
+        separator_dangerous.setFrameShadow(QFrame.Shadow.Sunken)
+        bottom_frame.addWidget(separator_dangerous)
+        
+        dangerous_title = QLabel("⚠️  Dangerous Operations")
+        dangerous_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #ff6b6b;")
+        bottom_frame.addWidget(dangerous_title)
+        
+        # Platform-specific checkbox text
+        if self.platform_name == "Windows":
+            checkbox_text = "Enable File/Folder Encryption on Lock (stored as .fadcrypt binary)"
+        else:  # Linux
+            checkbox_text = "Enable File/Folder Encryption on Lock (stored as .fadcrypt binary)"
+        
+        self.encryption_checkbox = QCheckBox(checkbox_text)
+        self.encryption_checkbox.setChecked(False)  # Default: Disabled for safety
+        self.encryption_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #e0e0e0;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #666666;
+                border-radius: 3px;
+                background-color: #2a2a2a;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #d32f2f;
+                background-color: #d32f2f;
+                image: url(none);
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #888888;
+            }
+        """)
+        bottom_frame.addWidget(self.encryption_checkbox)
+        
+        # Warning text below checkbox
+        if self.platform_name == "Windows":
+            encryption_warning_text = (
+                "⚠️  When disabled (default): Files locked via ACL only, readable when unlocked.\n"
+                "⚠️  When enabled: Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  ACL still applied to .fadcrypt file for dual-layer protection.\n"
+                "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
+                "⚠️  Keep recovery codes safe - encryption is irreversible without them."
+            )
+        else:  # Linux
+            encryption_warning_text = (
+                "⚠️  When disabled (default): Files locked via permissions (000) + immutable flag.\n"
+                "⚠️  When enabled: Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  Permissions (000) + immutable still applied to .fadcrypt for dual-layer protection.\n"
+                "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
+                "⚠️  Keep recovery codes safe - encryption is irreversible without them."
+            )
+        
+        encryption_warning = QLabel(encryption_warning_text)
+        encryption_warning.setStyleSheet("color: #ffb74d; font-size: 11px; padding-left: 26px; line-height: 1.6; font-weight: 500;")
+        encryption_warning.setWordWrap(True)
+        bottom_frame.addWidget(encryption_warning)
+        
+        bottom_frame.addSpacing(20)
+        
         cleanup_title = QLabel("🔧 Uninstall Cleanup")
         cleanup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         bottom_frame.addWidget(cleanup_title)
@@ -527,6 +593,7 @@ class SettingsPanel(QWidget):
         self.lock_tools_checkbox.stateChanged.connect(self.on_settings_changed)
         self.file_protection_checkbox.stateChanged.connect(self.on_settings_changed)
         self.scanning_interval_spinbox.valueChanged.connect(self.on_settings_changed)
+        self.encryption_checkbox.stateChanged.connect(self.on_settings_changed)
         
         # Initial preview update
         self.update_preview()
@@ -596,7 +663,8 @@ class SettingsPanel(QWidget):
             'wallpaper': self.get_wallpaper_choice(),
             'lock_tools': self.lock_tools_checkbox.isChecked(),
             'file_protection_enabled': self.file_protection_checkbox.isChecked(),
-            'scanning_interval': self.scanning_interval_spinbox.value()
+            'scanning_interval': self.scanning_interval_spinbox.value(),
+            'encryption_enabled': self.encryption_checkbox.isChecked()
         }
         
     def get_wallpaper_choice(self):
@@ -632,6 +700,7 @@ class SettingsPanel(QWidget):
         self.lock_tools_checkbox.setChecked(settings.get('lock_tools', False))  # Default: False for safety
         self.file_protection_checkbox.setChecked(settings.get('file_protection_enabled', True))  # Default: True (enabled)
         self.scanning_interval_spinbox.setValue(settings.get('scanning_interval', 1.0))  # Default: 1.0 seconds
+        self.encryption_checkbox.setChecked(settings.get('encryption_enabled', False))  # Default: False for safety
         
         self.on_settings_changed()
     

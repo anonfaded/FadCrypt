@@ -161,15 +161,33 @@ class MainWindowBase(QMainWindow):
             self.file_lock_manager.set_password_callback(self._handle_file_access_permission)
             print("✅ Fanotify password callback set (Linux)")
         
-        # Ensure config files are NOT protected (they need UI access)
-        # Fix corrupted/protected config files from previous app versions
-        from core.file_protection import get_file_protection_manager
-        import ctypes
-        file_protection = get_file_protection_manager()
+        # Initialize flag to track if we've verified password for encryption this session
+        self._encryption_password_verified = False
         
-        FILE_ATTRIBUTE_READONLY = 0x00000001
-        FILE_ATTRIBUTE_HIDDEN = 0x00000002
-        FILE_ATTRIBUTE_SYSTEM = 0x00000004
+        # PRE-LOAD PASSWORD FOR ENCRYPTION: Check if encryption is enabled and load password
+        # This ensures seamless encryption without prompts at monitoring start
+        try:
+            config_file = os.path.join(fadcrypt_folder, "apps_config.json")
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    import json
+                    config = json.load(f)
+                    dangerous_ops = config.get("dangerous_operations", {})
+                    encryption_enabled = dangerous_ops.get("encryption", False)
+                    
+                    if encryption_enabled and os.path.exists(password_file):
+                        print("[Init] Encryption is enabled - password will be loaded at first monitoring start")
+        except Exception as e:
+            print(f"[Init] Warning checking encryption: {e}")
+        
+        # Update file lock manager with cached password for encryption operations
+        self._update_file_lock_manager_password()
+        
+        # SEAMLESS ENCRYPTION: Master password persists in encrypted_password.bin
+        # At monitoring start, we auto-use cached password (from PasswordManager) - no new file needed
+        print("[Startup] Encryption setup: Will use persistent master password (encrypted_password.bin) for seamless operation")
+        
+        # Ensure config files are NOT protected (they need UI access)
         
         config_files_to_unprotect = [
             os.path.join(fadcrypt_folder, "apps_config.json"),
@@ -1404,6 +1422,7 @@ class MainWindowBase(QMainWindow):
         """Handle settings changes from SettingsPanel"""
         # Get current settings
         settings = self.settings_panel.get_settings()
+        print(f"[DEBUG] on_settings_changed called with: {settings}")
         
         # Update instance variables
         self.password_dialog_style = settings.get('dialog_style', 'simple')
@@ -1413,10 +1432,26 @@ class MainWindowBase(QMainWindow):
         autostart_enabled = settings.get('autostart', False)
         self.handle_autostart_setting(autostart_enabled)
         
-        # Save settings to file
+        # CRITICAL: Handle encryption enable/disable
+        encryption_enabled = settings.get('encryption_enabled', False)
+        if encryption_enabled:
+            # When encryption is ENABLED, try to load existing master password
+            cached_pwd = self.password_manager.get_password_bytes()
+            if not cached_pwd:
+                print("[Settings] Encryption enabled but no password cached - loading from encrypted_password.bin")
+                # Try to load from encrypted_password.bin (already stores the master password)
+                # The password_manager should handle this seamlessly
+                cached_pwd = self.password_manager.get_password_bytes()
+            
+            if cached_pwd:
+                print("✅ [Settings] Master password available for encryption")
+            else:
+                print("⚠️  [Settings] No master password found - encryption cannot work until user logs in")
+        
+        # Save settings to file (includes all settings like encryption)
         self.save_settings(settings)
         
-        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}, autostart={autostart_enabled}")
+        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}, encryption={encryption_enabled}")
     
     def handle_autostart_setting(self, enable):
         """
@@ -1430,13 +1465,47 @@ class MainWindowBase(QMainWindow):
         pass
     
     def save_settings(self, settings):
-        """Save settings to JSON file"""
+        """Save settings to JSON file and update app config"""
         import json
-        settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+        from core.file_protection import safe_write_to_protected_file
+        
+        fadcrypt_folder = self.get_fadcrypt_folder()
+        settings_file = os.path.join(fadcrypt_folder, 'settings.json')
+        config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+        
         try:
+            # Save general settings
             with open(settings_file, 'w') as f:
                 json.dump(settings, f, indent=4)
             print(f"Settings saved to {settings_file}")
+            
+            # Update dangerous_operations in apps_config.json
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            except:
+                config = {"applications": [], "locked_files_and_folders": []}
+            
+            # Update dangerous operations section
+            if "dangerous_operations" not in config:
+                config["dangerous_operations"] = {}
+            
+            encryption_enabled = settings.get('encryption_enabled', False)
+            print(f"[DEBUG] Saving encryption setting to config: {encryption_enabled}")
+            config["dangerous_operations"]["encryption"] = encryption_enabled
+            
+            # Save updated config
+            content = json.dumps(config, indent=2)
+            print(f"[DEBUG] Config content before save: {config}")
+            success, error = safe_write_to_protected_file(config_file, content)
+            print(f"[DEBUG] Save result: success={success}, error={error}")
+            if success:
+                from core.verbose_logger import vlog
+                vlog(f"[MainWindow] Encryption setting saved: {encryption_enabled}")
+                print(f"[DEBUG] Encryption setting successfully saved to disk")
+            else:
+                print(f"Warning: Could not save encryption setting: {error}")
+                
         except Exception as e:
             print(f"Error saving settings: {e}")
     
@@ -1488,6 +1557,18 @@ class MainWindowBase(QMainWindow):
             self.move(x, y)
         else:
             print("[MainWindow] ⚠️  No screen found, cannot center")
+    
+    def _update_file_lock_manager_password(self):
+        """
+        Update file lock manager with cached password for encryption operations.
+        Call this after successful password verification.
+        """
+        if self.file_lock_manager and self.password_manager:
+            password_bytes = self.password_manager.get_password_bytes()
+            if password_bytes:
+                self.file_lock_manager.set_password(password_bytes)
+                from core.verbose_logger import vlog
+                vlog("[MainWindow] Password set in file lock manager for encryption")
     
     def verify_password_with_recovery(self, title: str, prompt: str) -> bool:
         """
@@ -1560,6 +1641,11 @@ class MainWindowBase(QMainWindow):
             
             # Verify password
             if self.password_manager.verify_password(password):
+                # Update file lock manager with password for encryption operations
+                self._update_file_lock_manager_password()
+                # Mark that password has been verified for encryption this session
+                self._encryption_password_verified = True
+                print("[PasswordManager] ✅ Password verified and cached for encryption operations (will not prompt again this session)")
                 return True
             else:
                 # Invalid password - ask again
@@ -1965,6 +2051,9 @@ class MainWindowBase(QMainWindow):
         
         # Get all selected paths (supports multi-selection)
         selected_paths = self.file_grid_widget.get_selected_paths()
+        print(f"[UI] remove_file_item called with {len(selected_paths)} selected paths")
+        for path in selected_paths:
+            print(f"[UI]   - {path}")
         
         if not selected_paths:
             self.show_message("Info", "Please select one or more files/folders to remove.", "info")
@@ -1987,12 +2076,25 @@ class MainWindowBase(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             removed_count = 0
             
-            # Bulk remove optimization: defer grid refresh until all items removed
-            for selected_path in selected_paths:
-                if self.file_lock_manager.remove_item(selected_path):
-                    # Skip grid refresh during loop (optimization)
-                    self.file_grid_widget.remove_item(selected_path, defer_refresh=True)
-                    removed_count += 1
+            # Disable file watcher to prevent auto-refresh during bulk removal
+            self.config_refresh_timer.stop()  # Stop any pending refreshes
+            self.config_watcher.blockSignals(True)
+            
+            try:
+                # Bulk remove optimization: defer grid refresh until all items removed
+                for selected_path in selected_paths:
+                    print(f"[UI] Attempting to remove: {selected_path}")
+                    if self.file_lock_manager.remove_item(selected_path):
+                        # Skip grid refresh during loop (optimization)
+                        self.file_grid_widget.remove_item(selected_path, defer_refresh=True)
+                        removed_count += 1
+                        print(f"[UI] Successfully removed from lock manager")
+                    else:
+                        print(f"[UI] Failed to remove from lock manager")
+                
+            finally:
+                # Re-enable file watcher and clear blocked signals
+                self.config_watcher.blockSignals(False)
             
             # Update fanotify watches if monitoring is active
             if self.monitoring_active and hasattr(self.file_lock_manager, 'update_monitored_items'):
@@ -2497,6 +2599,53 @@ class MainWindowBase(QMainWindow):
             )
             return
 
+        # CRITICAL: If encryption is enabled, password MUST be cached/available
+        # This ensures seamless encryption without prompts
+        config_file = os.path.join(self.get_fadcrypt_folder(), "apps_config.json")
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    import json
+                    config = json.load(f)
+                    dangerous_ops = config.get("dangerous_operations", {})
+                    encryption_enabled = dangerous_ops.get("encryption", False)
+                    
+                    if encryption_enabled:
+                        # SEAMLESS ENCRYPTION: Get cached password
+                        # If not cached yet, prompt user ONCE
+                        cached_pwd = self.password_manager.get_password_bytes()
+                        if not cached_pwd:
+                            print("[Monitoring] Encryption enabled but password not cached - prompting for verification")
+                            from ui.dialogs.password_dialog import ask_password
+                            pwd, accepted = ask_password(
+                                "Encryption Enabled",
+                                "Encryption is enabled. Enter your password:",
+                                self.resource_path,
+                                style=self.password_dialog_style,
+                                wallpaper=self.wallpaper_choice,
+                                parent=self
+                            )
+                            if accepted and pwd:
+                                # Verify the password (this will cache it if correct)
+                                if self.password_manager.verify_password(pwd):
+                                    cached_pwd = self.password_manager.get_password_bytes()
+                                    print("✅ [Monitoring] Password verified and cached for encryption")
+                                else:
+                                    print("❌ [Monitoring] Password verification failed")
+                                    self.show_message("Invalid Password", "The password you entered is incorrect.", "error")
+                                    return
+                            else:
+                                print("[Monitoring] User cancelled password entry - cannot start monitoring with encryption enabled")
+                                self.show_message("Password Required", "Password is required to start monitoring with encryption enabled.", "error")
+                                return
+                        
+                        if cached_pwd:
+                            # Password available - use for encryption seamlessly
+                            self.file_lock_manager.set_password(cached_pwd)
+                            print("[Monitoring] ✅ Encryption enabled - using master password")
+        except Exception as e:
+            print(f"[Monitoring] Warning: Could not check encryption setting: {e}")
+
         # Check if any apps or locked items are added
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
 
@@ -2685,6 +2834,7 @@ class MainWindowBase(QMainWindow):
 
                 # Lock files and folders + start monitoring
                 if self.file_lock_manager:
+                    # Lock all items first
                     print("🔒 Locking files and starting monitoring...")
 
                     # Lock all items first
@@ -3184,27 +3334,15 @@ class MainWindowBase(QMainWindow):
                         "Protected files and folders are still locked.\n\n"
                         "Would you like to unlock them now?",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        None  # No parent so it's truly independent
+                        self  # Use self as parent for proper modality
                     )
-                    # Set window flags to keep on top and make it modal
-                    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Dialog)
-                    msg_box.setModal(True)
+                    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
                     reply = msg_box.exec()
                     
                     if reply == QMessageBox.StandardButton.Yes:
-                        # Ask for password
-                        from ui.dialogs.password_dialog import ask_password
-                        password = ask_password(
-                            "Unlock Files",
-                            "Enter your password to unlock files:",
-                            self.resource_path,
-                            style=self.password_dialog_style,
-                            wallpaper=self.wallpaper_choice,
-                            parent=self
-                        )
-                        
-                        if password and self.password_manager.verify_password(password):
-                            # Unlock files
+                        try:
+                            # Automatically unlock using existing connection
+                            # (user already logged in to start the app)
                             if self.file_lock_manager:
                                 print("🔓 Unlocking files and folders...")
                                 success, failed = self.file_lock_manager.unlock_all()
@@ -3218,18 +3356,22 @@ class MainWindowBase(QMainWindow):
                             
                             # Clear monitoring state
                             state['monitoring_active'] = False
-                            with open(state_file, 'w') as f:
-                                json.dump(state, f, indent=2)
+                            from core.file_protection import safe_write_to_protected_file
+                            content = json.dumps(state, indent=2)
+                            success, error = safe_write_to_protected_file(state_file, content)
+                            if not success:
+                                print(f"⚠️  Warning writing monitoring state: {error}")
                             
                             self.show_message(
                                 "Success",
                                 "Files unlocked successfully. Monitoring state cleared.",
                                 "success"
                             )
-                        else:
+                        except Exception as e:
+                            print(f"❌ Error during unlock: {e}")
                             self.show_message(
-                                "Failed",
-                                "Incorrect password. Files remain locked.",
+                                "Error",
+                                f"Failed to unlock files: {e}",
                                 "error"
                             )
                     else:
@@ -4124,20 +4266,44 @@ class MainWindowBase(QMainWindow):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            for item_path in selected_items:
-                self.file_grid_widget.remove_item(item_path)
-                
-                # Log activity
-                self.log_activity(
-                    'remove_item',
-                    item_path,
-                    'file_or_folder',
-                    success=True,
-                    details=f"Removed from protection list"
-                )
+            # Disable file watcher to prevent auto-refresh during bulk removal
+            self.config_refresh_timer.stop()
+            self.config_watcher.blockSignals(True)
             
-            self.save_locked_files_config()
-            self.show_message("Success", f"Removed {len(selected_items)} item(s) successfully.", "success")
+            try:
+                removed_count = 0
+                for item_path in selected_items:
+                    # Call file_lock_manager.remove_item() to unlock and remove properly
+                    if self.file_lock_manager.remove_item(item_path):
+                        removed_count += 1
+                        self.file_grid_widget.remove_item(item_path)
+                        
+                        # Log activity
+                        self.log_activity(
+                            'remove_item',
+                            item_path,
+                            'file_or_folder',
+                            success=True,
+                            details=f"Removed from protection list"
+                        )
+                    else:
+                        print(f"⚠️  Could not remove: {item_path}")
+                
+            finally:
+                # Re-enable file watcher
+                self.config_watcher.blockSignals(False)
+            
+            if removed_count > 0:
+                # Manual refresh instead of relying on auto-refresh
+                self.load_locked_files()
+                
+                # Update config display
+                if hasattr(self, 'update_config_display'):
+                    self.update_config_display()
+                
+                self.show_message("Success", f"Removed {removed_count} item(s) successfully.", "success")
+            else:
+                self.show_message("Error", "Failed to remove items.", "error")
     
     def open_stats_window(self):
         """Open the enhanced statistics dashboard window - requires password if monitoring active"""

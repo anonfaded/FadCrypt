@@ -615,25 +615,33 @@ class CursesFileBrowser:
                 # Determine icon
                 icon = "📁" if item['type'] == 'folder' else "📄"
                 
+                # Check if encrypted
+                is_encrypted = item.get('is_encrypted', False)
+                encrypted_status = ".fadcrypt encrypted" if is_encrypted else item['type']
+                
                 filtered_items.append({
                     'name': item['name'],
                     'path': item['path'],
-                    'type': item['type'],
+                    'type': encrypted_status,
                     'icon': icon,
                     'size_mb': size_mb,
                     'modified': modified,
-                    'is_dir': item['type'] == 'folder'
+                    'is_dir': item['type'] == 'folder',
+                    'is_encrypted': is_encrypted
                 })
             except (OSError, PermissionError):
                 # Add item even if we can't get stats (it's locked)
+                is_encrypted = item.get('is_encrypted', False)
+                encrypted_status = ".fadcrypt encrypted" if is_encrypted else item['type']
                 filtered_items.append({
                     'name': item['name'],
                     'path': item['path'],
-                    'type': item['type'],
+                    'type': encrypted_status,
                     'icon': "📁" if item['type'] == 'folder' else "📄",
                     'size_mb': 0,
                     'modified': "Locked",
-                    'is_dir': item['type'] == 'folder'
+                    'is_dir': item['type'] == 'folder',
+                    'is_encrypted': is_encrypted
                 })
         
         return filtered_items

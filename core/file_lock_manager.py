@@ -3,6 +3,7 @@ File and Folder Lock Manager (Base Class)
 
 Abstract base class for platform-specific file/folder locking implementations.
 Provides interface for locking files and folders to prevent read/write/delete/rename.
+Integrates with FileEncryptionManager for encrypted file/folder protection.
 """
 
 import os
@@ -31,6 +32,8 @@ class FileLockManager(ABC):
         self.app_locker = app_locker
         self.locked_items: List[Dict] = []
         self.config_file = os.path.join(config_folder, "apps_config.json")
+        self.encryption_manager = None  # Will be set by platform-specific subclasses
+        self.password_bytes: Optional[bytes] = None  # For encryption operations
         self._load_locked_items()
     
     def _get_config(self) -> Dict:
@@ -42,8 +45,16 @@ class FileLockManager(ABC):
                 with open(self.config_file, 'r') as f:
                     return json.load(f)
             except Exception:
-                return {"applications": [], "locked_files_and_folders": []}
-        return {"applications": [], "locked_files_and_folders": []}
+                return {
+                    "applications": [], 
+                    "locked_files_and_folders": [],
+                    "dangerous_operations": {"encryption": False}
+                }
+        return {
+            "applications": [], 
+            "locked_files_and_folders": [],
+            "dangerous_operations": {"encryption": False}
+        }
     
     def _load_locked_items(self):
         """Load locked items from unified config (apps_config.json) - reads directly from file"""
@@ -85,11 +96,14 @@ class FileLockManager(ABC):
             
             # Always save directly using safe write to ensure file is updated
             from core.file_protection import safe_write_to_protected_file
+            from core.verbose_logger import vlog
             import json
             content = json.dumps(config, indent=2)
+            vlog(f"[FileLockManager] About to save {len(self.locked_items)} locked items to config")
+            for item in self.locked_items:
+                vlog(f"  - {item.get('name', 'unknown')}: {item.get('path', 'unknown')}")
             success, error = safe_write_to_protected_file(self.config_file, content)
             if success:
-                from core.verbose_logger import vlog
                 vlog(f"💾 Saved {len(self.locked_items)} locked items to unified config")
                 # Update app_locker config if it exists
                 if self.app_locker and hasattr(self.app_locker, 'config'):
@@ -99,6 +113,30 @@ class FileLockManager(ABC):
                 
         except Exception as e:
             print(f"❌ Error saving locked items: {e}")
+    
+    def _is_encryption_enabled(self) -> bool:
+        """
+        Check if encryption feature is enabled in settings.
+        
+        Returns:
+            True if encryption is enabled, False otherwise
+        """
+        config = self._get_config()
+        dangerous_ops = config.get("dangerous_operations", {})
+        return dangerous_ops.get("encryption", False)
+    
+    def set_password(self, password: bytes):
+        """
+        Set master password for encryption operations.
+        
+        Args:
+            password: Master password as bytes
+        """
+        self.password_bytes = password
+        from core.verbose_logger import vlog
+        vlog(f"[FileLockManager] Password set for encryption operations ({len(password)} bytes)")
+        from core.verbose_logger import vlog
+        vlog(f"[FileLockManager] Password set for encryption operations")
     
     def add_item(self, path: str, item_type: str = "file") -> bool:
         """
@@ -146,6 +184,8 @@ class FileLockManager(ABC):
         """
         Remove file or folder from locked items list.
         
+        Handles decryption if encryption is enabled.
+        
         Args:
             path: Absolute path to file or folder
         
@@ -156,7 +196,10 @@ class FileLockManager(ABC):
         
         # Find the item to unlock
         item_to_unlock = None
-        for item in self.locked_items:
+        vlog(f"[FileLockManager] Attempting to remove: {path}")
+        vlog(f"[FileLockManager] Current locked_items count: {len(self.locked_items)}")
+        for i, item in enumerate(self.locked_items):
+            vlog(f"[FileLockManager]   Item {i}: {item['path']}")
             if item['path'] == path:
                 item_to_unlock = item
                 break
@@ -164,16 +207,48 @@ class FileLockManager(ABC):
         if not item_to_unlock:
             print(f"⚠️  Not found in locked items: {path}")
             return False
+        # Check if item is encrypted
+        is_encrypted = item_to_unlock.get("is_encrypted", False)
+        encryption_enabled = self._is_encryption_enabled()
         
-        # First unlock the item
+        vlog(f"[FileLockManager] Removing: {os.path.basename(path)} | Encrypted: {is_encrypted} | Encryption Feature: {encryption_enabled}")
+        
+        # If encrypted but password not cached, try to load it (so _unlock_item can use it)
+        if is_encrypted and not self.password_bytes and self.encryption_manager:
+            vlog(f"[FileLockManager] Item is encrypted but password not cached - attempting to load")
+            try:
+                from core.password_manager import PasswordManager
+                from core.crypto_manager import CryptoManager
+                from core.cli.password_prompt import PasswordPrompt
+                
+                config_dir = os.path.dirname(self.config_file) if self.config_file else None
+                if config_dir:
+                    password_file = os.path.join(config_dir, "encrypted_password.bin")
+                    if os.path.exists(password_file):
+                        crypto_manager = CryptoManager()
+                        password_manager = PasswordManager(password_file, crypto_manager)
+                        
+                        # Try to prompt for password
+                        password_prompt = PasswordPrompt(password_manager)
+                        if password_prompt.verify_password():
+                            self.password_bytes = password_manager.get_password_bytes()
+                            vlog(f"[FileLockManager] ✓ Password loaded from encrypted_password.bin")
+                        else:
+                            vlog(f"[FileLockManager] ⚠ Password prompt cancelled or failed")
+            except Exception as e:
+                vlog(f"[FileLockManager] Warning: Could not load password: {e}")
+        
+        # Unlock the item (handles decryption internally if encrypted)
         try:
             self._unlock_item(item_to_unlock)
         except Exception as e:
             vlog(f"Warning: Error unlocking {path}: {e}")
         
-        # Then remove from list
+        # Remove from list
         original_count = len(self.locked_items)
+        vlog(f"[FileLockManager] Before filter: {len(self.locked_items)} items")
         self.locked_items = [item for item in self.locked_items if item['path'] != path]
+        vlog(f"[FileLockManager] After filter: {len(self.locked_items)} items (removed {original_count - len(self.locked_items)})")
         
         if len(self.locked_items) < original_count:
             self._save_locked_items()
@@ -202,10 +277,10 @@ class FileLockManager(ABC):
             Tuple of (success_count, failure_count)
         """
         if not self.locked_items:
-            print("ℹ️  No items to lock")
+            print("ℹ️ No items to lock")
             return (0, 0)
         
-        print(f"🔒 Locking {len(self.locked_items)} items...")
+        print(f"🔒 Locking {len(self.locked_items)} item(s)...")
         success_count = 0
         failure_count = 0
         
@@ -242,7 +317,7 @@ class FileLockManager(ABC):
                 # Attempt to lock
                 if self._lock_item(item):
                     success_count += 1
-                    print(f"  ✅ Locked: {name}")
+                    print(f"  ✓ Locked: {name}")
                 else:
                     failure_count += 1
                     print(f"  ❌ Lock operation failed: {name}")
@@ -251,7 +326,7 @@ class FileLockManager(ABC):
                 failure_count += 1
                 print(f"  ❌ Error locking {item['name']}: {e}")
         
-        print(f"🔒 Lock complete: {success_count} success, {failure_count} failed")
+        print(f"✅ Successfully locked {success_count} item(s)!")
         return (success_count, failure_count)
     
     def unlock_all(self) -> Tuple[int, int]:
@@ -262,10 +337,10 @@ class FileLockManager(ABC):
             Tuple of (success_count, failure_count)
         """
         if not self.locked_items:
-            print("ℹ️  No items to unlock")
+            print("ℹ️ No items to unlock")
             return (0, 0)
         
-        print(f"🔓 Unlocking {len(self.locked_items)} items...")
+        print(f"🔓 Unlocking {len(self.locked_items)} item(s)...")
         success_count = 0
         failure_count = 0
         
@@ -273,7 +348,7 @@ class FileLockManager(ABC):
             try:
                 if self._unlock_item(item):
                     success_count += 1
-                    print(f"  ✅ Unlocked: {item['name']}")
+                    print(f"  ✓ Unlocked: {item['name']}")
                 else:
                     failure_count += 1
                     print(f"  ❌ Failed to unlock: {item['name']}")
@@ -281,7 +356,7 @@ class FileLockManager(ABC):
                 failure_count += 1
                 print(f"  ❌ Error unlocking {item['name']}: {e}")
         
-        print(f"🔓 Unlock complete: {success_count} success, {failure_count} failed")
+        print(f"✅ Successfully unlocked {success_count} item(s)!")
         return (success_count, failure_count)
     
     def lock_fadcrypt_configs(self):

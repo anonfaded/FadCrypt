@@ -134,7 +134,7 @@ class TUIManager:
             
             if actual_paths:
                 self.show_header()
-                print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                 
                 success_count = 0
                 for path in actual_paths:
@@ -187,12 +187,12 @@ class TUIManager:
                 
                 if actual_paths:
                     self.show_header()
-                    print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                    print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                     
                     success, failed = self.cli_handler.lock_multiple(actual_paths)
                     
                     if success > 0:
-                        print_success(f"Successfully locked {success} item(s)!")
+                        print_success(f"✅ Successfully locked {success} item(s)!")
                     if failed > 0:
                         print_error(f"Failed to lock {failed} item(s).")
                     
@@ -219,7 +219,7 @@ class TUIManager:
                         if os.path.exists(lock_file):
                             print_error(f"File is already locked: {os.path.basename(path)}")
                         elif self.cli_handler.lock_path(path):
-                            print_success("Successfully locked!")
+                            print_success("✅ Successfully locked!")
                         else:
                             print_error("Failed to lock file. Check permissions and try again.")
                     else:
@@ -228,7 +228,7 @@ class TUIManager:
                         if os.path.exists(config_file):
                             print_error(f"Folder is already locked: {os.path.basename(path)}")
                         elif self.cli_handler.lock_path(path):
-                            print_success("Successfully locked!")
+                            print_success("✅ Successfully locked!")
                         else:
                             print_error("Failed to lock folder. Check permissions and try again.")
                 
@@ -274,12 +274,12 @@ class TUIManager:
             
             if actual_paths:
                 self.show_header()
-                print_colored(f"Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
                 
                 success, failed = self.cli_handler.unlock_multiple(actual_paths)
                 
                 if success > 0:
-                    print_success(f"Successfully unlocked {success} item(s)!")
+                    print_success(f"✅ Successfully unlocked {success} item(s)!")
                 if failed > 0:
                     print_error(f"Failed to unlock {failed} item(s).")
                 
@@ -432,10 +432,10 @@ class TUIManager:
                                     actual_paths = [p for p in selected_paths if not p.startswith('__')]
                                     if actual_paths:
                                         self.show_header()
-                                        print_colored(f"Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                                        print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                                         success, failed = self.cli_handler.lock_multiple(actual_paths)
                                         if success > 0:
-                                            print_success(f"Successfully locked {success} item(s)!")
+                                            print_success(f"✅ Successfully locked {success} item(s)!")
                                         if failed > 0:
                                             print_error(f"Failed to lock {failed} item(s).")
                                         input("\nPress Enter to continue...")
@@ -448,10 +448,10 @@ class TUIManager:
                                 actual_paths = [p for p in selected_paths if not p.startswith('__')]
                                 if actual_paths:
                                     self.show_header()
-                                    print_colored(f"Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
+                                    print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
                                     success, failed = self.cli_handler.unlock_multiple(actual_paths)
                                     if success > 0:
-                                        print_success(f"Successfully unlocked {success} item(s)!")
+                                        print_success(f"✅ Successfully unlocked {success} item(s)!")
                                     if failed > 0:
                                         print_error(f"Failed to unlock {failed} item(s).")
                                     input("\nPress Enter to continue...")
@@ -468,13 +468,14 @@ class TUIManager:
             settings_menu_items = [
                 {'key': '1', 'icon': '🔑', 'text': 'Change Password', 'action': 'password'},
                 {'key': '2', 'icon': '🔐', 'text': 'Generate Recovery Codes', 'action': 'recovery'},
-                {'key': '3', 'icon': '📖', 'text': 'About FadCrypt', 'action': 'about'},
-                {'key': '4', 'icon': '🔙', 'text': 'Back to Main Menu', 'action': 'back'}
+                {'key': '3', 'icon': '⚠️', 'text': 'Dangerous Operations', 'action': 'dangerous'},
+                {'key': '4', 'icon': '📖', 'text': 'About FadCrypt', 'action': 'about'},
+                {'key': '5', 'icon': '🔙', 'text': 'Back to Main Menu', 'action': 'back'}
             ]
             
             choice = show_curses_menu("OPTIONS", settings_menu_items, "Back")
             
-            if choice == '4' or choice == 'back' or choice == 'quit':
+            if choice == '5' or choice == 'back' or choice == 'quit':
                 break
             elif choice == '1':
                 self.password_prompt.change_password()
@@ -483,7 +484,109 @@ class TUIManager:
                 if self.password_prompt.verify_password_with_recovery():
                     self.password_prompt.generate_recovery_codes()
             elif choice == '3':
+                self.dangerous_operations_menu()
+            elif choice == '4':
                 self.show_about()
+    
+    def dangerous_operations_menu(self):
+        """Dangerous operations menu"""
+        from core.file_protection import safe_write_to_protected_file
+        import json
+        
+        while True:
+            try:
+                # Load current config
+                config_file = os.path.join(self.cli_handler.config_folder, "apps_config.json")
+                
+                # Create config folder and default config if they don't exist
+                if not os.path.exists(self.cli_handler.config_folder):
+                    os.makedirs(self.cli_handler.config_folder, exist_ok=True)
+                
+                if not os.path.exists(config_file):
+                    # Create default config using safe write
+                    default_config = {
+                        "applications": [],
+                        "locked_files_and_folders": [],
+                        "dangerous_operations": {
+                            "encryption": False
+                        }
+                    }
+                    config_content = json.dumps(default_config, indent=2)
+                    safe_write_to_protected_file(config_file, config_content)
+                    config = default_config
+                else:
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                
+                dangerous_ops = config.get("dangerous_operations", {})
+                encryption_enabled = dangerous_ops.get("encryption", False)
+                
+                self.show_header()
+                print_colored("DANGEROUS OPERATIONS", Colors.TITLE)
+                print(f"\n{Colors.BORDER}Current Settings:{Colors.RESET}\n")
+                print(f"  [1] File/Folder Encryption: {'ENABLED ✓' if encryption_enabled else 'DISABLED'}")
+                
+                print(f"\n{Colors.BORDER}Description:{Colors.RESET}\n")
+                if encryption_enabled:
+                    print(Colors.INFO + """
+  When ENABLED:
+  • Files/folders are ENCRYPTED with AES-256 when locked
+  • Files are converted to .fadcrypt format (encrypted binary data)
+  • Locked files are COMPLETELY INACCESSIBLE without password
+  • Unlocking decrypts files back to original format
+  • Decryption requires your MASTER PASSWORD
+  • Encryption is IRREVERSIBLE - keep recovery codes safe
+  • If password is forgotten, recovery codes allow reset
+""" + Colors.RESET)
+                else:
+                    print(Colors.INFO + """
+  When DISABLED (Current):
+  • Files/folders are protected using Access Control Lists (ACLs) only
+  • Files remain readable when unlocked
+  • Fast lock/unlock operations
+  • No encryption overhead
+""" + Colors.RESET)
+                
+                print(f"{Colors.BORDER}Actions:{Colors.RESET}\n")
+                print_colored("  [E] Enable Encryption", Colors.TITLE if not encryption_enabled else Colors.DIM)
+                print_colored("  [D] Disable Encryption", Colors.TITLE if encryption_enabled else Colors.DIM)
+                print_colored("  [B] Back to Settings", Colors.TITLE)
+                
+                choice = input(f"\n{Colors.DIM}[Select option]: {Colors.RESET}").strip().upper()
+                
+                if choice == 'B':
+                    break
+                elif choice == 'E':
+                    if not encryption_enabled:
+                        config["dangerous_operations"]["encryption"] = True
+                        content = json.dumps(config, indent=2)
+                        success, error = safe_write_to_protected_file(config_file, content)
+                        if success:
+                            print_success("✓ Encryption ENABLED")
+                        else:
+                            print_error(f"Failed to save settings: {error}")
+                    else:
+                        print_warning("Encryption is already enabled")
+                    input("\nPress Enter to continue...")
+                elif choice == 'D':
+                    if encryption_enabled:
+                        config["dangerous_operations"]["encryption"] = False
+                        content = json.dumps(config, indent=2)
+                        success, error = safe_write_to_protected_file(config_file, content)
+                        if success:
+                            print_success("✓ Encryption DISABLED")
+                        else:
+                            print_error(f"Failed to save settings: {error}")
+                    else:
+                        print_warning("Encryption is already disabled")
+                    input("\nPress Enter to continue...")
+                
+            except Exception as e:
+                print_error(f"Error accessing dangerous operations: {e}")
+                import traceback
+                traceback.print_exc()
+                input("\nPress Enter to continue...")
+                break
     
     def show_about(self):
         """Show about information with menu navigation at bottom"""

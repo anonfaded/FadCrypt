@@ -4,6 +4,7 @@ Linux File Lock Manager
 Implements file/folder locking using chmod permissions and chattr attributes via elevated daemon.
 Uses safe write logic like Windows implementation.
 Unified approach with daemon for elevated operations.
+Integrates with FileEncryptionManagerLinux for encrypted file/folder protection.
 """
 
 import os
@@ -21,6 +22,11 @@ class FileLockManagerLinux(FileLockManager):
         super().__init__(config_folder, app_locker)
         self.permission_backup_folder = os.path.join(config_folder, "permission_backups")
         os.makedirs(self.permission_backup_folder, exist_ok=True)
+        
+        # Initialize encryption manager for Linux
+        from core.linux.file_encryption_manager_linux import FileEncryptionManagerLinux
+        from core.crypto_manager import CryptoManager
+        self.encryption_manager = FileEncryptionManagerLinux(config_folder, CryptoManager())
     
     def _get_permission_backup_path(self, item_path: str) -> str:
         """Get path for permission backup file"""
@@ -146,9 +152,14 @@ class FileLockManagerLinux(FileLockManager):
     
     def _lock_item(self, item: Dict) -> bool:
         """
-        Lock file or folder using daemon for elevated operations.
+        Lock file or folder by encrypting (if enabled) then applying daemon protections.
         
-        This makes files:
+        Encryption (if enabled):
+        1. Converts file/folder to .fadcrypt format using AES-256-GCM
+        2. Original file/folder is deleted after successful encryption
+        3. Encrypted .fadcrypt file is then permission-locked
+        
+        Permission lock always applied:
         1. No permissions for owner/group/others (000) via daemon
         2. Immutable attribute via chattr +i via daemon
         3. Read-only visual indicator
@@ -159,6 +170,47 @@ class FileLockManagerLinux(FileLockManager):
         if not os.path.exists(path):
             vlog(f"[Item] Path no longer exists: {path}")
             return False
+        
+        # Step 0: Encrypt if feature is enabled
+        config = self._get_config()
+        dangerous_ops = config.get("dangerous_operations", {})
+        encryption_enabled = dangerous_ops.get("encryption", False)
+        has_manager = self.encryption_manager is not None
+        has_password = self.password_bytes is not None
+        
+        print(f"[DEBUG] Config dangerous_ops: {dangerous_ops}")
+        print(f"[DEBUG] encryption_enabled={encryption_enabled}, has_manager={has_manager}, has_password={has_password}")
+        
+        if encryption_enabled:
+            vlog(f"[Item] Encryption feature ENABLED")
+            vlog(f"[Item] Has manager: {has_manager}, Has password: {has_password}")
+        
+        if encryption_enabled and has_manager and has_password:
+            print(f"🔐 Encrypting: {os.path.basename(path)}")
+            vlog(f"[Item] Encryption enabled - encrypting before lock...")
+            item_type = item.get('type', 'file')
+            success, encrypted_path, error = self.encryption_manager.encrypt_item(
+                path,
+                self.password_bytes,
+                item_type
+            )
+            
+            if success:
+                print(f"✓ Encrypted successfully: {os.path.basename(encrypted_path)}")
+                vlog(f"  [Encrypt] ✓ Successfully encrypted to .fadcrypt")
+                # Update item metadata to track encryption
+                item['is_encrypted'] = True
+                item['encrypted_path'] = encrypted_path
+                # Now lock the encrypted file instead of original
+                path = encrypted_path
+            else:
+                print(f"❌ Encryption failed: {error}")
+                vlog(f"  [Encrypt] ❌ Encryption failed: {error}")
+                return False
+        else:
+            # Mark as not encrypted
+            item['is_encrypted'] = False
+            item['encrypted_path'] = None
         
         client = self._get_daemon_client()
         if not client or not client.is_available():
