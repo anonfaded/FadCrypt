@@ -36,7 +36,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 - Perfect for protecting documents, photos, archives, source code, and other sensitive data
 
 **Key Highlights:**
-- **Cross-Platform:** Windows and Linux with unified CLI and separate optimized GUIs
+- **Cross-Platform:** Windows and Linux desktop platforms with unified CLI and separate optimized GUIs
 - **Military-Grade Encryption:** AES-256-GCM with PBKDF2 key derivation (100,000 iterations)
 - **Fully Encrypted:** Configuration, passwords, and recovery codes are all encrypted
 - **No External Dependencies:** Open-source and completely free with no cloud sync or telemetry
