@@ -258,8 +258,7 @@ class PasswordPrompt:
         
         print_success("Recovery code verified!")
         
-        # Get new password
-        print(f"\n{Colors.INFO}Now create a new master password:")
+        # Get new password (curses prompt will display its own label)
         new_password = self.prompt_password("New password", confirm=True)
         if not new_password:
             print_warning("Password recovery cancelled.")
@@ -272,7 +271,7 @@ class PasswordPrompt:
             print_success("Password successfully reset!")
             
             # Ask if user wants to generate new recovery codes
-            print(f"\n{Colors.WARNING}⚠️  Important: Your old recovery codes are now invalid and cannot be used again.")
+            print(f"\n{Colors.WARNING}⚠️  Important: Your old recovery codes are  still valid, each code can be used only once. If you generate new codes, the old ones will become invalid and unusable. It is recommended to generate new codes now and save them securely.")
             print(f"{Colors.PRIMARY}Would you like to generate new recovery codes? (y/n):")
             print(f" {Colors.SUCCESS}❯{Colors.RESET} ", end='')
             choice = input().strip().lower()

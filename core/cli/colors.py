@@ -4,10 +4,10 @@ Color Theme for FadCrypt TUI
 Red-themed color scheme using colorama for cross-platform support.
 """
 
-from colorama import Fore, Back, Style, init
+from colorama import Fore, Back, Style, just_fix_windows_console
 
-# Initialize colorama for Windows support
-init(autoreset=True)
+# Initialize colorama for Windows support - use just_fix_windows_console for proper emoji support
+just_fix_windows_console()
 
 
 class Colors:

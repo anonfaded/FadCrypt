@@ -135,8 +135,6 @@ class FileLockManager(ABC):
         self.password_bytes = password
         from core.verbose_logger import vlog
         vlog(f"[FileLockManager] Password set for encryption operations ({len(password)} bytes)")
-        from core.verbose_logger import vlog
-        vlog(f"[FileLockManager] Password set for encryption operations")
     
     def add_item(self, path: str, item_type: str = "file") -> bool:
         """
@@ -159,9 +157,15 @@ class FileLockManager(ABC):
             print(f"   System paths are protected to prevent breaking your system")
             return False
         
+        # Check if trying to lock a .fadcrypt file (already encrypted)
+        if path.endswith('.fadcrypt'):
+            print(f"❌ File is already encrypted: {os.path.basename(path)}")
+            print(f"   Cannot lock .fadcrypt files directly. Unlock the original file instead.")
+            return False
+        
         # Check if already in list
         if any(item['path'] == path for item in self.locked_items):
-            print(f"⚠️  Already in list: {path}")
+            print(f"❌ Already locked: {os.path.basename(path)}")
             return False
         
         # Get metadata
@@ -187,7 +191,7 @@ class FileLockManager(ABC):
         Handles decryption if encryption is enabled.
         
         Args:
-            path: Absolute path to file or folder
+            path: Absolute path to file or folder (with or without .fadcrypt extension)
         
         Returns:
             True if removed successfully, False otherwise
@@ -196,13 +200,28 @@ class FileLockManager(ABC):
         
         # Find the item to unlock
         item_to_unlock = None
+        actual_item_path = None  # Track the actual path stored in the list
         vlog(f"[FileLockManager] Attempting to remove: {path}")
         vlog(f"[FileLockManager] Current locked_items count: {len(self.locked_items)}")
+        
+        # Try to find exact match first
         for i, item in enumerate(self.locked_items):
             vlog(f"[FileLockManager]   Item {i}: {item['path']}")
             if item['path'] == path:
                 item_to_unlock = item
+                actual_item_path = item['path']
                 break
+        
+        # If not found and path ends with .fadcrypt, try stripping it
+        if not item_to_unlock and path.endswith('.fadcrypt'):
+            original_path = path[:-9]  # Remove .fadcrypt extension
+            vlog(f"[FileLockManager] Not found with .fadcrypt extension, trying: {original_path}")
+            for i, item in enumerate(self.locked_items):
+                if item['path'] == original_path:
+                    item_to_unlock = item
+                    actual_item_path = item['path']  # Use the actual path from the item
+                    vlog(f"[FileLockManager] Found match by stripping .fadcrypt extension")
+                    break
         
         if not item_to_unlock:
             print(f"⚠️  Not found in locked items: {path}")
@@ -211,7 +230,7 @@ class FileLockManager(ABC):
         is_encrypted = item_to_unlock.get("is_encrypted", False)
         encryption_enabled = self._is_encryption_enabled()
         
-        vlog(f"[FileLockManager] Removing: {os.path.basename(path)} | Encrypted: {is_encrypted} | Encryption Feature: {encryption_enabled}")
+        vlog(f"[FileLockManager] Removing: {os.path.basename(actual_item_path)} | Encrypted: {is_encrypted} | Encryption Feature: {encryption_enabled}")
         
         # If encrypted but password not cached, try to load it (so _unlock_item can use it)
         if is_encrypted and not self.password_bytes and self.encryption_manager:
@@ -242,17 +261,17 @@ class FileLockManager(ABC):
         try:
             self._unlock_item(item_to_unlock)
         except Exception as e:
-            vlog(f"Warning: Error unlocking {path}: {e}")
+            vlog(f"Warning: Error unlocking {actual_item_path}: {e}")
         
-        # Remove from list
+        # Remove from list using the actual stored path
         original_count = len(self.locked_items)
         vlog(f"[FileLockManager] Before filter: {len(self.locked_items)} items")
-        self.locked_items = [item for item in self.locked_items if item['path'] != path]
+        self.locked_items = [item for item in self.locked_items if item['path'] != actual_item_path]
         vlog(f"[FileLockManager] After filter: {len(self.locked_items)} items (removed {original_count - len(self.locked_items)})")
         
         if len(self.locked_items) < original_count:
             self._save_locked_items()
-            vlog(f"✅ Removed from locked items: {os.path.basename(path)}")
+            vlog(f"[OK] Removed from locked items: {os.path.basename(actual_item_path)}")
             return True
         else:
             return False

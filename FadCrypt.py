@@ -108,8 +108,8 @@ if '--register-context' in sys.argv:
     # SECURITY: Require password UNLESS called with --internal-auth flag
     # The --internal-auth flag is only used by GUI/installer after they've authenticated
     if '--internal-auth' not in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import print_error
         from core.password_manager import PasswordManager
         from core.cli.password_prompt import PasswordPrompt
@@ -198,8 +198,8 @@ if '--register-context' in sys.argv:
 if '--unregister-context' in sys.argv:
     # SECURITY: Require password UNLESS called with --internal-auth flag
     if '--internal-auth' not in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import print_error
         from core.password_manager import PasswordManager
         from core.cli.password_prompt import PasswordPrompt
@@ -368,8 +368,8 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
 if '--cleanup' in sys.argv:
     # SECURITY: Require password UNLESS called with --internal-auth flag
     if '--internal-auth' not in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import print_error
         from core.password_manager import PasswordManager
         from core.cli.password_prompt import PasswordPrompt
@@ -737,8 +737,8 @@ sys.path.insert(0, str(project_root))
 if '--install-service' in sys.argv:
     # SECURITY: Require password UNLESS called with --internal-auth flag
     if '--internal-auth' not in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import print_error
         from core.password_manager import PasswordManager
         from core.cli.password_prompt import PasswordPrompt
@@ -847,8 +847,8 @@ if '--install-service' in sys.argv:
 if '--uninstall-service' in sys.argv:
     # SECURITY: Require password UNLESS called with --internal-auth flag
     if '--internal-auth' not in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import print_error
         from core.password_manager import PasswordManager
         from core.cli.password_prompt import PasswordPrompt
@@ -1019,8 +1019,8 @@ def launch_tui():
     """Launch the Text User Interface (TUI)"""
     try:
         # Initialize colorama for Windows
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         
         # Get platform-specific paths
         system = platform.system()
@@ -1139,8 +1139,16 @@ def requires_password_protection():
 
 def handle_direct_cli_commands():
     """Handle direct CLI commands like --lock, --unlock, --list with password protection"""
-    from colorama import init
-    init()
+    # Set UTF-8 encoding for stdout/stderr to support emojis
+    import io
+    import sys
+    if sys.stdout.encoding != 'utf-8':
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    if sys.stderr.encoding != 'utf-8':
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    
+    from colorama import just_fix_windows_console
+    just_fix_windows_console()
     
     from core.cli.colors import print_success, print_error, print_info, print_colored, Colors, BoxChars
     
@@ -1187,43 +1195,77 @@ def handle_direct_cli_commands():
             print_error("Authentication failed.")
             return False
         
+        # Get the cached password and set it in cli_handler so we don't prompt again
+        cached_password = password_manager.get_password_bytes()
+        if cached_password and hasattr(cli_handler, 'file_lock_manager') and cli_handler.file_lock_manager:
+            cli_handler.file_lock_manager.set_password(cached_password)
+        
         # Clear screen after successful authentication
         os.system('cls' if os.name == 'nt' else 'clear')
+        sys.stdout.flush()
+        sys.stderr.flush()
     
     # Handle --lock
     if '--lock' in sys.argv:
         idx = sys.argv.index('--lock')
         if idx + 1 < len(sys.argv):
-            paths = sys.argv[idx + 1:]
+            # Get paths, but filter out flags (things starting with --)
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
             
-            print_info(f"Locking {len(paths)} item(s)...\n")
+            if not paths:
+                print_error("Usage: fadcrypt --lock <path1> [path2] ...")
+                return False
+            
+            # Ensure UTF-8 encoding is active for emoji display
+            import io
+            if sys.stdout.encoding != 'utf-8':
+                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            
+            print_colored(f"🔒 Locking {len(paths)} item(s)...\n", Colors.INFO)
+            sys.stdout.flush()
             
             success, failed = cli_handler.lock_multiple(paths)
             
             if success > 0:
                 print_success(f"Successfully locked {success} item(s)!")
+                sys.stdout.flush()
             if failed > 0:
                 print_error(f"Failed to lock {failed} item(s).")
+                sys.stdout.flush()
             
             return True
         else:
             print_error("Usage: fadcrypt --lock <path1> [path2] ...")
+
             return False
     
     # Handle --unlock
     elif '--unlock' in sys.argv:
         idx = sys.argv.index('--unlock')
         if idx + 1 < len(sys.argv):
-            paths = sys.argv[idx + 1:]
+            # Get paths, but filter out flags (things starting with --)
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
             
-            print_info(f"Unlocking {len(paths)} item(s)...\n")
+            if not paths:
+                print_error("Usage: fadcrypt --unlock <path1> [path2] ...")
+                return False
+            
+            # Ensure UTF-8 encoding is active for emoji display
+            import io
+            if sys.stdout.encoding != 'utf-8':
+                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            
+            print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
+            sys.stdout.flush()
             
             success, failed = cli_handler.unlock_multiple(paths)
             
             if success > 0:
                 print_success(f"Successfully unlocked {success} item(s)!")
+                sys.stdout.flush()
             if failed > 0:
                 print_error(f"Failed to unlock {failed} item(s).")
+                sys.stdout.flush()
             
             return True
         else:
@@ -1314,16 +1356,16 @@ def main():
     
     # Handle --help first (before any other processing)
     if '--help' in sys.argv or '-h' in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.help_display import show_help
         show_help()
         return
     
     # Handle --version
     if '--version' in sys.argv or '-v' in sys.argv:
-        from colorama import init
-        init()
+        from colorama import just_fix_windows_console
+        just_fix_windows_console()
         from core.cli.colors import Colors
         
         python_version = sys.version.split()[0]

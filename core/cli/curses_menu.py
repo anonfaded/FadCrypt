@@ -484,6 +484,17 @@ def show_curses_menu(title: str, items: List[Dict], quit_text: str = "Quit") -> 
         return menu.show_menu(title, items)
     
     try:
-        return curses.wrapper(_menu_wrapper)
+        result = curses.wrapper(_menu_wrapper)
+        # Restore terminal state and encoding after curses exits
+        import sys
+        import io
+        sys.stdout.flush()
+        sys.stderr.flush()
+        # Reset to UTF-8 encoding in case curses changed it
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        if sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+        return result
     except Exception:
         return None
