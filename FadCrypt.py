@@ -1212,7 +1212,8 @@ def handle_direct_cli_commands():
                 # EARLY VALIDATION: Check if paths exist and determine if any are actually locked
                 # Only prompt for password if there are locked items
                 valid_paths = []
-                invalid_paths = []
+                invalid_paths = []  # Paths that don't exist
+                unlocked_paths = []  # Paths that exist but are not locked
                 suggested_paths = []  # For when user tries to unlock original file that's been encrypted
                 
                 locked_items = cli_handler.file_lock_manager.get_locked_items()
@@ -1236,7 +1237,7 @@ def handle_direct_cli_commands():
                         if is_locked:
                             valid_paths.append(path)
                         else:
-                            invalid_paths.append(path)  # Exists but not locked
+                            unlocked_paths.append(path)  # Exists but not locked
                     else:
                         # Path doesn't exist - check if it's an original file that was encrypted
                         if abs_path in locked_items_paths:
@@ -1254,7 +1255,7 @@ def handle_direct_cli_commands():
                 locked_paths = valid_paths
                 
                 # If there are invalid paths or no locked paths, handle without calling CLI handler
-                if invalid_paths or suggested_paths or not locked_paths:
+                if invalid_paths or suggested_paths or unlocked_paths or not locked_paths:
                     print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
                     sys.stdout.flush()
                     
@@ -1273,8 +1274,7 @@ def handle_direct_cli_commands():
                         for original_path, fadcrypt_path in suggested_paths:
                             error_messages.append(f"{original_path}: File was locked, use: fadcrypt --unlock {os.path.basename(fadcrypt_path)}")
                     
-                    if not locked_paths and valid_paths:
-                        unlocked_paths = [path for path in valid_paths if path not in locked_paths]
+                    if unlocked_paths:
                         error_messages.extend([f"{path}: Item is not locked: {os.path.basename(path)}" for path in unlocked_paths])
                     
                     # Show errors
