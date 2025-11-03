@@ -13,6 +13,9 @@ import os
 import platform
 import tempfile
 
+# CRITICAL: Force unbuffered output for live progress display in PowerShell/CMD
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 # CRITICAL: Set console encoding to UTF-8 FIRST to prevent Unicode errors
 try:
     import codecs
@@ -1183,6 +1186,33 @@ def handle_direct_cli_commands():
         from core.cli.cli_handler_linux import CLIHandlerLinux
         cli_handler = CLIHandlerLinux(config_folder)
     
+    # EARLY PATH VALIDATION: Check paths before password authentication
+    # This prevents prompting for password when paths are invalid
+    if '--lock' in sys.argv:
+        idx = sys.argv.index('--lock')
+        if idx + 1 < len(sys.argv):
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+            if paths:
+                # Validate all paths exist before proceeding
+                invalid_paths = []
+                for path in paths:
+                    if not cli_handler.validate_path(path):
+                        invalid_paths.append(path)
+                
+                if invalid_paths:
+                    print_error("Cannot proceed - the following paths are invalid:")
+                    for path in invalid_paths:
+                        print_error(f"   {path}: Path does not exist or is not accessible")
+                    return False
+    elif '--unlock' in sys.argv:
+        idx = sys.argv.index('--unlock')
+        if idx + 1 < len(sys.argv):
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+            if paths:
+                # For unlock, we don't validate existence since the original path might not exist
+                # (it could be encrypted as .fadcrypt), but we can at least check the argument format
+                pass  # Unlock validation is less strict since files might be encrypted
+    
     # Only require password for user-facing commands (not system operations)
     if requires_password_protection():
         # Ensure password exists
@@ -1224,13 +1254,24 @@ def handle_direct_cli_commands():
             print_colored(f"🔒 Locking {len(paths)} item(s)...\n", Colors.INFO)
             sys.stdout.flush()
             
-            success, failed = cli_handler.lock_multiple(paths)
+            success, failed, successful_paths, error_messages = cli_handler.lock_multiple(paths)
             
             if success > 0:
                 print_success(f"Successfully locked {success} item(s)!")
+                print()
+                print_colored("🔒 Items are now protected. To unlock later, use:", Colors.INFO)
+                for path in successful_paths:
+                    item_name = os.path.basename(path)
+                    print_colored(f"   fadcrypt --unlock {item_name}", Colors.SUCCESS)
+                print()
                 sys.stdout.flush()
+            
             if failed > 0:
                 print_error(f"Failed to lock {failed} item(s).")
+                if error_messages:
+                    print_colored("Error details:", Colors.ERROR)
+                    for error_msg in error_messages:
+                        print_colored(f"   {error_msg}", Colors.ERROR)
                 sys.stdout.flush()
             
             return True
@@ -1258,13 +1299,26 @@ def handle_direct_cli_commands():
             print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
             sys.stdout.flush()
             
-            success, failed = cli_handler.unlock_multiple(paths)
+            success, failed, successful_paths, error_messages = cli_handler.unlock_multiple(paths)
             
             if success > 0:
                 print_success(f"Successfully unlocked {success} item(s)!")
+                print()
+                print_colored("🔓 Items are now accessible at their original locations:", Colors.INFO)
+                for path in successful_paths:
+                    item_name = os.path.basename(path)
+                    print_colored(f"   📁 {item_name}", Colors.SUCCESS)
+                print()
+                print_colored("🔒 To lock these items again later, use:", Colors.INFO)
+                for path in successful_paths:
+                    item_name = os.path.basename(path)
+                    print_colored(f"   fadcrypt --lock {item_name}", Colors.SUCCESS)
+                print()
                 sys.stdout.flush()
             if failed > 0:
-                print_error(f"Failed to unlock {failed} item(s).")
+                print_error(f"Failed to unlock {failed} item(s):")
+                for error_msg in error_messages:
+                    print_error(f"   {error_msg}")
                 sys.stdout.flush()
             
             return True

@@ -27,7 +27,7 @@ class CLIHandlerBase(ABC):
         self._ensure_config_initialized()
     
     @abstractmethod
-    def lock_path(self, path: str) -> bool:
+    def lock_path(self, path: str) -> Tuple[bool, str]:
         """
         Lock a file or folder.
         
@@ -35,12 +35,12 @@ class CLIHandlerBase(ABC):
             path: Absolute path to file or folder
         
         Returns:
-            True if locked successfully, False otherwise
+            Tuple of (success: bool, error_message: str)
         """
         pass
     
     @abstractmethod
-    def unlock_path(self, path: str) -> bool:
+    def unlock_path(self, path: str) -> Tuple[bool, str]:
         """
         Unlock a file or folder.
         
@@ -48,11 +48,11 @@ class CLIHandlerBase(ABC):
             path: Absolute path to file or folder
         
         Returns:
-            True if unlocked successfully, False otherwise
+            Tuple of (success: bool, error_message: str)
         """
         pass
     
-    def lock_multiple(self, paths: List[str]) -> Tuple[int, int]:
+    def lock_multiple(self, paths: List[str]) -> Tuple[int, int, List[str], List[str]]:
         """
         Lock multiple paths.
         
@@ -62,21 +62,26 @@ class CLIHandlerBase(ABC):
             paths: List of absolute paths
         
         Returns:
-            Tuple of (success_count, failure_count)
+            Tuple of (success_count, failure_count, successful_paths, error_messages)
         """
         # CRITICAL: Set password for encryption if enabled
         self._ensure_password_for_encryption()
         
         success_count = 0
         failure_count = 0
+        successful_paths = []
+        error_messages = []
         
         for path in paths:
-            if self.lock_path(path):
+            success, error_msg = self.lock_path(path)
+            if success:
                 success_count += 1
+                successful_paths.append(path)
             else:
                 failure_count += 1
+                error_messages.append(f"{path}: {error_msg}")
         
-        return (success_count, failure_count)
+        return (success_count, failure_count, successful_paths, error_messages)
     
     def _ensure_password_for_encryption(self):
         """
@@ -131,7 +136,7 @@ class CLIHandlerBase(ABC):
         except Exception as e:
             print(f"[Encryption] ⚠ Warning: Could not ensure password: {e}")
     
-    def unlock_multiple(self, paths: List[str]) -> Tuple[int, int]:
+    def unlock_multiple(self, paths: List[str]) -> Tuple[int, int, List[str], List[str]]:
         """
         Unlock multiple paths.
         
@@ -141,21 +146,26 @@ class CLIHandlerBase(ABC):
             paths: List of absolute paths
         
         Returns:
-            Tuple of (success_count, failure_count)
+            Tuple of (success_count, failure_count, successful_paths, error_messages)
         """
         # CRITICAL: Set password for decryption if enabled
         self._ensure_password_for_encryption()
         
         success_count = 0
         failure_count = 0
+        successful_paths = []
+        error_messages = []
         
         for path in paths:
-            if self.unlock_path(path):
+            success, error_msg = self.unlock_path(path)
+            if success:
                 success_count += 1
+                successful_paths.append(path)
             else:
                 failure_count += 1
+                error_messages.append(f"{path}: {error_msg}")
         
-        return (success_count, failure_count)
+        return (success_count, failure_count, successful_paths, error_messages)
     
     @abstractmethod
     def list_locked_items(self) -> List[Dict]:

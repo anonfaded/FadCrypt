@@ -189,10 +189,10 @@ class TUIManager:
                     self.show_header()
                     print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                     
-                    success, failed = self.cli_handler.lock_multiple(actual_paths)
+                    success, failed, _ = self.cli_handler.lock_multiple(actual_paths)
                     
                     if success > 0:
-                        print_success(f"✅ Successfully locked {success} item(s)!")
+                        print_success(f"Successfully locked {success} item(s)!")
                     if failed > 0:
                         print_error(f"Failed to lock {failed} item(s).")
                     
@@ -219,7 +219,7 @@ class TUIManager:
                         if os.path.exists(lock_file):
                             print_error(f"File is already locked: {os.path.basename(path)}")
                         elif self.cli_handler.lock_path(path):
-                            print_success("✅ Successfully locked!")
+                            print_success("Successfully locked!")
                         else:
                             print_error("Failed to lock file. Check permissions and try again.")
                     else:
@@ -228,7 +228,7 @@ class TUIManager:
                         if os.path.exists(config_file):
                             print_error(f"Folder is already locked: {os.path.basename(path)}")
                         elif self.cli_handler.lock_path(path):
-                            print_success("✅ Successfully locked!")
+                            print_success("Successfully locked!")
                         else:
                             print_error("Failed to lock folder. Check permissions and try again.")
                 
@@ -276,7 +276,7 @@ class TUIManager:
                 self.show_header()
                 print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
                 
-                success, failed = self.cli_handler.unlock_multiple(actual_paths)
+                success, failed, _ = self.cli_handler.unlock_multiple(actual_paths)
                 
                 if success > 0:
                     print_success(f"✅ Successfully unlocked {success} item(s)!")
@@ -433,9 +433,9 @@ class TUIManager:
                                     if actual_paths:
                                         self.show_header()
                                         print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
-                                        success, failed = self.cli_handler.lock_multiple(actual_paths)
+                                        success, failed, _ = self.cli_handler.lock_multiple(actual_paths)
                                         if success > 0:
-                                            print_success(f"✅ Successfully locked {success} item(s)!")
+                                            print_success(f"Successfully locked {success} item(s)!")
                                         if failed > 0:
                                             print_error(f"Failed to lock {failed} item(s).")
                                         input("\nPress Enter to continue...")
@@ -449,7 +449,7 @@ class TUIManager:
                                 if actual_paths:
                                     self.show_header()
                                     print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
-                                    success, failed = self.cli_handler.unlock_multiple(actual_paths)
+                                    success, failed, _ = self.cli_handler.unlock_multiple(actual_paths)
                                     if success > 0:
                                         print_success(f"✅ Successfully unlocked {success} item(s)!")
                                     if failed > 0:

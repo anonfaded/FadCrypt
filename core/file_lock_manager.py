@@ -11,6 +11,8 @@ import json
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
+from .verbose_logger import vlog
+
 
 class FileLockManager(ABC):
     """
@@ -196,7 +198,6 @@ class FileLockManager(ABC):
         Returns:
             True if removed successfully, False otherwise
         """
-        from core.verbose_logger import vlog
         
         # Find the item to unlock
         item_to_unlock = None
@@ -258,22 +259,28 @@ class FileLockManager(ABC):
                 vlog(f"[FileLockManager] Warning: Could not load password: {e}")
         
         # Unlock the item (handles decryption internally if encrypted)
+        unlock_success = False
         try:
-            self._unlock_item(item_to_unlock)
+            unlock_success = self._unlock_item(item_to_unlock)
         except Exception as e:
             vlog(f"Warning: Error unlocking {actual_item_path}: {e}")
+            unlock_success = False
         
-        # Remove from list using the actual stored path
-        original_count = len(self.locked_items)
-        vlog(f"[FileLockManager] Before filter: {len(self.locked_items)} items")
-        self.locked_items = [item for item in self.locked_items if item['path'] != actual_item_path]
-        vlog(f"[FileLockManager] After filter: {len(self.locked_items)} items (removed {original_count - len(self.locked_items)})")
-        
-        if len(self.locked_items) < original_count:
-            self._save_locked_items()
-            vlog(f"[OK] Removed from locked items: {os.path.basename(actual_item_path)}")
-            return True
+        if unlock_success:
+            # Remove from list using the actual stored path
+            original_count = len(self.locked_items)
+            vlog(f"[FileLockManager] Before filter: {len(self.locked_items)} items")
+            self.locked_items = [item for item in self.locked_items if item['path'] != actual_item_path]
+            vlog(f"[FileLockManager] After filter: {len(self.locked_items)} items (removed {original_count - len(self.locked_items)})")
+            
+            if len(self.locked_items) < original_count:
+                self._save_locked_items()
+                vlog(f"[OK] Removed from locked items: {os.path.basename(actual_item_path)}")
+                return True
+            else:
+                return False
         else:
+            vlog(f"[FileLockManager] Unlock failed for {actual_item_path}, not removing from list")
             return False
     
     def get_locked_items(self) -> List[Dict]:

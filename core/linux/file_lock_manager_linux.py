@@ -13,6 +13,7 @@ from typing import Dict, Optional
 import time
 
 from core.file_lock_manager import FileLockManager
+from core.verbose_logger import vlog
 
 
 class FileLockManagerLinux(FileLockManager):
@@ -36,7 +37,6 @@ class FileLockManagerLinux(FileLockManager):
     
     def _backup_permissions(self, path: str) -> bool:
         """Backup original permissions for path"""
-        from core.verbose_logger import vlog
         from core.file_protection import safe_write_to_protected_file
         
         backup_path = self._get_permission_backup_path(path)
@@ -66,7 +66,6 @@ class FileLockManagerLinux(FileLockManager):
     
     def _restore_permissions(self, path: str) -> bool:
         """Restore permissions from backup using daemon"""
-        from core.verbose_logger import vlog
         backup_path = self._get_permission_backup_path(path)
         
         if not os.path.exists(backup_path):
@@ -123,7 +122,6 @@ class FileLockManagerLinux(FileLockManager):
         
         Returns dict with: name, path, type, original_permissions (backup path), filesystem, lock_method
         """
-        from core.verbose_logger import vlog
         
         try:
             # Backup permissions first
@@ -164,7 +162,6 @@ class FileLockManagerLinux(FileLockManager):
         2. Immutable attribute via chattr +i via daemon
         3. Read-only visual indicator
         """
-        from core.verbose_logger import vlog
         path = item['path']
         
         if not os.path.exists(path):
@@ -244,7 +241,6 @@ class FileLockManagerLinux(FileLockManager):
         1. Immutable attribute via daemon chattr -i
         2. Restores original permissions from backup via daemon
         """
-        from core.verbose_logger import vlog
         path = item['path']
         
         # CRITICAL: Handle encrypted items first
@@ -315,8 +311,10 @@ class FileLockManagerLinux(FileLockManager):
                         # Continue to unlock the restored original file
                     else:
                         vlog(f"  [Item] ⚠ Decryption failed: {error}")
+                        return False
                 else:
                     vlog(f"  [Item] ⚠ Cannot decrypt - missing encryption manager or password")
+                    return False
         
         # Now unlock the item (whether originally locked or just decrypted)
         if not os.path.exists(path):
@@ -393,11 +391,9 @@ class FileLockManagerLinux(FileLockManager):
         Files are protected by permissions and immutable flags, not runtime monitoring.
         """
         if not self.locked_items:
-            from core.verbose_logger import vlog
             vlog("No locked files to protect")
             return False
         
-        from core.verbose_logger import vlog
         vlog(f"Static file protection active for {len(self.locked_items)} items")
         vlog("OK: File protection via chmod+chattr active")
         return True

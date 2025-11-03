@@ -13,6 +13,7 @@ from typing import Dict, Optional
 import time
 
 from core.file_lock_manager import FileLockManager
+from core.verbose_logger import vlog
 
 
 class FileLockManagerWindows(FileLockManager):
@@ -36,7 +37,6 @@ class FileLockManagerWindows(FileLockManager):
     
     def _backup_acl(self, path: str) -> bool:
         """Backup ACL for path"""
-        from core.verbose_logger import vlog
         backup_path = self._get_acl_backup_path(path)
         
         try:
@@ -77,7 +77,6 @@ class FileLockManagerWindows(FileLockManager):
                 return False
         
         try:
-            from core.verbose_logger import vlog
             
             # Restore ACL from backup
             # Note: icacls outputs to console even with capture_output=True
@@ -119,7 +118,6 @@ class FileLockManagerWindows(FileLockManager):
         
         Returns dict with: name, path, type, original_permissions (ACL backup path), filesystem, lock_method
         """
-        from core.verbose_logger import vlog
         
         try:
             # Backup ACL first
@@ -161,7 +159,6 @@ class FileLockManagerWindows(FileLockManager):
         3. Read-only (READONLY attribute)
         4. Access denied via ACL (deny Everyone)
         """
-        from core.verbose_logger import vlog
         path = item['path']
         
         if not os.path.exists(path):
@@ -253,7 +250,6 @@ class FileLockManagerWindows(FileLockManager):
         2. ACL deny rules (if any)
         3. Stops ProcessMonitor interception
         """
-        from core.verbose_logger import vlog
         path = item['path']
         
         # CRITICAL: Handle encrypted items first
@@ -332,8 +328,10 @@ class FileLockManagerWindows(FileLockManager):
                         # Continue to unlock the restored original file
                     else:
                         vlog(f"  [Item] ⚠ Decryption failed: {error}")
+                        return False
                 else:
                     vlog(f"  [Item] ⚠ Cannot decrypt - missing encryption manager or password")
+                    return False
         
         # Now unlock the item (whether originally locked or just decrypted)
         if not os.path.exists(path):
@@ -440,7 +438,6 @@ class FileLockManagerWindows(FileLockManager):
             log_activity_func: Function to log activity events
         """
         if hasattr(self, '_monitor') and self._monitor is not None:
-            from core.verbose_logger import vlog
             vlog("Monitoring already started")
             return False
         
@@ -448,17 +445,14 @@ class FileLockManagerWindows(FileLockManager):
             # Windows uses context menu approach for file locking
             # No additional monitoring needed - files are locked via shell extension
             if not self.locked_items:
-                from core.verbose_logger import vlog
                 vlog("No locked files to monitor")
                 return False
             
-            from core.verbose_logger import vlog
             vlog(f"Context menu monitoring ready for {len(self.locked_items)} items")
             vlog("OK: File locking via context menu active")
             return True
             
         except Exception as e:
-            from core.verbose_logger import vlog
             vlog(f"Error starting monitor: {e}")
             import traceback
             traceback.print_exc()

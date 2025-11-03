@@ -7,7 +7,7 @@ Windows-specific implementation of CLI lock/unlock operations.
 import os
 import json
 import time
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from .cli_handler_base import CLIHandlerBase
 
@@ -26,16 +26,23 @@ class CLIHandlerWindows(CLIHandlerBase):
         try:
             from core.windows.file_lock_manager_windows import FileLockManagerWindows
             self.file_lock_manager = FileLockManagerWindows(self.config_folder)
+            # Verify initialization succeeded
+            if self.file_lock_manager is None:
+                print("Warning: FileLockManagerWindows initialization returned None")
+        except ImportError as e:
+            print(f"Import error initializing file lock manager: {e}")
+            self.file_lock_manager = None
         except Exception as e:
             print(f"Error initializing file lock manager: {e}")
+            self.file_lock_manager = None
     
-    def lock_path(self, path: str) -> bool:
+    def lock_path(self, path: str) -> Tuple[bool, str]:
         """Lock a file or folder using Windows ACL"""
         if not self.file_lock_manager:
-            return False
+            return False, "File lock manager not initialized"
         
         if not self.validate_path(path):
-            return False
+            return False, "Invalid path"
         
         # Convert to absolute path for consistency
         abs_path = os.path.abspath(path)
@@ -44,18 +51,24 @@ class CLIHandlerWindows(CLIHandlerBase):
         item_type = "folder" if os.path.isdir(abs_path) else "file"
         
         # Add to locked items
-        return self.file_lock_manager.add_item(abs_path, item_type)
+        if self.file_lock_manager.add_item(abs_path, item_type):
+            return True, ""
+        else:
+            return False, "Failed to lock item"
     
-    def unlock_path(self, path: str) -> bool:
+    def unlock_path(self, path: str) -> Tuple[bool, str]:
         """Unlock a file or folder"""
         if not self.file_lock_manager:
-            return False
+            return False, "File lock manager not initialized"
         
         # Convert to absolute path to match stored paths
         abs_path = os.path.abspath(path)
         
         # Remove from locked items
-        return self.file_lock_manager.remove_item(abs_path)
+        if self.file_lock_manager.remove_item(abs_path):
+            return True, ""
+        else:
+            return False, "Failed to unlock item"
     
     def list_locked_items(self) -> List[Dict]:
         """List all locked items"""
