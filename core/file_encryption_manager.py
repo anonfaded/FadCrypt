@@ -120,29 +120,8 @@ def show_progress(message, progress_callback, stop_event, start_time=None):
         sys.stdout.write('\r' + ' ' * 150 + '\r')  # Clear the line
         sys.stdout.flush()
     else:
-        # Final update with checkmark
-        progress_msg = progress_callback()
-        
-        # Extract final percentage for progress bar
-        percentage = 100.0
-        if '%' in progress_msg:
-            try:
-                percent_str = progress_msg.split('%')[0].strip()
-                if percent_str.replace('.', '').isdigit():
-                    percentage = float(percent_str)
-            except:
-                percentage = 100.0
-        
-        # Create completed progress bar
-        bar_width = 20
-        filled = int(bar_width * percentage / 100)
-        bar = '█' * filled + '░' * (bar_width - filled)
-        progress_bar = f"{Colors.ERROR}[{bar}]{Colors.RESET}"
-        
-        elapsed = ""
-        if start_time:
-            elapsed = f" ({time.time() - start_time:.1f}s)"
-        sys.stdout.write(f"\r{message} ✓ {progress_bar} {progress_msg}{elapsed}\n")
+        # Clear the progress line after completion
+        sys.stdout.write('\r' + ' ' * 150 + '\r')  # Clear the line
         sys.stdout.flush()
 
 
@@ -442,7 +421,7 @@ class FileEncryptionManager(ABC):
                     progress_thread.join()
                     
                     elapsed = time.time() - start_time
-                    print(f"✓ File read: {format_bytes(len(file_data))} ({elapsed:.1f}s)", flush=True)
+                    # print(f"✓ File read: {format_bytes(len(file_data))} ({elapsed:.1f}s)", flush=True)  # Removed for cleaner output
                 else:
                     # For folder: create tar archive in memory with progress
                     vlog(f"[FileEncryption] Creating archive of folder...")
@@ -487,7 +466,7 @@ class FileEncryptionManager(ABC):
                     
                     file_data = archive_buffer.getvalue()
                     elapsed = time.time() - start_archive
-                    print(f"✓ Archive created: {format_bytes(len(file_data))} ({elapsed:.1f}s)", flush=True)
+                    # print(f"✓ Archive created: {format_bytes(len(file_data))} ({elapsed:.1f}s)", flush=True)  # Removed for cleaner output
                     vlog(f"[FileEncryption] Archive size: {len(file_data)} bytes")
                 
                 # Create metadata
@@ -540,7 +519,7 @@ class FileEncryptionManager(ABC):
                     except:
                         pass
                     return False, "", error
-                print(f"✓ Data encrypted: {format_bytes(len(encrypted_data))} ({elapsed_encrypt:.1f}s)", flush=True)
+                # print(f"✓ Data encrypted: {format_bytes(len(encrypted_data))} ({elapsed_encrypt:.1f}s)", flush=True)  # Removed for cleaner output
                 
                 # Write to temporary file with progress
                 vlog(f"[FileEncryption] Writing encrypted file...")
@@ -603,7 +582,7 @@ class FileEncryptionManager(ABC):
                 progress_thread.join()
                 
                 elapsed_write = time.time() - start_write
-                print(f"✓ File written: {format_bytes(total_size)} ({elapsed_write:.1f}s)", flush=True)
+                # print(f"✓ File written: {format_bytes(total_size)} ({elapsed_write:.1f}s)", flush=True)  # Removed for cleaner output
                 vlog(f"[FileEncryption] Encrypted file written: {total_size} bytes")
                 
                 # Small delay to ensure file system operations are complete
@@ -644,7 +623,7 @@ class FileEncryptionManager(ABC):
                     except:
                         pass
                     return False, "", error
-                print(f"✓ Verification passed ({elapsed_verify:.1f}s)", flush=True)
+                # print(f"✓ Verification passed ({elapsed_verify:.1f}s)", flush=True)  # Removed for cleaner output
                 vlog(f"[FileEncryption] ✓ Verification successful")
                 
                 # Small delay to ensure file operations are complete
@@ -722,7 +701,7 @@ class FileEncryptionManager(ABC):
                     finalize_thread.join()
                     
                     elapsed_finalize = time.time() - start_finalize
-                    print(f"✓ Finalized ({elapsed_finalize:.1f}s)", flush=True)
+                    # print(f"✓ Finalized ({elapsed_finalize:.1f}s)", flush=True)  # Removed for cleaner output
                     vlog(f"[FileEncryption] ✓ Encryption successful: {os.path.basename(encrypted_path)}")
                     return True, encrypted_path, None
                 except Exception as e:
@@ -895,7 +874,7 @@ class FileEncryptionManager(ABC):
                     except:
                         pass
                     return False, error
-                print(f"✓ Data decrypted: {format_bytes(len(decrypted_data))} ({elapsed_decrypt:.1f}s)", flush=True)
+                # print(f"✓ Data decrypted: {format_bytes(len(decrypted_data))} ({elapsed_decrypt:.1f}s)", flush=True)  # Removed for cleaner output
                 vlog(f"[FileEncryption] Decrypted {len(decrypted_data)} bytes")
                 
                 # Handle based on item type
@@ -936,7 +915,7 @@ class FileEncryptionManager(ABC):
                     progress_thread.join()
                     
                     elapsed = time.time() - start_write_time
-                    print(f"✓ File restored: {format_bytes(total_size)} ({elapsed:.1f}s)", flush=True)
+                    # print(f"✓ File restored: {format_bytes(total_size)} ({elapsed:.1f}s)", flush=True)  # Removed for cleaner output
                     vlog(f"[FileEncryption] Restored file: {os.path.basename(output_path)}")
                 else:
                     # Extract archive efficiently
@@ -991,7 +970,7 @@ class FileEncryptionManager(ABC):
                         progress_thread.join()
                         
                         elapsed = time.time() - start_extract
-                        print(f"✓ Archive extracted: {format_bytes(len(decrypted_data))} ({elapsed:.1f}s)", flush=True)
+                        # print(f"✓ Archive extracted: {format_bytes(len(decrypted_data))} ({elapsed:.1f}s)", flush=True)  # Removed for cleaner output
                         
                     except KeyboardInterrupt:
                         # Handle interruption during extraction

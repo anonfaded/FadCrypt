@@ -1209,9 +1209,85 @@ def handle_direct_cli_commands():
         if idx + 1 < len(sys.argv):
             paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
             if paths:
-                # For unlock, we don't validate existence since the original path might not exist
-                # (it could be encrypted as .fadcrypt), but we can at least check the argument format
-                pass  # Unlock validation is less strict since files might be encrypted
+                # EARLY VALIDATION: Check if paths exist and determine if any are actually locked
+                # Only prompt for password if there are locked items
+                valid_paths = []
+                invalid_paths = []
+                suggested_paths = []  # For when user tries to unlock original file that's been encrypted
+                
+                locked_items = cli_handler.file_lock_manager.get_locked_items()
+                locked_items_paths = [item['path'] for item in locked_items]
+                
+                for path in paths:
+                    abs_path = os.path.abspath(path)
+                    
+                    # Check various scenarios for unlock
+                    path_exists = cli_handler.validate_path(path)
+                    if path_exists:
+                        # Path exists - check if it's locked
+                        is_locked = abs_path in locked_items_paths
+                        if not is_locked and abs_path.endswith('.fadcrypt'):
+                            # Check if original path is locked
+                            original_path = os.path.splitext(abs_path)[0]  # Remove .fadcrypt extension
+                            original_path = os.path.normpath(original_path)
+                            locked_items_paths_normalized = [os.path.normpath(p) for p in locked_items_paths]
+                            is_locked = original_path in locked_items_paths_normalized
+                        
+                        if is_locked:
+                            valid_paths.append(path)
+                        else:
+                            invalid_paths.append(path)  # Exists but not locked
+                    else:
+                        # Path doesn't exist - check if it's an original file that was encrypted
+                        if abs_path in locked_items_paths:
+                            # Original file is locked, check if .fadcrypt file exists
+                            fadcrypt_path = abs_path + '.fadcrypt'
+                            if os.path.exists(fadcrypt_path):
+                                # Auto-map to .fadcrypt file and unlock it
+                                valid_paths.append(fadcrypt_path)
+                            else:
+                                invalid_paths.append(path)  # Locked but .fadcrypt file missing
+                        else:
+                            invalid_paths.append(path)  # Truly doesn't exist
+                
+                # Check which valid paths are actually locked (already done above)
+                locked_paths = valid_paths
+                
+                # If there are invalid paths or no locked paths, handle without calling CLI handler
+                if invalid_paths or suggested_paths or not locked_paths:
+                    print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
+                    sys.stdout.flush()
+                    
+                    # Build error messages
+                    error_messages = []
+                    if invalid_paths:
+                        for path in invalid_paths:
+                            abs_path = os.path.abspath(path)
+                            if abs_path in locked_items_paths:
+                                # File is locked but .fadcrypt file is missing
+                                error_messages.append(f"{path}: Locked item file is missing (expected {path}.fadcrypt)")
+                            else:
+                                error_messages.append(f"{path}: File or folder does not exist")
+                    
+                    if suggested_paths:
+                        for original_path, fadcrypt_path in suggested_paths:
+                            error_messages.append(f"{original_path}: File was locked, use: fadcrypt --unlock {os.path.basename(fadcrypt_path)}")
+                    
+                    if not locked_paths and valid_paths:
+                        unlocked_paths = [path for path in valid_paths if path not in locked_paths]
+                        error_messages.extend([f"{path}: Item is not locked: {os.path.basename(path)}" for path in unlocked_paths])
+                    
+                    # Show errors
+                    if error_messages:
+                        print_error(f"Failed to unlock {len(error_messages)} item(s):")
+                        for error_msg in error_messages:
+                            print_error(f"   {error_msg}")
+                        sys.stdout.flush()
+                    
+                    return True
+                else:
+                    # There are locked items, proceed with normal password verification
+                    pass  # Fall through to normal processing
     
     # Only require password for user-facing commands (not system operations)
     if requires_password_protection():
@@ -1306,12 +1382,18 @@ def handle_direct_cli_commands():
                 print()
                 print_colored("🔓 Items are now accessible at their original locations:", Colors.INFO)
                 for path in successful_paths:
+                    # Remove .fadcrypt extension for display since files are restored to original names
                     item_name = os.path.basename(path)
+                    if item_name.endswith('.fadcrypt'):
+                        item_name = item_name[:-10]  # Remove '.fadcrypt' (10 characters)
                     print_colored(f"   📁 {item_name}", Colors.SUCCESS)
                 print()
                 print_colored("🔒 To lock these items again later, use:", Colors.INFO)
                 for path in successful_paths:
+                    # Remove .fadcrypt extension for display since files are restored to original names
                     item_name = os.path.basename(path)
+                    if item_name.endswith('.fadcrypt'):
+                        item_name = item_name[:-10]  # Remove '.fadcrypt' (10 characters)
                     print_colored(f"   fadcrypt --lock {item_name}", Colors.SUCCESS)
                 print()
                 sys.stdout.flush()

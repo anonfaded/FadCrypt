@@ -225,7 +225,7 @@ class FileLockManager(ABC):
                     break
         
         if not item_to_unlock:
-            print(f"⚠️  Not found in locked items: {path}")
+            vlog(f"[FileLockManager] Item not found in locked items: {path}")
             return False
         # Check if item is encrypted
         is_encrypted = item_to_unlock.get("is_encrypted", False)

@@ -61,6 +61,8 @@ class CLIHandlerLinux(CLIHandlerBase):
         if not self.file_lock_manager:
             return False, "File lock manager not initialized"
         
+        # Path existence and lock status already validated in unlock_multiple, no need to check again
+        
         # Convert to absolute path to match stored paths
         abs_path = os.path.abspath(path)
         
@@ -68,7 +70,7 @@ class CLIHandlerLinux(CLIHandlerBase):
         if self.file_lock_manager.remove_item(abs_path):
             return True, ""
         else:
-            return False, "Failed to unlock item"
+            return False, f"Failed to unlock (permission or system error): {os.path.basename(path)}"
     
     def list_locked_items(self) -> List[Dict]:
         """List all locked items"""
