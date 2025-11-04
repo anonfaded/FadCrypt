@@ -473,10 +473,19 @@ fadcrypt --on TestFolder
 | `--0` or `--off` | Disable protections | Moved, Copied, Deleted (but still encrypted) |
 | `--1` or `--on` | Enable protections (DEFAULT) | **Cannot** be moved, copied, edited, or deleted |
 
+**Important: Works on ANY File!**
+
+The `--1`/`--on` and `--0`/`--off` flags work on **any file or folder**, not just encrypted ones:
+- Use them to make system files, configs, or documents immutable without encryption
+- Lighter option than full encryption if you just want protection without decryption overhead
+- Perfect for protecting important files you don't want accidentally modified or deleted
+- Can toggle protection on/off anytime, on any file type
+
 **When to Use Each Mode:**
 
-- **Tamper-Proof (ON)** - Default for maximum security. Use when you want to absolutely prevent unauthorized access.
-- **Non-Protected (OFF)** - Use when you need flexibility to organize or back up encrypted files while keeping them encrypted.
+- **Tamper-Proof (ON)** - Default for maximum security. Use when you want to absolutely prevent unauthorized access or modifications.
+- **Non-Protected (OFF)** - Use when you need flexibility to organize or back up files while keeping them protected.
+- **Immutable Without Encryption** - Use `--1` on regular files when you want read-only protection without encryption overhead.
 
 ## Performance
 

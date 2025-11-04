@@ -77,9 +77,13 @@ def show_help():
     print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --0 file.txt{RESET}")
     print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--1 or --on{RESET}      : Enable tamper-proof protections (switch ON)")
     print(f"{RED}│{RESET}                      {DIM}Files cannot be moved, copied, edited, or deleted{RESET}")
+    print(f"{RED}│{RESET}                      {DIM}Works on ANY file, encrypted or not!{RESET}")
+    print(f"{RED}│{RESET}                      {DIM}Lighter option than encryption - no decryption needed{RESET}")
     print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --1 TestFolder{RESET}")
     print(f"{RED}│{RESET}")
-    print(f"{RED}│{RESET} {YELLOW}Default:{RESET} All files are locked with full tamper-proof protection (ON)")
+    print(f"{RED}│{RESET} {YELLOW}Note:{RESET} Use --1/--on to make files immutable without encryption.")
+    print(f"{RED}│{RESET}       Perfect for system files or configs you don't want modified.")
+    print(f"{RED}│{RESET} {YELLOW}Default:{RESET} All locked files get full tamper-proof protection (ON)")
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Windows-specific context menu section
