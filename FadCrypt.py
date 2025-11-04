@@ -1518,8 +1518,12 @@ def handle_direct_cli_commands():
         
         
         # Toggle tamper-proof protections
-        success_count = 0
+        from core.cli.colors import Colors, BoxChars
+        
+        toggled_count = 0
+        skipped_count = 0
         failed_count = 0
+        toggled_paths = []
         
         for path in paths:
             try:
@@ -1533,16 +1537,13 @@ def handle_direct_cli_commands():
                 
                 # Only toggle if state is different from desired state
                 if current_protected_state == toggle_mode:
-                    status = "enabled" if toggle_mode else "disabled"
-                    print(f"ℹ  Already {status}: {os.path.basename(path)}")
-                    success_count += 1
+                    skipped_count += 1
                     continue
                 
                 # Toggle protection
                 if cli_handler.toggle_tamper_proof(path, toggle_mode):
-                    status = "enabled" if toggle_mode else "disabled"
-                    print_success(f"✓ Tamper-proof protections {status} for: {os.path.basename(path)}")
-                    success_count += 1
+                    toggled_paths.append(os.path.basename(path))
+                    toggled_count += 1
                 else:
                     print_error(f"✗ Failed to toggle protections for: {path}")
                     failed_count += 1
@@ -1550,14 +1551,70 @@ def handle_direct_cli_commands():
                 print_error(f"✗ Error processing {path}: {str(e)}")
                 failed_count += 1
         
-        # Summary
+        # Summary with styled box (like MAIN MENU)
         print()
-        if success_count > 0:
-            print_success(f"✓ Successfully toggled {success_count} item(s)")
-        if failed_count > 0:
-            print_error(f"✗ Failed to toggle {failed_count} item(s)")
         
-        return True if success_count > 0 else False
+        if toggled_count > 0:
+            # Toggled successfully
+            if toggle_mode:
+                print(f"{Colors.BORDER}╭─ 🔒 Locked {toggled_count} item(s) successfully{Colors.RESET}")
+            else:
+                print(f"{Colors.BORDER}╭─ 🔓 Released {toggled_count} item(s) successfully{Colors.RESET}")
+            
+            if failed_count > 0 or skipped_count > 0:
+                print(f"{Colors.BORDER}│{Colors.RESET}")
+            
+            if failed_count > 0:
+                print_error(f"{Colors.BORDER}│{Colors.RESET}  ✗ {failed_count} item(s) failed")
+            elif skipped_count > 0:
+                print(f"{Colors.BORDER}│{Colors.RESET}  ○ {skipped_count} item(s) already protected")
+            
+            # Command info with colors - multi-line format
+            if paths and os.path.exists(paths[0]):
+                filename = os.path.basename(paths[0])
+                print(f"{Colors.BORDER}│{Colors.RESET}")
+                if toggle_mode:
+                    print(f"{Colors.BORDER}│{Colors.RESET}  Files: {Colors.HIGHLIGHT}IMMUTABLE & LOCKED{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  To turn OFF tamper-proof protections:")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --0 {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}              {Colors.DIM}or{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --off {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                else:
+                    print(f"{Colors.BORDER}│{Colors.RESET}  Files: {Colors.HIGHLIGHT}MOVEABLE, COPYABLE & DELETABLE{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  To turn ON tamper-proof protections:")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --1 {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}              {Colors.DIM}or{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --on {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+            
+            print(f"{Colors.BORDER}╰────────────────────────────────────────────{Colors.RESET}")
+        elif failed_count > 0:
+            print(f"{Colors.BORDER}╭─ ✗ {failed_count} item(s) failed{Colors.RESET}")
+            print(f"{Colors.BORDER}╰────────────────────────────────────────────{Colors.RESET}")
+        elif skipped_count > 0:
+            if toggle_mode:
+                print(f"{Colors.BORDER}╭─ 🔒 All {skipped_count} item(s) already protected{Colors.RESET}")
+            else:
+                print(f"{Colors.BORDER}╭─ 🔓 All {skipped_count} item(s) already released{Colors.RESET}")
+            
+            if paths and os.path.exists(paths[0]):
+                filename = os.path.basename(paths[0])
+                print(f"{Colors.BORDER}│{Colors.RESET}")
+                if toggle_mode:
+                    print(f"{Colors.BORDER}│{Colors.RESET}  Files: {Colors.HIGHLIGHT}IMMUTABLE & LOCKED{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  To turn OFF tamper-proof protections:")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --0 {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}              {Colors.DIM}or{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --off {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                else:
+                    print(f"{Colors.BORDER}│{Colors.RESET}  Files: {Colors.HIGHLIGHT}MOVEABLE, COPYABLE & DELETABLE{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  To turn ON tamper-proof protections:")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --1 {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}              {Colors.DIM}or{Colors.RESET}")
+                    print(f"{Colors.BORDER}│{Colors.RESET}  {Colors.SECONDARY}fadcrypt --on {Colors.RESET}{Colors.HIGHLIGHT}{filename}{Colors.RESET}")
+            
+            print(f"{Colors.BORDER}╰────────────────────────────────────────────{Colors.RESET}")
+        
+        return True if toggled_count > 0 else False
     
     return False
 
