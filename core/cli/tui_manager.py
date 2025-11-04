@@ -84,7 +84,15 @@ class TUIManager:
                     confirm = input(f"\n{Colors.DIM}[Y/N]: {Colors.RESET}").strip().lower()
                     
                     if confirm in ['y', 'yes']:
-                        print_success("Goodbye! :)")
+                        # Clear screen and animate goodbye message
+                        import time
+                        self.clear_screen()
+                        goodbye_msg = "Goodbye from FadCrypt... :)"
+                        print(f"\n{Colors.HIGHLIGHT}", end="", flush=True)
+                        for char in goodbye_msg:
+                            print(char, end="", flush=True)
+                            time.sleep(0.05)
+                        print(f"{Colors.RESET}\n")
                         break
                     else:
                         print_info("Returning to main menu...")
