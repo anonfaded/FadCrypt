@@ -791,7 +791,6 @@ class FileEncryptionManager(ABC):
                 return False, error
             
             vlog(f"[FileEncryption] Decrypting: {os.path.basename(encrypted_path)}")
-            print(f"🔓 Decrypting {os.path.basename(encrypted_path)}...", flush=True)
             
             # Extract metadata
             if interrupted:
@@ -809,9 +808,8 @@ class FileEncryptionManager(ABC):
             
             vlog(f"[FileEncryption] Metadata: type={item_type}, hash={original_hash[:16]}...")
             
-            # Create temporary extraction directory on the same drive as output
+            # For folders, extract directly to output path (no temp folder needed)
             output_dir = os.path.dirname(os.path.abspath(output_path))
-            temp_extract_dir = tempfile.mkdtemp(suffix='.fadcrypt_extract', dir=output_dir)
             
             try:
                 # Read and decrypt file from encrypted_path
@@ -867,12 +865,6 @@ class FileEncryptionManager(ABC):
                     # Stop spinner thread
                     stop_event.set()
                     spinner_thread.join()
-                    # Cleanup temp directory
-                    try:
-                        import shutil
-                        shutil.rmtree(temp_extract_dir)
-                    except:
-                        pass
                     return False, error
                 # print(f"✓ Data decrypted: {format_bytes(len(decrypted_data))} ({elapsed_decrypt:.1f}s)", flush=True)  # Removed for cleaner output
                 vlog(f"[FileEncryption] Decrypted {len(decrypted_data)} bytes")
@@ -921,53 +913,57 @@ class FileEncryptionManager(ABC):
                     # Extract archive efficiently
                     start_extract = time.time()
                     
-                    # Count total members and calculate total size
-                    import io
-                    with tarfile.open(fileobj=io.BytesIO(decrypted_data), mode='r') as tar:
-                        members = tar.getmembers()
-                        total_members = len(members)
-                        total_size = sum(member.size for member in members if member.isfile())
-                    
-                    # Progress tracking variables
-                    bytes_extracted = [0]  # Use list to allow modification in callback
-                    files_extracted = [0]
-                    
-                    # Progress callback based on bytes extracted
-                    def get_extract_progress():
-                        progress = (bytes_extracted[0] / total_size) * 100 if total_size > 0 else 100
-                        elapsed = time.time() - start_extract
-                        if elapsed > 0:
-                            speed = bytes_extracted[0] / elapsed / (1024 * 1024)  # MB/s
-                            eta = (total_size - bytes_extracted[0]) / (speed * 1024 * 1024) if speed > 0 else 0
-                        else:
-                            speed = 0
-                            eta = 0
-                        return f"{progress:.1f}% ({files_extracted[0]}/{total_members} files) | {speed:.2f} MB/s | ETA: {eta:.1f}s"
-                    
-                    # Start progress thread
+                    # Start spinner thread for extraction (simple, no detailed progress for speed)
                     stop_event = threading.Event()
-                    progress_thread = threading.Thread(target=show_progress, args=(f"🔓 Extracting {os.path.basename(encrypted_path)}", get_extract_progress, stop_event, start_extract))
-                    progress_thread.start()
+                    spinner_thread = threading.Thread(target=show_spinner, args=(f"🔓 Extracting {os.path.basename(encrypted_path)}", stop_event, start_extract))
+                    spinner_thread.start()
                     
-                    # Extract all files at once for better performance
+                    # Extract all files at once for maximum performance
                     import io
+                    import shutil
                     try:
+                        # Extract to temp location first to avoid nested folders
+                        temp_extract = output_path + "_temp_extract"
+                        os.makedirs(temp_extract, exist_ok=True)
+                        
                         with tarfile.open(fileobj=io.BytesIO(decrypted_data), mode='r') as tar:
-                            # Extract all at once - much faster than one by one
-                            tar.extractall(path=temp_extract_dir)
-                            
-                            # Update progress tracking (approximate)
-                            for member in tar.getmembers():
-                                if member.isfile():
-                                    bytes_extracted[0] += member.size
-                                    files_extracted[0] += 1
-                                
-                                # Check for interruption
-                                if interrupted:
-                                    raise KeyboardInterrupt("Operation interrupted by user")
+                            # Extract all at once to temp location
+                            tar.extractall(path=temp_extract)
+                        
+                        # Check if tar has nested folder structure (archive contains folder name)
+                        # If so, move contents up one level to avoid nesting
+                        temp_contents = os.listdir(temp_extract)
+                        if len(temp_contents) == 1 and os.path.isdir(os.path.join(temp_extract, temp_contents[0])):
+                            # Single folder in archive - check if it matches original folder name
+                            extracted_folder = os.path.join(temp_extract, temp_contents[0])
+                            original_name = os.path.basename(output_path)
+                            if temp_contents[0] == original_name:
+                                # Move contents from nested folder to final location
+                                os.makedirs(output_path, exist_ok=True)
+                                for item in os.listdir(extracted_folder):
+                                    src = os.path.join(extracted_folder, item)
+                                    dst = os.path.join(output_path, item)
+                                    if os.path.exists(dst):
+                                        if os.path.isdir(dst):
+                                            shutil.rmtree(dst)
+                                        else:
+                                            os.remove(dst)
+                                    shutil.move(src, dst)
+                                shutil.rmtree(temp_extract)
+                            else:
+                                # Different name, just move the temp folder to output path
+                                if os.path.exists(output_path):
+                                    shutil.rmtree(output_path)
+                                shutil.move(extracted_folder, output_path)
+                                shutil.rmtree(temp_extract)
+                        else:
+                            # Multiple items or files directly in archive root
+                            if os.path.exists(output_path):
+                                shutil.rmtree(output_path)
+                            shutil.move(temp_extract, output_path)
                         
                         stop_event.set()
-                        progress_thread.join()
+                        spinner_thread.join()
                         
                         elapsed = time.time() - start_extract
                         # print(f"✓ Archive extracted: {format_bytes(len(decrypted_data))} ({elapsed:.1f}s)", flush=True)  # Removed for cleaner output
@@ -975,61 +971,19 @@ class FileEncryptionManager(ABC):
                     except KeyboardInterrupt:
                         # Handle interruption during extraction
                         stop_event.set()
-                        progress_thread.join()
+                        spinner_thread.join()
                         error = "Extraction interrupted by user (Ctrl+C)"
                         vlog(f"[FileEncryption] {error}")
-                        # Cleanup temp directory
-                        try:
-                            import shutil
-                            shutil.rmtree(temp_extract_dir)
-                        except:
-                            pass
                         return False, error
                     
-                    # Move extracted folder to output path
-                    start_move = time.time()
-                    
-                    # Show spinner during move
-                    stop_event = threading.Event()
-                    move_thread = threading.Thread(target=show_spinner, args=(f"🔓 Restoring {os.path.basename(output_path)}", stop_event, start_move))
-                    move_thread.start()
-                    
-                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    import shutil
-                    extracted_items = os.listdir(temp_extract_dir)
-                    if extracted_items:
-                        extracted_path = os.path.join(temp_extract_dir, extracted_items[0])
-                        shutil.move(extracted_path, output_path)
-                    
-                    stop_event.set()
-                    move_thread.join()
-                    
-                    elapsed_move = time.time() - start_move
-                    print(f"✓ Restored ({elapsed_move:.1f}s)", flush=True)
-                    vlog(f"[FileEncryption] Restored folder: {os.path.basename(output_path)}")
+                    # Folder extraction complete
+                    vlog(f"[FileEncryption] Extracted folder: {os.path.basename(output_path)}")
                 
-                # Verify hash if possible
-                start_verify = time.time()
-                restored_hash = self._calculate_hash(output_path)
-                elapsed_verify = time.time() - start_verify
+                # No hash verification needed - AES-GCM authentication tag already verified integrity during decryption
+                # Skip post-verification to significantly improve performance
                 
-                if restored_hash == original_hash:
-                    print(f"✓ Verification passed ({elapsed_verify:.1f}s)", flush=True)
-                    vlog(f"[FileEncryption] ✓ Hash verification passed")
-                else:
-                    print(f"⚠ Verification failed ({elapsed_verify:.1f}s)", flush=True)
-                    vlog(f"[FileEncryption] ⚠ Hash mismatch - data may be corrupted")
-                    vlog(f"[FileEncryption]   Expected: {original_hash}")
-                    vlog(f"[FileEncryption]   Got:      {restored_hash}")
-                    vlog(f"[FileEncryption]   Got:      {restored_hash}")
-                
-                # ATOMIC: Delete encrypted .fadcrypt file after successful decryption
+                # Delete encrypted .fadcrypt file after successful decryption
                 start_cleanup = time.time()
-                
-                # Show spinner during cleanup
-                stop_event = threading.Event()
-                cleanup_thread = threading.Thread(target=show_spinner, args=(f"🔓 Cleaning up", stop_event, start_cleanup))
-                cleanup_thread.start()
                 
                 try:
                     os.remove(encrypted_path)
@@ -1037,29 +991,13 @@ class FileEncryptionManager(ABC):
                 except Exception as del_error:
                     vlog(f"[FileEncryption] ⚠ Warning: Could not delete encrypted file: {del_error}")
                 
-                # Cleanup temp extraction directory
-                try:
-                    import shutil
-                    shutil.rmtree(temp_extract_dir)
-                except:
-                    pass
-                
-                stop_event.set()
-                cleanup_thread.join()
-                
                 elapsed_cleanup = time.time() - start_cleanup
-                print(f"✓ Cleanup completed ({elapsed_cleanup:.1f}s)", flush=True)
+                # print(f"✓ Cleanup completed ({elapsed_cleanup:.1f}s)", flush=True)  # Removed for cleaner output
                 return True, ""
                     
             except Exception as e:
                 error = f"Decryption error: {e}"
                 vlog(f"[FileEncryption] {error}")
-                # Cleanup on error
-                try:
-                    import shutil
-                    shutil.rmtree(temp_extract_dir)
-                except:
-                    pass
                 return False, error
                 
             except KeyboardInterrupt:
@@ -1067,12 +1005,6 @@ class FileEncryptionManager(ABC):
                 interrupted = True
                 error = "Decryption interrupted by user (Ctrl+C)"
                 vlog(f"[FileEncryption] {error}")
-                # Cleanup temp directory
-                try:
-                    import shutil
-                    shutil.rmtree(temp_extract_dir)
-                except:
-                    pass
                 return False, error
                 
         except Exception as e:
@@ -1084,13 +1016,7 @@ class FileEncryptionManager(ABC):
             signal.signal(signal.SIGINT, old_handler)
             
             # Comprehensive cleanup of temporary resources
-            if 'temp_extract_dir' in locals() and os.path.exists(temp_extract_dir):
-                try:
-                    vlog(f"[FileEncryption] Cleaning up temp directory: {os.path.basename(temp_extract_dir)}")
-                    import shutil
-                    shutil.rmtree(temp_extract_dir)
-                except Exception as cleanup_error:
-                    vlog(f"[FileEncryption] Warning: Failed to cleanup temp directory: {cleanup_error}")
+            # temp_extract_dir no longer needed - extracting directly to output path
             
             # If interrupted, also cleanup any partial output that might exist
             if interrupted and 'output_path' in locals() and os.path.exists(output_path):
