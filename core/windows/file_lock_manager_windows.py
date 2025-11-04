@@ -503,14 +503,9 @@ class FileLockManagerWindows(FileLockManager):
         
         try:
             if enable:
-                # Apply full deny rules (tamper-proof ON)
+                # Apply same deny rules as _lock_item uses
                 subprocess.run(
-                    ['icacls', path, '/deny', 'Everyone:(OI)(CI)F'],
-                    capture_output=True,
-                    timeout=10
-                )
-                subprocess.run(
-                    ['icacls', path, '/deny', 'Everyone:(OI)(CI)D'],
+                    ['icacls', path, '/deny', 'Everyone:(F)', '/T'],
                     capture_output=True,
                     timeout=10
                 )

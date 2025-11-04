@@ -7,6 +7,7 @@ Windows-specific implementation of CLI lock/unlock operations.
 import os
 import json
 import time
+import subprocess
 from typing import List, Dict, Tuple
 
 from .cli_handler_base import CLIHandlerBase
@@ -97,4 +98,27 @@ class CLIHandlerWindows(CLIHandlerBase):
             return self.file_lock_manager.toggle_tamper_proof(abs_path, enable)
         except Exception as e:
             print(f"Error toggling tamper-proof: {e}")
+            return False
+    
+    def is_tamper_proof_enabled(self, path: str) -> bool:
+        """Check if tamper-proof protections are enabled by checking ACL attributes"""
+        if not self.validate_path(path):
+            return False
+        
+        abs_path = os.path.abspath(path)
+        
+        try:
+            result = subprocess.run(
+                ['icacls', abs_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                output = result.stdout
+                # Check for deny: (D) for deny or (N) for no-access in icacls output
+                return 'Everyone' in output and ('(D)' in output or '(N)' in output)
+            return False
+        except Exception:
             return False

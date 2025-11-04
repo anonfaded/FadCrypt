@@ -425,29 +425,37 @@ class FileLockManagerLinux(FileLockManager):
         if not os.path.exists(path):
             return False
         
+        client = self._get_elevated_client()
+        if not client:
+            vlog(f"[Toggle] Error: Daemon not available")
+            return False
+        
         try:
-            client = self._get_elevated_client()
-            
             if enable:
-                # Apply tamper-proof protections (chmod 000, chattr +i)
-                os.chmod(path, 0o000)  # Remove all permissions
-                
-                if client:
-                    # Set immutable flag via elevated daemon
+                # Apply same protections as _lock_item: chmod 000 via daemon, then chattr +i
+                success, msg = client.chmod([path], 0o000)
+                if success:
+                    vlog(f"  [Toggle] Applied 000 permissions via daemon: {os.path.basename(path)}")
+                    # Set immutable flag via daemon
                     client.execute_command("chattr", ["+i", path])
-            else:
-                # Disable tamper-proof protections (chmod 644/755, chattr -i)
-                # Determine if it's a file or folder
-                if os.path.isdir(path):
-                    os.chmod(path, 0o755)  # rwxr-xr-x
+                    return True
                 else:
-                    os.chmod(path, 0o644)  # rw-r--r--
+                    vlog(f"  [Toggle] daemon chmod failed: {msg}")
+                    return False
+            else:
+                # Disable tamper-proof protections via daemon
+                if os.path.isdir(path):
+                    success, msg = client.chmod([path], 0o755)
+                else:
+                    success, msg = client.chmod([path], 0o644)
                 
-                if client:
-                    # Remove immutable flag via elevated daemon
+                if success:
+                    vlog(f"  [Toggle] Restored permissions via daemon: {os.path.basename(path)}")
                     client.execute_command("chattr", ["-i", path])
-            
-            return True
+                    return True
+                else:
+                    vlog(f"  [Toggle] daemon chmod failed: {msg}")
+                    return False
         except Exception as e:
             vlog(f"Error toggling tamper-proof on {path}: {e}")
             return False

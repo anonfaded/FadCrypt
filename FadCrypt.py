@@ -1523,6 +1523,22 @@ def handle_direct_cli_commands():
         
         for path in paths:
             try:
+                if not os.path.exists(path):
+                    print_error(f"✗ Path does not exist: {path}")
+                    failed_count += 1
+                    continue
+                
+                # Check current protection state
+                current_protected_state = cli_handler.is_tamper_proof_enabled(path)
+                
+                # Only toggle if state is different from desired state
+                if current_protected_state == toggle_mode:
+                    status = "enabled" if toggle_mode else "disabled"
+                    print(f"ℹ  Already {status}: {os.path.basename(path)}")
+                    success_count += 1
+                    continue
+                
+                # Toggle protection
                 if cli_handler.toggle_tamper_proof(path, toggle_mode):
                     status = "enabled" if toggle_mode else "disabled"
                     print_success(f"✓ Tamper-proof protections {status} for: {os.path.basename(path)}")

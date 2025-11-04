@@ -7,6 +7,7 @@ Linux-specific implementation of CLI lock/unlock operations.
 import os
 import json
 import time
+import subprocess
 from typing import List, Dict, Tuple
 
 from .cli_handler_base import CLIHandlerBase
@@ -97,4 +98,28 @@ class CLIHandlerLinux(CLIHandlerBase):
             return self.file_lock_manager.toggle_tamper_proof(abs_path, enable)
         except Exception as e:
             print(f"Error toggling tamper-proof: {e}")
+            return False
+    
+    def is_tamper_proof_enabled(self, path: str) -> bool:
+        if not self.validate_path(path):
+            return False
+        abs_path = os.path.abspath(path)
+        try:
+            stat_info = os.stat(abs_path)
+            perms = stat_info.st_mode & 0o777
+            if perms != 0o000:
+                return False
+            try:
+                result = subprocess.run(['lsattr', abs_path], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    output = result.stdout.strip()
+                    if len(output) > 4:
+                        flags = output.split()[0]
+                        if len(flags) > 4 and flags[4] == 'i':
+                            return True
+                return False
+            except Exception:
+                return True
+        except Exception:
+            return False
             return False
