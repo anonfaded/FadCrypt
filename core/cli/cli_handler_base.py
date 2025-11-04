@@ -356,26 +356,43 @@ class CLIHandlerBase(ABC):
                     
                     # Content lines
                     lines = [
-                        ("DEFAULT (All protections enabled):", curses.color_pair(4) | curses.A_BOLD),
+                        ("TAMPER-PROOF: Like a Switch (OFF=0, ON=1)", curses.color_pair(4) | curses.A_BOLD),
                         ("By default, FadCrypt locks files with FULL", curses.color_pair(2)),
-                        ("tamper-proof protection. Encrypted files", curses.color_pair(2)),
+                        ("tamper-proof protection (ON). Encrypted files", curses.color_pair(2)),
                         ("CANNOT be copied, moved, edited, or deleted.", curses.color_pair(2)),
                         ("", curses.color_pair(2)),
-                        ("DISABLE PROTECTIONS (--0 flag):", curses.color_pair(4) | curses.A_BOLD),
-                        ("Use --0 to disable tamper-proof protections.", curses.color_pair(2)),
+                        ("TURN OFF (--0 or --off):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Disable tamper-proof protections from encrypted files.", curses.color_pair(2)),
                         ("Files become MOVEABLE, COPYABLE, & DELETABLE.", curses.color_pair(2)),
-                        ("Example: fadcrypt --0 file.txt", curses.color_pair(6)),
+                        ("Examples: fadcrypt --0 file.txt  OR  fadcrypt --off file.txt", curses.color_pair(6)),
                         ("", curses.color_pair(2)),
-                        ("RE-ENABLE PROTECTIONS (--1 flag):", curses.color_pair(4) | curses.A_BOLD),
-                        ("Use --1 to re-enable full protections.", curses.color_pair(2)),
-                        ("Returns file to fully tamper-proof state.", curses.color_pair(2)),
-                        ("Example: fadcrypt --1 TestFolder", curses.color_pair(6)),
+                        ("TURN ON (--1 or --on):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Re-enable full tamper-proof protections.", curses.color_pair(2)),
+                        ("Returns file to fully protected state.", curses.color_pair(2)),
+                        ("Examples: fadcrypt --1 TestFolder  OR  fadcrypt --on TestFolder", curses.color_pair(6)),
                     ]
                     
                     for text, attr in lines:
                         if line_y < box_start_y + box_height - 3:
                             display_text = text[:box_width-6] if text else ""
-                            stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
+                            
+                            # Special handling for "OR" - render it in gray (dimmed)
+                            if "OR" in display_text:
+                                # Split and render with different colors for OR
+                                parts = display_text.split("  OR  ")
+                                if len(parts) == 2:
+                                    # Render first part
+                                    stdscr.addstr(line_y, box_start_x + 2, parts[0], attr)
+                                    # Render OR in gray
+                                    or_pos = box_start_x + 2 + len(parts[0])
+                                    stdscr.addstr(line_y, or_pos, "  OR  ", curses.color_pair(4))
+                                    # Render second part
+                                    second_pos = or_pos + 6
+                                    stdscr.addstr(line_y, second_pos, parts[1], attr)
+                                else:
+                                    stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
+                            else:
+                                stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
                             line_y += 1
                     
                     # Separator before options

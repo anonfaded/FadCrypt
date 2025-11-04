@@ -446,6 +446,38 @@ fadcrypt --lock ./file.txt --verbose
 - Detects already-locked items and prevents double-locking
 - Automatic recovery on interrupted operations
 
+### Tamper-Proof Protection Control
+
+By default, FadCrypt applies **full tamper-proof protection** to all encrypted files, preventing them from being copied, moved, edited, or deleted until they are decrypted.
+
+**Control Tamper-Proof Behavior:**
+
+You can enable or disable tamper-proof protections using simple toggle flags:
+
+```bash
+# TURN OFF (Disable tamper-proof) - files become moveable and copyable
+fadcrypt --0 file.txt
+# or
+fadcrypt --off file.txt
+
+# TURN ON (Enable tamper-proof) - restore full protection
+fadcrypt --1 TestFolder
+# or
+fadcrypt --on TestFolder
+```
+
+**What the Flags Do:**
+
+| Flag | Behavior | Files Can Be... |
+|------|----------|-----------------|
+| `--0` or `--off` | Disable protections | Moved, Copied, Deleted (but still encrypted) |
+| `--1` or `--on` | Enable protections (DEFAULT) | **Cannot** be moved, copied, edited, or deleted |
+
+**When to Use Each Mode:**
+
+- **Tamper-Proof (ON)** - Default for maximum security. Use when you want to absolutely prevent unauthorized access.
+- **Non-Protected (OFF)** - Use when you need flexibility to organize or back up encrypted files while keeping them encrypted.
+
 ## Performance
 
 FadCrypt uses AES-256-GCM encryption with efficient streaming I/O and optimized cryptographic operations. Files are encrypted with authentication to ensure data integrity.

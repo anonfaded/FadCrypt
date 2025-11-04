@@ -70,6 +70,18 @@ def show_help():
     print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --list{RESET}")
     print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
+    # Tamper-Proof Protection
+    print(f"{RED}╭─ 🔐 {BRIGHT_RED}TAMPER-PROOF PROTECTION{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--0 or --off{RESET}     : Disable tamper-proof protections (switch OFF)")
+    print(f"{RED}│{RESET}                      {DIM}Files become moveable, copyable, and deletable{RESET}")
+    print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --0 file.txt{RESET}")
+    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--1 or --on{RESET}      : Enable tamper-proof protections (switch ON)")
+    print(f"{RED}│{RESET}                      {DIM}Files cannot be moved, copied, edited, or deleted{RESET}")
+    print(f"{RED}│{RESET}                      {DIM}Example: fadcrypt --1 TestFolder{RESET}")
+    print(f"{RED}│{RESET}")
+    print(f"{RED}│{RESET} {YELLOW}Default:{RESET} All files are locked with full tamper-proof protection (ON)")
+    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
+    
     # Windows-specific context menu section
     if system == "Windows":
         print(f"{RED}╭─ 🖱️  {BRIGHT_RED}CONTEXT MENU (Windows){RESET}")
