@@ -486,3 +486,43 @@ class FileLockManagerWindows(FileLockManager):
             )
         except Exception as e:
             print(f"  [Config] Error unlocking {path}: {e}")
+    
+    def toggle_tamper_proof(self, path: str, enable: bool) -> bool:
+        """
+        Toggle tamper-proof protections on Windows via ACL.
+        
+        Args:
+            path: Path to the file or folder
+            enable: True to enable protections, False to disable
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not os.path.exists(path):
+            return False
+        
+        try:
+            if enable:
+                # Apply full deny rules (tamper-proof ON)
+                subprocess.run(
+                    ['icacls', path, '/deny', 'Everyone:(OI)(CI)F'],
+                    capture_output=True,
+                    timeout=10
+                )
+                subprocess.run(
+                    ['icacls', path, '/deny', 'Everyone:(OI)(CI)D'],
+                    capture_output=True,
+                    timeout=10
+                )
+                return True
+            else:
+                # Remove deny rules (tamper-proof OFF)
+                subprocess.run(
+                    ['icacls', path, '/remove:d', 'Everyone'],
+                    capture_output=True,
+                    timeout=10
+                )
+                return True
+        except Exception as e:
+            vlog(f"Error toggling tamper-proof on {path}: {e}")
+            return False

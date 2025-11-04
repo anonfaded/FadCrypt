@@ -1484,6 +1484,65 @@ def handle_direct_cli_commands():
         
         return True
     
+    # Handle tamper-proof toggle flags: --0/--off and --1/--on
+    elif '--0' in sys.argv or '--off' in sys.argv or '--1' in sys.argv or '--on' in sys.argv:
+        # Determine which flag was used
+        toggle_mode = None
+        flag_used = None
+        if '--0' in sys.argv:
+            toggle_mode = False  # Disable protections
+            idx = sys.argv.index('--0')
+            flag_used = '--0'
+        elif '--off' in sys.argv:
+            toggle_mode = False
+            idx = sys.argv.index('--off')
+            flag_used = '--off'
+        elif '--1' in sys.argv:
+            toggle_mode = True  # Enable protections
+            idx = sys.argv.index('--1')
+            flag_used = '--1'
+        elif '--on' in sys.argv:
+            toggle_mode = True
+            idx = sys.argv.index('--on')
+            flag_used = '--on'
+        
+        # Get paths
+        if idx + 1 < len(sys.argv):
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+        else:
+            paths = []
+        
+        if not paths:
+            print_error(f"Usage: fadcrypt {flag_used} <path1> [path2] ...")
+            return False
+        
+        
+        # Toggle tamper-proof protections
+        success_count = 0
+        failed_count = 0
+        
+        for path in paths:
+            try:
+                if cli_handler.toggle_tamper_proof(path, toggle_mode):
+                    status = "enabled" if toggle_mode else "disabled"
+                    print_success(f"✓ Tamper-proof protections {status} for: {os.path.basename(path)}")
+                    success_count += 1
+                else:
+                    print_error(f"✗ Failed to toggle protections for: {path}")
+                    failed_count += 1
+            except Exception as e:
+                print_error(f"✗ Error processing {path}: {str(e)}")
+                failed_count += 1
+        
+        # Summary
+        print()
+        if success_count > 0:
+            print_success(f"✓ Successfully toggled {success_count} item(s)")
+        if failed_count > 0:
+            print_error(f"✗ Failed to toggle {failed_count} item(s)")
+        
+        return True if success_count > 0 else False
+    
     return False
 
 
@@ -1530,7 +1589,8 @@ def main():
     system = platform.system()
     
     # Handle direct CLI commands first
-    if '--lock' in sys.argv or '--unlock' in sys.argv or '--list' in sys.argv or '--list-locked' in sys.argv:
+    if '--lock' in sys.argv or '--unlock' in sys.argv or '--list' in sys.argv or '--list-locked' in sys.argv or \
+       '--0' in sys.argv or '--1' in sys.argv or '--off' in sys.argv or '--on' in sys.argv:
         handle_direct_cli_commands()
         return
     

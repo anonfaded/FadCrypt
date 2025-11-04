@@ -411,6 +411,43 @@ class FileLockManagerLinux(FileLockManager):
         except ImportError:
             return None
     
-
-    
-
+    def toggle_tamper_proof(self, path: str, enable: bool) -> bool:
+        """
+        Toggle tamper-proof protections on Linux via chmod/chattr.
+        
+        Args:
+            path: Path to the file or folder
+            enable: True to enable protections, False to disable
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not os.path.exists(path):
+            return False
+        
+        try:
+            client = self._get_elevated_client()
+            
+            if enable:
+                # Apply tamper-proof protections (chmod 000, chattr +i)
+                os.chmod(path, 0o000)  # Remove all permissions
+                
+                if client:
+                    # Set immutable flag via elevated daemon
+                    client.execute_command("chattr", ["+i", path])
+            else:
+                # Disable tamper-proof protections (chmod 644/755, chattr -i)
+                # Determine if it's a file or folder
+                if os.path.isdir(path):
+                    os.chmod(path, 0o755)  # rwxr-xr-x
+                else:
+                    os.chmod(path, 0o644)  # rw-r--r--
+                
+                if client:
+                    # Remove immutable flag via elevated daemon
+                    client.execute_command("chattr", ["-i", path])
+            
+            return True
+        except Exception as e:
+            vlog(f"Error toggling tamper-proof on {path}: {e}")
+            return False

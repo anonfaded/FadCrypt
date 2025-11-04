@@ -80,3 +80,21 @@ class CLIHandlerWindows(CLIHandlerBase):
         # Reload from disk to get fresh data
         self.file_lock_manager._load_locked_items()
         return self.file_lock_manager.get_locked_items()
+    
+    def toggle_tamper_proof(self, path: str, enable: bool) -> bool:
+        """Toggle tamper-proof protections on Windows via ACL"""
+        if not self.file_lock_manager:
+            return False
+        
+        if not self.validate_path(path):
+            return False
+        
+        abs_path = os.path.abspath(path)
+        
+        try:
+            # Use the file lock manager to toggle protections
+            # For now, return stub - full implementation to follow
+            return self.file_lock_manager.toggle_tamper_proof(abs_path, enable)
+        except Exception as e:
+            print(f"Error toggling tamper-proof: {e}")
+            return False

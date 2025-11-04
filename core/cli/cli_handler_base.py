@@ -540,6 +540,20 @@ class CLIHandlerBase(ABC):
         """
         pass
     
+    @abstractmethod
+    def toggle_tamper_proof(self, path: str, enable: bool) -> bool:
+        """
+        Toggle tamper-proof protections on a file or folder.
+        
+        Args:
+            path: Path to the file or folder
+            enable: True to enable protections, False to disable
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        pass
+    
     def validate_path(self, path: str) -> bool:
         """
         Validate that a path exists and is accessible.
