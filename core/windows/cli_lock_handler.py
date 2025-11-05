@@ -1,38 +1,58 @@
 """
-Context Menu Lock Handler - Password-Protected File Locking via Context Menu
+Context Menu Lock Handler - Uses CLI handler with full encryption support
 
 Handles --context-lock and --context-unlock from Windows context menu with password verification.
 Uses PyQt6 password dialog for user authentication.
-Uses existing PasswordManager and CryptoManager for consistency with GUI.
+Uses CLI handler for FULL encryption/decryption logic (not just ACL).
 """
 
 import sys
 import os
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
-# Set up logging to both console and file
+# Import color utilities
+try:
+    from core.cli.colors import Colors, print_error, print_success, print_colored
+except ImportError:
+    class Colors:
+        BORDER = '\033[91m'
+        HIGHLIGHT = '\033[92m'
+        SECONDARY = '\033[34m'
+        DIM = '\033[90m'
+        INFO = '\033[94m'
+        SUCCESS = '\033[92m'
+        ERROR = '\033[91m'
+        RESET = '\033[0m'
+    
+    def print_error(msg):
+        print(f"{Colors.ERROR}{msg}{Colors.RESET}")
+    
+    def print_success(msg):
+        print(f"{Colors.SUCCESS}{msg}{Colors.RESET}")
+    
+    def print_colored(msg, color):
+        print(f"{color}{msg}{Colors.RESET}")
+
+# Logging
 def get_fadcrypt_logs_folder():
-    """Get the unified FadCrypt logs folder for Windows."""
-    import os
     appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
     logs_dir = os.path.join(appdata, 'FadCrypt', 'logs')
     os.makedirs(logs_dir, exist_ok=True)
     return logs_dir
 
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stderr),  # Console output
-        logging.FileHandler(os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_cli_debug.log'), mode='a')  # File output
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(os.path.join(get_fadcrypt_logs_folder(), 'fadcrypt_cli_debug.log'), mode='a')
     ]
 )
 logger = logging.getLogger(__name__)
 
 
 def get_fadcrypt_config_folder():
-    """Get FadCrypt configuration folder path (matches main_window_windows.py)"""
     appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
     config_dir = os.path.join(appdata, 'FadCrypt', 'config')
     os.makedirs(config_dir, exist_ok=True)
@@ -40,175 +60,94 @@ def get_fadcrypt_config_folder():
 
 
 def get_password_manager():
-    """Get the same PasswordManager used by the GUI"""
     from core.crypto_manager import CryptoManager
     from core.password_manager import PasswordManager
     
-    # Use same folder structure as GUI
     fadcrypt_folder = get_fadcrypt_config_folder()
-    
-    # Use exact same initialization as GUI
     password_file = os.path.join(fadcrypt_folder, "encrypted_password.bin")
     recovery_codes_file = os.path.join(fadcrypt_folder, "recovery_codes.json")
     
     crypto_manager = CryptoManager()
     password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
-    
     return password_manager
 
 
-def add_to_locked_items(file_path: str) -> bool:
-    """
-    Add file/folder to locked items list in apps_config.json.
-    This makes it appear in the Files & Folders tab.
-    
-    Args:
-        file_path: Absolute path to file or folder
-    
-    Returns:
-        True if added successfully, False otherwise
-    """
+def show_result_dialog(success: bool, operation: str, filename: str, error_msg: str = None):
+    """Show result dialog after lock/unlock operation"""
     try:
-        import json
-        import time
+        from PyQt6.QtWidgets import QApplication, QMessageBox
         
-        config_folder = get_fadcrypt_config_folder()
-        config_file = os.path.join(config_folder, 'apps_config.json')
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
         
-        # Determine if it's a file or folder
-        if os.path.isfile(file_path):
-            item_type = "file"
-        elif os.path.isdir(file_path):
-            item_type = "folder"
+        if success:
+            if operation.upper() == "LOCK":
+                title = "File Locked Successfully"
+                message = f"✓ '{filename}' is now locked\n\nThe file has been encrypted and protected."
+            else:
+                title = "File Unlocked Successfully"
+                message = f"✓ '{filename}' is now unlocked\n\nThe file has been decrypted and is accessible."
+            QMessageBox.information(None, f"FadCrypt - {title}", message)
         else:
-            logger.error(f"Path does not exist or is not a file/folder: {file_path}")
-            return False
-        
-        # Load existing config
-        config = {"applications": [], "locked_files_and_folders": []}
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading config: {e}")
-        
-        # Check if already in list
-        locked_items = config.get("locked_files_and_folders", [])
-        if any(item['path'] == file_path for item in locked_items):
-            logger.info(f"Item already in locked list: {file_path}")
-            return False
-        
-        # Create metadata for the item
-        item_metadata = {
-            "name": os.path.basename(file_path) or file_path,
-            "path": os.path.abspath(file_path),
-            "type": item_type,
-            "original_permissions": "default",
-            "filesystem": "ntfs",
-            "lock_method": "icacls",
-            "locked_at": int(time.time()),
-            "unlock_count": 0
-        }
-        
-        # Add to locked items
-        locked_items.append(item_metadata)
-        config["locked_files_and_folders"] = locked_items
-        
-        # Save config using safe write (handles protected files)
-        try:
-            from core.file_protection import safe_write_to_protected_file
-            content = json.dumps(config, indent=4)
-            success, error = safe_write_to_protected_file(config_file, content)
-            
-            if success:
-                logger.info(f"Added to locked items: {os.path.basename(file_path)}")
-                return True
+            if operation.upper() == "LOCK":
+                title = "Lock Failed"
+                message = f"✗ Failed to lock '{filename}'\n\n{error_msg or 'Check permissions and try again.'}"
             else:
-                logger.error(f"Failed to save config: {error}")
-                return False
-        except Exception as e:
-            logger.error(f"Error using safe write: {e}")
-            # Fallback to direct write
-            with open(config_file, 'w') as f:
-                json.dump(config, f, indent=4)
-            logger.info(f"Added to locked items (direct write): {os.path.basename(file_path)}")
-            return True
+                title = "Unlock Failed"
+                message = f"✗ Failed to unlock '{filename}'\n\n{error_msg or 'Check permissions and try again.'}"
+            QMessageBox.critical(None, f"FadCrypt - {title}", message)
         
     except Exception as e:
-        logger.error(f"Error adding to locked items: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return False
+        logger.error(f"Error showing result dialog: {e}")
 
 
-def remove_from_locked_items(file_path: str) -> bool:
-    """
-    Remove file/folder from locked items list in apps_config.json.
-    This makes it disappear from the Files & Folders tab.
-    
-    Args:
-        file_path: Absolute path to file or folder
-    
-    Returns:
-        True if removed successfully, False otherwise
-    """
+def show_output_dialog(output: str, operation: str):
+    """Show operation output in a scrollable text dialog"""
     try:
-        import json
+        from PyQt6.QtWidgets import QApplication
+        from ui.dialogs.operation_logs_dialog import OperationLogsDialog
         
-        config_folder = get_fadcrypt_config_folder()
-        config_file = os.path.join(config_folder, 'apps_config.json')
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
         
-        # Load existing config
-        if not os.path.exists(config_file):
-            logger.warning("Config file does not exist")
-            return False
-        
-        try:
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading config: {e}")
-            return False
-        
-        # Remove from locked items
-        locked_items = config.get("locked_files_and_folders", [])
-        original_count = len(locked_items)
-        
-        # Filter out the item with matching path
-        locked_items = [item for item in locked_items if item['path'] != file_path]
-        
-        if len(locked_items) == original_count:
-            logger.warning(f"Item not found in locked list: {file_path}")
-            return False
-        
-        config["locked_files_and_folders"] = locked_items
-        
-        # Save config using safe write (handles protected files)
-        try:
-            from core.file_protection import safe_write_to_protected_file
-            content = json.dumps(config, indent=4)
-            success, error = safe_write_to_protected_file(config_file, content)
-            
-            if success:
-                logger.info(f"Removed from locked items: {os.path.basename(file_path)}")
-                return True
-            else:
-                logger.error(f"Failed to save config: {error}")
-                return False
-        except Exception as e:
-            logger.error(f"Error using safe write: {e}")
-            # Fallback to direct write
-            with open(config_file, 'w') as f:
-                json.dump(config, f, indent=4)
-            logger.info(f"Removed from locked items (direct write): {os.path.basename(file_path)}")
-            return True
+        dialog = OperationLogsDialog(
+            title=f"FadCrypt - {operation} Operation Results",
+            logs=output,
+            parent=None
+        )
+        dialog.exec()
         
     except Exception as e:
-        logger.error(f"Error removing from locked items: {e}")
+        logger.error(f"Error showing output dialog: {e}")
+
+
+def show_context_menu_password_dialog(operation: str) -> Tuple[Optional[str], 'ContextMenuPasswordDialog']:
+    """Show context menu password dialog with logs display."""
+    try:
+        logger.info(f"Creating context menu password dialog for {operation}")
+        from PyQt6.QtWidgets import QApplication
+        from ui.dialogs.context_menu_password_dialog import ContextMenuPasswordDialog
+        
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+            logger.info("Created new QApplication")
+        
+        dialog = ContextMenuPasswordDialog(operation=operation, parent=None)
+        
+        # Show dialog modally - this will block until user closes it
+        result = dialog.exec()
+        
+        # Return password and dialog for post-operation processing
+        return dialog.password_value, dialog
+        
+    except Exception as e:
+        logger.error(f"Dialog error: {e}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
-        return False
+        return None, None
 
 
 def show_password_dialog(operation: str) -> Optional[str]:
@@ -218,26 +157,18 @@ def show_password_dialog(operation: str) -> Optional[str]:
         from PyQt6.QtWidgets import QApplication
         from ui.dialogs.password_dialog import PasswordDialog
         
-        # Use the same resource_path logic as FadCrypt.py
         def resource_path(relative_path):
-            """Get absolute path to resource, works for dev and for PyInstaller"""
             try:
-                # PyInstaller creates a temp folder and stores path in _MEIPASS
                 base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
             except Exception:
                 base_path = os.path.abspath(".")
             return os.path.join(base_path, relative_path)
         
-        logger.info("Creating QApplication instance")
-        # Create Qt application if needed
         app = QApplication.instance()
         if app is None:
             app = QApplication(sys.argv)
             logger.info("Created new QApplication")
-        else:
-            logger.info("Using existing QApplication")
         
-        logger.info("Creating PasswordDialog")
         dialog = PasswordDialog(
             title="FadCrypt",
             prompt=f"Enter your password to {operation.lower()} this file",
@@ -247,15 +178,11 @@ def show_password_dialog(operation: str) -> Optional[str]:
             show_forgot_password=False
         )
         
-        logger.info("Showing password dialog")
         result = dialog.exec()
-        logger.info(f"Dialog result: {result}")
         
         if result == 1:  # QDialog.Accepted
-            logger.info("Password accepted")
             return dialog.password_value
         else:
-            logger.info("Password dialog cancelled")
             return None
         
     except Exception as e:
@@ -265,18 +192,107 @@ def show_password_dialog(operation: str) -> Optional[str]:
         return None
 
 
-def lock_file_with_password(file_path: str) -> bool:
-    """Lock file after password verification using existing PasswordManager"""
+def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
+    """Perform the actual lock operation with password and dialog for logs."""
+    try:
+        # Verify password
+        password_manager = get_password_manager()
+        if not password_manager.verify_password(password):
+            logger.error("Incorrect password")
+            if pwd_dialog:
+                pwd_dialog.update_logs("❌ Incorrect password!")
+            return False
+        
+        # Update logs in dialog
+        if pwd_dialog:
+            pwd_dialog.update_logs(f"✓ Password verified")
+            pwd_dialog.update_logs(f"🔒 Locking: {os.path.basename(file_path)}...")
+        
+        # Save original print before redirecting
+        original_print = print
+        
+        # Define print redirect with event processing - ONLY send to dialog, not terminal
+        from PyQt6.QtWidgets import QApplication
+        
+        def print_with_logs_and_events(*args, **kwargs):
+            msg = ' '.join(str(a) for a in args)
+            if pwd_dialog:
+                pwd_dialog.update_logs(msg)
+                # Process GUI events so logs appear in real-time
+                QApplication.processEvents()
+            # Do NOT print to terminal during operation - show ONLY in dialog
+        
+        # Redirect print BEFORE importing file_lock_manager
+        import builtins
+        import sys
+        import io
+        
+        # Save original stdout/stderr
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        
+        # Create dummy streams to suppress non-dialog output
+        dummy_stream = io.StringIO()
+        builtins.print = print_with_logs_and_events
+        
+        try:
+            # Suppress stdout/stderr during operation - all output should go to dialog
+            sys.stdout = dummy_stream
+            sys.stderr = dummy_stream
+            
+            # Use CLI handler with full encryption support
+            logger.info("Using file lock manager with encryption support")
+            from core.windows.file_lock_manager_windows import FileLockManagerWindows
+            
+            config_folder = os.path.dirname(password_manager.password_file)
+            file_lock_mgr = FileLockManagerWindows(config_folder)
+            
+            # Set password bytes for encryption
+            file_lock_mgr.password_bytes = password_manager.get_password_bytes()
+            
+            # Lock the item directly
+            item_type = "folder" if os.path.isdir(file_path) else "file"
+            success = file_lock_mgr.add_item(file_path, item_type)
+            
+            if success:
+                if pwd_dialog:
+                    pwd_dialog.update_logs("✓ Lock operation completed successfully!")
+            else:
+                if pwd_dialog:
+                    pwd_dialog.update_logs("✗ Lock operation failed!")
+            
+            return success
+        finally:
+            # Restore stdout/stderr
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            builtins.print = original_print
+            # Process events to show final logs in dialog
+            if pwd_dialog:
+                for _ in range(10):  # Process multiple times to ensure all updates show
+                    QApplication.processEvents()
+    except Exception as e:
+        logger.error(f"Lock operation error: {e}")
+        if pwd_dialog:
+            pwd_dialog.update_logs(f"❌ Error: {str(e)}")
+        return False
+
+
+def lock_file_with_password(file_path: str) -> Tuple[bool, dict]:
+    """
+    Lock file with integrated password dialog and logs display.
+    
+    Returns:
+        Tuple[bool, dict]: (success: bool, info: dict)
+    """
     try:
         logger.info(f"Starting lock operation for: {file_path}")
         
-        # Check if password exists first
         password_manager = get_password_manager()
         password_file = password_manager.password_file
         
         if not os.path.exists(password_file):
-            logger.error("No master password set up. Please open FadCrypt GUI and create a password first.")
-            # Show error dialog
+            logger.error("No master password set up.")
             from PyQt6.QtWidgets import QApplication, QMessageBox
             app = QApplication.instance()
             if app is None:
@@ -285,59 +301,150 @@ def lock_file_with_password(file_path: str) -> bool:
             QMessageBox.critical(
                 None,
                 "FadCrypt - Password Required",
-                "No master password has been set up.\n\nPlease open the FadCrypt application and create a password first before using context menu locking."
+                "No master password has been set up.\n\nPlease open FadCrypt and create a password first."
             )
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'No password'}
         
-        # Show password dialog
-        password = show_password_dialog("LOCK")
+        # Define the operation callback
+        def perform_operation(password, dialog):
+            return perform_lock_operation(file_path, password, dialog)
+        
+        # Show context menu password dialog with callback
+        from PyQt6.QtWidgets import QApplication
+        from ui.dialogs.context_menu_password_dialog import ContextMenuPasswordDialog
+        
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+        
+        dialog = ContextMenuPasswordDialog(operation="LOCK", parent=None, operation_callback=perform_operation)
+        
+        # Show dialog modally - operation executes inside dialog
+        result = dialog.exec()
+        
+        # Get success from dialog's operation result
+        password = dialog.password_value
         if not password:
             logger.warning("Lock cancelled by user")
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'Cancelled'}
         
-        logger.info("Password entered, verifying...")
-        # Use same password verification as GUI
-        if not password_manager.verify_password(password):
-            logger.error("Incorrect password")
-            return False
+        # Return result (operation already completed inside dialog)
+        # We need to track success - let's add it to dialog
+        success = dialog.operation_complete
         
-        logger.info("Password verified, locking file...")
-        # Lock the file using ACL
-        from core.windows.acl_locker import ACLFileLocker
-        locker = ACLFileLocker()
-        
-        if locker.lock_path(file_path):
-            logger.info(f"File locked: {file_path}")
-            
-            # Add to locked items list so it appears in Files & Folders tab
-            logger.info("Adding to locked items list...")
-            if add_to_locked_items(file_path):
-                logger.info("Successfully added to locked items list")
-            else:
-                logger.warning("Could not add to locked items list (may already exist)")
-            
-            return True
+        if success:
+            return True, {'path': file_path, 'name': os.path.basename(file_path), 'error': None}
         else:
-            logger.error(f"Failed to lock file: {file_path}")
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'Operation failed'}
     
     except Exception as e:
         logger.error(f"Lock error: {e}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
+        return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': str(e)}
+
+
+def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
+    """Perform the actual unlock operation with password and dialog for logs."""
+    try:
+        # Verify password
+        password_manager = get_password_manager()
+        if not password_manager.verify_password(password):
+            logger.error("Incorrect password")
+            if pwd_dialog:
+                pwd_dialog.update_logs("❌ Incorrect password!")
+            return False
+        
+        # Update logs in dialog
+        if pwd_dialog:
+            pwd_dialog.update_logs(f"✓ Password verified")
+            pwd_dialog.update_logs(f"🔓 Unlocking: {os.path.basename(file_path)}...")
+        
+        # Save original print before redirecting
+        original_print = print
+        
+        # Define print redirect with event processing - ONLY send to dialog, not terminal
+        from PyQt6.QtWidgets import QApplication
+        
+        def print_with_logs_and_events(*args, **kwargs):
+            msg = ' '.join(str(a) for a in args)
+            if pwd_dialog:
+                pwd_dialog.update_logs(msg)
+                # Process GUI events so logs appear in real-time
+                QApplication.processEvents()
+            # Do NOT print to terminal during operation - show ONLY in dialog
+        
+        # Redirect print BEFORE importing file_lock_manager
+        import builtins
+        import sys
+        import io
+        
+        # Save original stdout/stderr
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        
+        # Create dummy streams to suppress non-dialog output
+        dummy_stream = io.StringIO()
+        builtins.print = print_with_logs_and_events
+        
+        try:
+            # Suppress stdout/stderr during operation - all output should go to dialog
+            sys.stdout = dummy_stream
+            sys.stderr = dummy_stream
+            
+            # Use file_lock_manager directly
+            logger.info("Using file_lock_manager with decryption support")
+            
+            config_folder = os.path.dirname(password_manager.password_file)
+            from core.windows.file_lock_manager_windows import FileLockManagerWindows
+            
+            file_lock_mgr = FileLockManagerWindows(config_folder)
+            
+            # Set password bytes for decryption
+            file_lock_mgr.password_bytes = password_manager.get_password_bytes()
+            
+            # Unlock the item directly
+            success = file_lock_mgr.remove_item(file_path)
+            
+            if success:
+                if pwd_dialog:
+                    pwd_dialog.update_logs("✓ Unlock operation completed successfully!")
+            else:
+                if pwd_dialog:
+                    pwd_dialog.update_logs("✗ Unlock operation failed!")
+            
+            return success
+        finally:
+            # Restore stdout/stderr
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            builtins.print = original_print
+            # Process events to show final logs in dialog
+            if pwd_dialog:
+                for _ in range(10):  # Process multiple times to ensure all updates show
+                    QApplication.processEvents()
+    except Exception as e:
+        logger.error(f"Unlock operation error: {e}")
+        if pwd_dialog:
+            pwd_dialog.update_logs(f"❌ Error: {str(e)}")
         return False
 
 
-def unlock_file_with_password(file_path: str) -> bool:
-    """Unlock file after password verification using existing PasswordManager"""
+def unlock_file_with_password(file_path: str) -> Tuple[bool, dict]:
+    """
+    Unlock file with integrated password dialog and logs display.
+    
+    Returns:
+        Tuple[bool, dict]: (success: bool, info: dict)
+    """
     try:
-        # Check if password exists first
+        logger.info(f"Starting unlock operation for: {file_path}")
+        
         password_manager = get_password_manager()
         password_file = password_manager.password_file
         
         if not os.path.exists(password_file):
-            logger.error("No master password set up. Please open FadCrypt GUI and create a password first.")
-            # Show error dialog
+            logger.error("No master password set up.")
             from PyQt6.QtWidgets import QApplication, QMessageBox
             app = QApplication.instance()
             if app is None:
@@ -346,40 +453,43 @@ def unlock_file_with_password(file_path: str) -> bool:
             QMessageBox.critical(
                 None,
                 "FadCrypt - Password Required",
-                "No master password has been set up.\n\nPlease open the FadCrypt application and create a password first before using context menu unlocking."
+                "No master password has been set up.\n\nPlease open FadCrypt and create a password first."
             )
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'No password'}
         
-        # Show password dialog
-        password = show_password_dialog("UNLOCK")
+        # Define the operation callback
+        def perform_operation(password, dialog):
+            return perform_unlock_operation(file_path, password, dialog)
+        
+        # Show context menu password dialog with callback
+        from PyQt6.QtWidgets import QApplication
+        from ui.dialogs.context_menu_password_dialog import ContextMenuPasswordDialog
+        
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+        
+        dialog = ContextMenuPasswordDialog(operation="UNLOCK", parent=None, operation_callback=perform_operation)
+        
+        # Show dialog modally - operation executes inside dialog
+        result = dialog.exec()
+        
+        # Get success from dialog's operation result
+        password = dialog.password_value
         if not password:
             logger.warning("Unlock cancelled by user")
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'Cancelled'}
         
-        # Use same password verification as GUI
-        if not password_manager.verify_password(password):
-            logger.error("Incorrect password")
-            return False
+        # Return result (operation already completed inside dialog)
+        success = dialog.operation_complete
         
-        # Unlock the file using ACL
-        from core.windows.acl_locker import ACLFileLocker
-        locker = ACLFileLocker()
-        
-        if locker.unlock_path(file_path):
-            logger.info(f"File unlocked: {file_path}")
-            
-            # Remove from locked items list so it disappears from Files & Folders tab
-            logger.info("Removing from locked items list...")
-            if remove_from_locked_items(file_path):
-                logger.info("Successfully removed from locked items list")
-            else:
-                logger.warning("Could not remove from locked items list (may not exist)")
-            
-            return True
+        if success:
+            return True, {'path': file_path, 'name': os.path.basename(file_path), 'error': None}
         else:
-            logger.error(f"Failed to unlock file")
-            return False
+            return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': 'Operation failed'}
     
     except Exception as e:
-        logger.error(f"Error: {e}")
-        return False
+        logger.error(f"Unlock error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': str(e)}

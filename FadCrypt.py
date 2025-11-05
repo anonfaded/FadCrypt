@@ -339,7 +339,40 @@ if '--unregister-context' in sys.argv:
                 f.write(f"[REGISTER-CONTEXT] Traceback: {traceback.format_exc()}\n")
         except:
             pass
-    sys.exit(0)# Handle --context-lock and --context-unlock from context menu
+    sys.exit(0)
+
+# DEV MODE: Test context menu without registry (for development/testing)
+# Usage: python FadCrypt.py --test-context-lock <path>
+#        python FadCrypt.py --test-context-unlock <path>
+if '--test-context-lock' in sys.argv or '--test-context-unlock' in sys.argv:
+    print(f"[DEV MODE] Testing context menu: {sys.argv}", flush=True)
+    try:
+        if '--test-context-lock' in sys.argv:
+            idx = sys.argv.index('--test-context-lock')
+            if idx + 1 < len(sys.argv):
+                path = sys.argv[idx + 1]
+                print(f"[DEV MODE] Test-locking file: {path}", flush=True)
+                from core.windows.cli_lock_handler import lock_file_with_password
+                success, info = lock_file_with_password(path)
+                print(f"[DEV MODE] Test-lock result: {success}", flush=True)
+                sys.exit(0 if success else 1)
+        
+        elif '--test-context-unlock' in sys.argv:
+            idx = sys.argv.index('--test-context-unlock')
+            if idx + 1 < len(sys.argv):
+                path = sys.argv[idx + 1]
+                print(f"[DEV MODE] Test-unlocking file: {path}", flush=True)
+                from core.windows.cli_lock_handler import unlock_file_with_password
+                success, info = unlock_file_with_password(path)
+                print(f"[DEV MODE] Test-unlock result: {success}", flush=True)
+                sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"[DEV MODE] Error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+# Handle --context-lock and --context-unlock from context menu
 if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
     print(f"[CONTEXT MENU] Processing context menu arguments: {sys.argv}", flush=True)
     try:
@@ -349,7 +382,7 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
                 path = sys.argv[idx + 1]
                 print(f"[CONTEXT MENU] Locking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import lock_file_with_password
-                success = lock_file_with_password(path)
+                success, info = lock_file_with_password(path)
                 print(f"[CONTEXT MENU] Lock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
         
@@ -359,7 +392,7 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
                 path = sys.argv[idx + 1]
                 print(f"[CONTEXT MENU] Unlocking file: {path}", flush=True)
                 from core.windows.cli_lock_handler import unlock_file_with_password
-                success = unlock_file_with_password(path)
+                success, info = unlock_file_with_password(path)
                 print(f"[CONTEXT MENU] Unlock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
     except Exception as e:

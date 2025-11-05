@@ -145,17 +145,27 @@ class TUIManager:
                 print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                 
                 success_count = 0
+                failed_count = 0
                 for path in actual_paths:
                     try:
                         if self.cli_handler.lock_item(path):
-                            print_success(f"✓ Locked: {os.path.basename(path)}")
                             success_count += 1
                         else:
+                            failed_count += 1
                             print_error(f"✗ Failed to lock: {os.path.basename(path)}")
                     except Exception as e:
+                        failed_count += 1
                         print_error(f"✗ Error locking {os.path.basename(path)}: {str(e)}")
                 
-                print_colored(f"\nLocked {success_count}/{len(actual_paths)} item(s) successfully.", Colors.SUCCESS)
+                # Styled summary box like --lock
+                if success_count > 0 or failed_count > 0:
+                    print(f"{Colors.SUCCESS}╭─ 🔒 LOCK STATUS ───────────────────────{Colors.RESET}")
+                    if success_count > 0:
+                        print(f"{Colors.SUCCESS}├ ✓ {success_count} item(s) locked successfully{Colors.RESET}")
+                    if failed_count > 0:
+                        print(f"{Colors.ERROR}├ ✗ {failed_count} item(s) failed{Colors.RESET}")
+                    print(f"{Colors.SUCCESS}╰─────────────────────────────────────────{Colors.RESET}")
+                
                 input("\nPress Enter to continue...")
 
     def lock_files_menu(self):
@@ -199,10 +209,14 @@ class TUIManager:
                     
                     success, failed, _ = self.cli_handler.lock_multiple(actual_paths)
                     
-                    if success > 0:
-                        print_success(f"Successfully locked {success} item(s)!")
-                    if failed > 0:
-                        print_error(f"Failed to lock {failed} item(s).")
+                    # Styled summary box like --lock
+                    if success > 0 or failed > 0:
+                        print(f"{Colors.SUCCESS}╭─ 🔒 LOCK STATUS ───────────────────────{Colors.RESET}")
+                        if success > 0:
+                            print(f"{Colors.SUCCESS}├ ✓ {success} item(s) locked successfully{Colors.RESET}")
+                        if failed > 0:
+                            print(f"{Colors.ERROR}├ ✗ {failed} item(s) failed{Colors.RESET}")
+                        print(f"{Colors.SUCCESS}╰─────────────────────────────────────────{Colors.RESET}")
                     
                     input("\nPress Enter to continue...")
         
@@ -286,10 +300,14 @@ class TUIManager:
                 
                 success, failed, _ = self.cli_handler.unlock_multiple(actual_paths)
                 
-                if success > 0:
-                    print_success(f"✅ Successfully unlocked {success} item(s)!")
-                if failed > 0:
-                    print_error(f"Failed to unlock {failed} item(s).")
+                # Styled summary box like --unlock
+                if success > 0 or failed > 0:
+                    print(f"{Colors.SUCCESS}╭─ 🔓 UNLOCK STATUS ─────────────────────{Colors.RESET}")
+                    if success > 0:
+                        print(f"{Colors.SUCCESS}├ ✓ {success} item(s) unlocked successfully{Colors.RESET}")
+                    if failed > 0:
+                        print(f"{Colors.ERROR}├ ✗ {failed} item(s) failed{Colors.RESET}")
+                    print(f"{Colors.SUCCESS}╰─────────────────────────────────────────{Colors.RESET}")
                 
                 input("\nPress Enter to continue...")
     

@@ -96,6 +96,10 @@ def show_help():
         print(f"{RED}│{RESET} These options use the following flags internally:")
         print(f"{RED}│{RESET}   --context-lock <path>    {DIM}(called by context menu){RESET}")
         print(f"{RED}│{RESET}   --context-unlock <path>  {DIM}(called by context menu){RESET}")
+        print(f"{RED}│{RESET}")
+        print(f"{RED}│{RESET} {DIM}DEV MODE (Testing without registry):{RESET}")
+        print(f"{RED}│{RESET}   --test-context-lock <path>   {DIM}(test lock without registry){RESET}")
+        print(f"{RED}│{RESET}   --test-context-unlock <path> {DIM}(test unlock without registry){RESET}")
         print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Installation & Setup
