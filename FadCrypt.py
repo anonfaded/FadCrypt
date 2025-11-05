@@ -342,30 +342,56 @@ if '--unregister-context' in sys.argv:
     sys.exit(0)
 
 # DEV MODE: Test context menu without registry (for development/testing)
-# Usage: python FadCrypt.py --test-context-lock <path>
-#        python FadCrypt.py --test-context-unlock <path>
+# Usage: python FadCrypt.py --test-context-lock <path> [<path2> ...]
+#        python FadCrypt.py --test-context-unlock <path> [<path2> ...]
 if '--test-context-lock' in sys.argv or '--test-context-unlock' in sys.argv:
     print(f"[DEV MODE] Testing context menu: {sys.argv}", flush=True)
     try:
         if '--test-context-lock' in sys.argv:
             idx = sys.argv.index('--test-context-lock')
-            if idx + 1 < len(sys.argv):
-                path = sys.argv[idx + 1]
-                print(f"[DEV MODE] Test-locking file: {path}", flush=True)
+            # Get all paths after the flag (filter out other flags)
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+            if not paths:
+                print(f"[DEV MODE] No paths provided", flush=True)
+                sys.exit(1)
+            
+            if len(paths) == 1:
+                # Single file
+                print(f"[DEV MODE] Test-locking file: {paths[0]}", flush=True)
                 from core.windows.cli_lock_handler import lock_file_with_password
-                success, info = lock_file_with_password(path)
+                success, info = lock_file_with_password(paths[0])
                 print(f"[DEV MODE] Test-lock result: {success}", flush=True)
-                sys.exit(0 if success else 1)
+            else:
+                # Batch operation
+                print(f"[DEV MODE] Test-locking {len(paths)} files: {paths}", flush=True)
+                from core.windows.cli_lock_handler import lock_multiple_with_password
+                success, info = lock_multiple_with_password(paths)
+                print(f"[DEV MODE] Test-lock result: {success} - {info['success']}/{len(paths)} succeeded", flush=True)
+            
+            sys.exit(0 if success else 1)
         
         elif '--test-context-unlock' in sys.argv:
             idx = sys.argv.index('--test-context-unlock')
-            if idx + 1 < len(sys.argv):
-                path = sys.argv[idx + 1]
-                print(f"[DEV MODE] Test-unlocking file: {path}", flush=True)
+            # Get all paths after the flag (filter out other flags)
+            paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+            if not paths:
+                print(f"[DEV MODE] No paths provided", flush=True)
+                sys.exit(1)
+            
+            if len(paths) == 1:
+                # Single file
+                print(f"[DEV MODE] Test-unlocking file: {paths[0]}", flush=True)
                 from core.windows.cli_lock_handler import unlock_file_with_password
-                success, info = unlock_file_with_password(path)
+                success, info = unlock_file_with_password(paths[0])
                 print(f"[DEV MODE] Test-unlock result: {success}", flush=True)
-                sys.exit(0 if success else 1)
+            else:
+                # Batch operation
+                print(f"[DEV MODE] Test-unlocking {len(paths)} files: {paths}", flush=True)
+                from core.windows.cli_lock_handler import unlock_multiple_with_password
+                success, info = unlock_multiple_with_password(paths)
+                print(f"[DEV MODE] Test-unlock result: {success} - {info['success']}/{len(paths)} succeeded", flush=True)
+            
+            sys.exit(0 if success else 1)
     except Exception as e:
         print(f"[DEV MODE] Error: {e}", flush=True)
         import traceback
@@ -379,20 +405,30 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
         if '--context-lock' in sys.argv:
             idx = sys.argv.index('--context-lock')
             if idx + 1 < len(sys.argv):
-                path = sys.argv[idx + 1]
-                print(f"[CONTEXT MENU] Locking file: {path}", flush=True)
-                from core.windows.cli_lock_handler import lock_file_with_password
-                success, info = lock_file_with_password(path)
+                # Get all paths after --context-lock (support batch operations)
+                paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+                if not paths:
+                    print(f"[CONTEXT MENU] No paths provided", flush=True)
+                    sys.exit(1)
+                
+                print(f"[CONTEXT MENU] Locking {len(paths)} item(s): {paths}", flush=True)
+                from core.windows.cli_lock_handler import lock_files_with_password_batch
+                success, info = lock_files_with_password_batch(paths)
                 print(f"[CONTEXT MENU] Lock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
         
         elif '--context-unlock' in sys.argv:
             idx = sys.argv.index('--context-unlock')
             if idx + 1 < len(sys.argv):
-                path = sys.argv[idx + 1]
-                print(f"[CONTEXT MENU] Unlocking file: {path}", flush=True)
-                from core.windows.cli_lock_handler import unlock_file_with_password
-                success, info = unlock_file_with_password(path)
+                # Get all paths after --context-unlock (support batch operations)
+                paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+                if not paths:
+                    print(f"[CONTEXT MENU] No paths provided", flush=True)
+                    sys.exit(1)
+                
+                print(f"[CONTEXT MENU] Unlocking {len(paths)} item(s): {paths}", flush=True)
+                from core.windows.cli_lock_handler import unlock_files_with_password_batch
+                success, info = unlock_files_with_password_batch(paths)
                 print(f"[CONTEXT MENU] Unlock result: {success}", flush=True)
                 sys.exit(0 if success else 1)
     except Exception as e:

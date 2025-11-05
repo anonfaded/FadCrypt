@@ -195,6 +195,9 @@ def show_password_dialog(operation: str) -> Optional[str]:
 def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
     """Perform the actual lock operation with password and dialog for logs."""
     try:
+        # Convert to absolute path to match how CLI stores paths
+        abs_file_path = os.path.abspath(file_path)
+        
         # Verify password
         password_manager = get_password_manager()
         if not password_manager.verify_password(password):
@@ -206,7 +209,7 @@ def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         # Update logs in dialog
         if pwd_dialog:
             pwd_dialog.update_logs(f"✓ Password verified")
-            pwd_dialog.update_logs(f"🔒 Locking: {os.path.basename(file_path)}...")
+            pwd_dialog.update_logs(f"🔒 Locking: {os.path.basename(abs_file_path)}...")
         
         # Save original print before redirecting
         original_print = print
@@ -251,8 +254,8 @@ def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             file_lock_mgr.password_bytes = password_manager.get_password_bytes()
             
             # Lock the item directly
-            item_type = "folder" if os.path.isdir(file_path) else "file"
-            success = file_lock_mgr.add_item(file_path, item_type)
+            item_type = "folder" if os.path.isdir(abs_file_path) else "file"
+            success = file_lock_mgr.add_item(abs_file_path, item_type)
             
             if success:
                 if pwd_dialog:
@@ -347,6 +350,9 @@ def lock_file_with_password(file_path: str) -> Tuple[bool, dict]:
 def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
     """Perform the actual unlock operation with password and dialog for logs."""
     try:
+        # Convert to absolute path to match stored paths
+        abs_file_path = os.path.abspath(file_path)
+        
         # Verify password
         password_manager = get_password_manager()
         if not password_manager.verify_password(password):
@@ -358,12 +364,12 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         # Update logs in dialog
         if pwd_dialog:
             pwd_dialog.update_logs(f"✓ Password verified")
-            pwd_dialog.update_logs(f"🔓 Unlocking: {os.path.basename(file_path)}...")
+            pwd_dialog.update_logs(f"🔓 Unlocking: {os.path.basename(abs_file_path)}...")
         
         # Save original print before redirecting
         original_print = print
         
-        # Define print redirect with event processing - ONLY send to dialog, not terminal
+        # Define print redirect with event processing - send to dialog, not terminal
         from PyQt6.QtWidgets import QApplication
         
         def print_with_logs_and_events(*args, **kwargs):
@@ -392,19 +398,19 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             sys.stdout = dummy_stream
             sys.stderr = dummy_stream
             
-            # Use file_lock_manager directly
-            logger.info("Using file_lock_manager with decryption support")
-            
-            config_folder = os.path.dirname(password_manager.password_file)
+            # Use the full file lock manager flow (matches CLI behavior)
+            logger.info("Using full file lock manager with decryption support")
             from core.windows.file_lock_manager_windows import FileLockManagerWindows
             
+            config_folder = os.path.dirname(password_manager.password_file)
             file_lock_mgr = FileLockManagerWindows(config_folder)
             
-            # Set password bytes for decryption
+            # Set password bytes for decryption (this was cached when password was verified)
             file_lock_mgr.password_bytes = password_manager.get_password_bytes()
             
-            # Unlock the item directly
-            success = file_lock_mgr.remove_item(file_path)
+            # Unlock the item using the full remove_item() flow (handles decryption, ACL removal, config persistence)
+            # Pass absolute path to match how items are stored
+            success = file_lock_mgr.remove_item(abs_file_path)
             
             if success:
                 if pwd_dialog:
@@ -412,6 +418,7 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             else:
                 if pwd_dialog:
                     pwd_dialog.update_logs("✗ Unlock operation failed!")
+                logger.error(f"[perform_unlock] remove_item returned False for {abs_file_path}")
             
             return success
         finally:
@@ -425,6 +432,8 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
                     QApplication.processEvents()
     except Exception as e:
         logger.error(f"Unlock operation error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         if pwd_dialog:
             pwd_dialog.update_logs(f"❌ Error: {str(e)}")
         return False
@@ -493,3 +502,199 @@ def unlock_file_with_password(file_path: str) -> Tuple[bool, dict]:
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return False, {'path': file_path, 'name': os.path.basename(file_path), 'error': str(e)}
+
+
+def lock_multiple_with_password(paths: list) -> tuple:
+    """
+    Lock multiple files with a single password dialog.
+    Shows progress as each file is processed.
+    
+    Args:
+        paths: List of file paths to lock
+        
+    Returns:
+        Tuple of (success: bool, info: dict) where info contains:
+            - 'success': number of successfully locked files
+            - 'failed': number of failed files
+            - 'paths': list of successfully locked file paths
+            - 'errors': dict mapping failed paths to error messages
+    """
+    try:
+        from ui.dialogs.context_menu_password_dialog import ContextMenuPasswordDialog
+        from PyQt6.QtWidgets import QApplication
+        import sys
+        
+        logger.info(f"[BATCH LOCK] Processing {len(paths)} file(s)")
+        
+        # Ensure QApplication exists
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+        
+        # Initialize result tracking
+        successful_paths = []
+        failed_paths = {}
+        
+        # Create dialog for batch lock operation
+        pwd_dialog = ContextMenuPasswordDialog(operation="LOCK")
+        
+        # Define batch operation callback
+        def batch_operation(password, dialog):
+            """Process all files with progress updates"""
+            nonlocal successful_paths, failed_paths
+            
+            dialog.update_logs(f"<span style='color:#00bfff;'>🔄 Processing {len(paths)} file(s)...</span>")
+            
+            for idx, file_path in enumerate(paths, 1):
+                filename = os.path.basename(file_path)
+                dialog.update_logs(f"<span style='color:#00bfff;'>📁 [{idx}/{len(paths)}] Processing: {filename}</span>")
+                
+                # Perform lock operation for this file
+                success = perform_lock_operation(file_path, password, dialog)
+                
+                if success:
+                    successful_paths.append(file_path)
+                else:
+                    failed_paths[file_path] = "Operation failed"
+            
+            # Show summary
+            if successful_paths:
+                dialog.update_logs(f"<span style='color:#00ff00;'>✓ Successfully locked {len(successful_paths)} of {len(paths)} file(s)</span>")
+            if failed_paths:
+                dialog.update_logs(f"<span style='color:#ff4444;'>✗ Failed to lock {len(failed_paths)} of {len(paths)} file(s)</span>")
+            
+            return len(successful_paths) > 0
+        
+        # Set operation callback in constructor - pass as operation_callback parameter
+        pwd_dialog.operation_callback = batch_operation
+        
+        # Show dialog and wait for user
+        logger.info("[BATCH LOCK] Showing password dialog...")
+        result = pwd_dialog.exec()
+        
+        if result == pwd_dialog.DialogCode.Rejected:
+            logger.warning("[BATCH LOCK] Cancelled by user")
+            return False, {
+                'success': 0,
+                'failed': len(paths),
+                'paths': [],
+                'errors': {path: 'Cancelled' for path in paths}
+            }
+        
+        # Return results
+        overall_success = len(successful_paths) > 0
+        return overall_success, {
+            'success': len(successful_paths),
+            'failed': len(failed_paths),
+            'paths': successful_paths,
+            'errors': failed_paths
+        }
+    
+    except Exception as e:
+        logger.error(f"[BATCH LOCK] Error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False, {
+            'success': 0,
+            'failed': len(paths),
+            'paths': [],
+            'errors': {path: str(e) for path in paths}
+        }
+
+
+def unlock_multiple_with_password(paths: list) -> tuple:
+    """
+    Unlock multiple files with a single password dialog.
+    Shows progress as each file is processed.
+    
+    Args:
+        paths: List of file paths to unlock
+        
+    Returns:
+        Tuple of (success: bool, info: dict) where info contains:
+            - 'success': number of successfully unlocked files
+            - 'failed': number of failed files
+            - 'paths': list of successfully unlocked file paths
+            - 'errors': dict mapping failed paths to error messages
+    """
+    try:
+        from ui.dialogs.context_menu_password_dialog import ContextMenuPasswordDialog
+        from PyQt6.QtWidgets import QApplication
+        import sys
+        
+        logger.info(f"[BATCH UNLOCK] Processing {len(paths)} file(s)")
+        
+        # Ensure QApplication exists
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+        
+        # Initialize result tracking
+        successful_paths = []
+        failed_paths = {}
+        
+        # Create dialog for batch unlock operation
+        pwd_dialog = ContextMenuPasswordDialog(operation="UNLOCK")
+        
+        # Define batch operation callback
+        def batch_operation(password, dialog):
+            """Process all files with progress updates"""
+            nonlocal successful_paths, failed_paths
+            
+            dialog.update_logs(f"<span style='color:#00bfff;'>🔄 Processing {len(paths)} file(s)...</span>")
+            
+            for idx, file_path in enumerate(paths, 1):
+                filename = os.path.basename(file_path)
+                dialog.update_logs(f"<span style='color:#00bfff;'>📁 [{idx}/{len(paths)}] Processing: {filename}</span>")
+                
+                # Perform unlock operation for this file
+                success = perform_unlock_operation(file_path, password, dialog)
+                
+                if success:
+                    successful_paths.append(file_path)
+                else:
+                    failed_paths[file_path] = "Operation failed"
+            
+            # Show summary
+            if successful_paths:
+                dialog.update_logs(f"<span style='color:#00ff00;'>✓ Successfully unlocked {len(successful_paths)} of {len(paths)} file(s)</span>")
+            if failed_paths:
+                dialog.update_logs(f"<span style='color:#ff4444;'>✗ Failed to unlock {len(failed_paths)} of {len(paths)} file(s)</span>")
+            
+            return len(successful_paths) > 0
+        
+        # Set operation callback in constructor
+        pwd_dialog.operation_callback = batch_operation
+        
+        # Show dialog and wait for user
+        logger.info("[BATCH UNLOCK] Showing password dialog...")
+        result = pwd_dialog.exec()
+        
+        if result == pwd_dialog.DialogCode.Rejected:
+            logger.warning("[BATCH UNLOCK] Cancelled by user")
+            return False, {
+                'success': 0,
+                'failed': len(paths),
+                'paths': [],
+                'errors': {path: 'Cancelled' for path in paths}
+            }
+        
+        # Return results
+        overall_success = len(successful_paths) > 0
+        return overall_success, {
+            'success': len(successful_paths),
+            'failed': len(failed_paths),
+            'paths': successful_paths,
+            'errors': failed_paths
+        }
+    
+    except Exception as e:
+        logger.error(f"[BATCH UNLOCK] Error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False, {
+            'success': 0,
+            'failed': len(paths),
+            'paths': [],
+            'errors': {path: str(e) for path in paths}
+        }

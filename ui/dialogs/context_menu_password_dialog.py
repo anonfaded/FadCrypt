@@ -252,7 +252,7 @@ class ContextMenuPasswordDialog(QDialog):
                     self.mark_operation_complete(success)
                 else:
                     # Check if it was password error (logs will show it)
-                    if "Incorrect password" in self.logs_text or "password" in self.logs_text.lower():
+                    if "Incorrect password" in self.logs_text:
                         self.update_logs("\n⚠️ Please try again with the correct password")
                         # Re-enable password input for retry
                         self.password_input.setEnabled(True)

@@ -619,6 +619,47 @@ sudo dpkg -i fadcrypt_X.X.X_amd64.deb
 
 Includes: Main application, elevated daemon service, desktop integration, automatic cleanup.
 
+## Development Testing
+
+For developers testing context menu functionality without full registry integration, FadCrypt provides special testing flags:
+
+### Context Menu Test Flags
+
+```bash
+# Test lock operation (single file)
+python FadCrypt.py --test-context-lock <path>
+
+# Test lock operation (multiple files - batch)
+python FadCrypt.py --test-context-lock <path1> <path2> <path3>
+
+# Test unlock operation (single file)
+python FadCrypt.py --test-context-unlock <path>
+
+# Test unlock operation (multiple files - batch)
+python FadCrypt.py --test-context-unlock <path1> <path2> <path3>
+```
+
+**Security Note:** These test flags provide the **same security** as the real context menu:
+- Require valid master password already set up
+- Require correct password entry in authentication dialog
+- Perform full encryption/decryption process with all security checks
+- Support batch operations (multiple files with single password entry)
+
+**Use Cases:**
+- Debugging context menu integration issues
+- Testing batch lock/unlock without installing registry entries
+- Verifying password dialog behavior during development
+- Testing file encryption/decryption logic before deployment
+
+**Example:**
+```bash
+# Test locking 3 files at once
+python FadCrypt.py --test-context-lock "file1.txt" "file2.txt" "file3.txt"
+
+# A password dialog will appear - enter your master password
+# All files will be processed and encrypted with progress updates
+```
+
 # Reset Password
 
 Follow the steps below to regain access to FadCrypt, or download the guide as a PDF for reference:  
