@@ -108,7 +108,8 @@ class ReadmeDialog(QDialog):
         discord_button.setFixedSize(220, 40)
         discord_button.setStyleSheet("""
             QPushButton {
-                background-color: #5865f2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -116,10 +117,12 @@ class ReadmeDialog(QDialog):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #4752c4;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QPushButton:pressed {
-                background-color: #3c40c4;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         discord_button.clicked.connect(lambda: webbrowser.open("https://discord.gg/kvAZvdkuuN"))
@@ -145,7 +148,8 @@ class ReadmeDialog(QDialog):
         self.ok_button.setFixedSize(150, 40)
         self.ok_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 border-radius: 5px;
@@ -153,10 +157,12 @@ class ReadmeDialog(QDialog):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #9a0007;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         self.ok_button.clicked.connect(self.accept)

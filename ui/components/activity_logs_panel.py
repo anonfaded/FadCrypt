@@ -84,7 +84,8 @@ class ActivityLogsPanel(QWidget):
         export_btn = QPushButton("📥 Export CSV")
         export_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4caf50;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 border: none;
                 padding: 8px 20px;
@@ -92,7 +93,12 @@ class ActivityLogsPanel(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         export_btn.clicked.connect(self.export_logs)
@@ -102,7 +108,8 @@ class ActivityLogsPanel(QWidget):
         refresh_btn = QPushButton("🔄 Refresh")
         refresh_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2196F3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 border: none;
                 padding: 8px 20px;
@@ -110,7 +117,12 @@ class ActivityLogsPanel(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #0b7dda;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         refresh_btn.clicked.connect(self.load_logs)

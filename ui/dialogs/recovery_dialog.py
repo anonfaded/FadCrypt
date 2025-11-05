@@ -120,15 +120,18 @@ class RecoveryCodeDialog(QDialog):
         next_button.setFixedHeight(36)
         next_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 font-size: 13px;
                 font-weight: 600;
             }
-            QPushButton:hover { background-color: #1565c0; }
-            QPushButton:pressed { background-color: #0d47a1; }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff); }
+            QPushButton:pressed { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99); }
         """)
         next_button.clicked.connect(self.on_code_enter_pressed)
         code_layout.addWidget(next_button)
@@ -291,15 +294,18 @@ class RecoveryCodeDialog(QDialog):
         cancel_button.setFixedSize(120, 36)
         cancel_button.setStyleSheet("""
             QPushButton {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: #e0e0e0;
                 border: none;
                 border-radius: 6px;
                 font-size: 13px;
                 font-weight: 600;
             }
-            QPushButton:hover { background-color: #464646; }
-            QPushButton:pressed { background-color: #2e2e2e; }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555); }
+            QPushButton:pressed { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333); }
         """)
         cancel_button.clicked.connect(self.reject)
         
@@ -308,17 +314,21 @@ class RecoveryCodeDialog(QDialog):
         self.recover_button.setEnabled(False)  # Disabled until code verified
         self.recover_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 font-size: 13px;
                 font-weight: 600;
             }
-            QPushButton:hover:enabled { background-color: #b71c1c; }
-            QPushButton:pressed:enabled { background-color: #9a0007; }
+            QPushButton:hover:enabled { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000); }
+            QPushButton:pressed:enabled { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000); }
             QPushButton:disabled {
-                background-color: #555555;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: #888888;
             }
         """)
@@ -520,13 +530,15 @@ class RecoveryCodeDialog(QDialog):
             QMessageBox { background-color: #1e1e1e; }
             QMessageBox QLabel { color: #e0e0e0; font-size: 12px; }
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 padding: 5px 20px;
                 border-radius: 3px;
             }
-            QPushButton:hover { background-color: #b71c1c; }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000); }
         """)
         msg_box.exec()
     
@@ -539,13 +551,15 @@ class RecoveryCodeDialog(QDialog):
             QMessageBox { background-color: #1e1e1e; }
             QMessageBox QLabel { color: #e0e0e0; font-size: 12px; }
             QPushButton {
-                background-color: #4caf50;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 border: none;
                 padding: 5px 20px;
                 border-radius: 3px;
             }
-            QPushButton:hover { background-color: #388e3c; }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00); }
         """)
         msg_box.exec()
     
@@ -560,14 +574,16 @@ class RecoveryCodeDialog(QDialog):
             QMessageBox { background-color: #1e1e1e; }
             QMessageBox QLabel { color: #e0e0e0; font-size: 12px; }
             QPushButton {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: white;
                 border: none;
                 padding: 5px 20px;
                 border-radius: 3px;
                 min-width: 60px;
             }
-            QPushButton:hover { background-color: #464646; }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555); }
         """)
         return msg_box.exec() == QMessageBox.StandardButton.Yes
     

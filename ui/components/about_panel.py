@@ -114,7 +114,8 @@ class AboutPanel(QWidget):
         update_button = QPushButton("🔄 Check for Updates")
         update_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 font-size: 13px;
@@ -123,10 +124,12 @@ class AboutPanel(QWidget):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #9a0007;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         update_button.clicked.connect(self.check_for_updates)
@@ -140,7 +143,8 @@ class AboutPanel(QWidget):
         source_button = QPushButton("📂 Source Code")
         source_button.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: white;
                 font-weight: bold;
                 padding: 12px 20px;
@@ -148,7 +152,12 @@ class AboutPanel(QWidget):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #616161;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
             }
         """)
         source_button.clicked.connect(lambda: webbrowser.open("https://github.com/anonfaded/FadCrypt"))
@@ -158,15 +167,21 @@ class AboutPanel(QWidget):
         coffee_button = QPushButton("☕ Buy Me Coffee")
         coffee_button.setStyleSheet("""
             QPushButton {
-                background-color: #ffeb3b;
-                color: #000000;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
+                color: white;
                 font-weight: bold;
                 padding: 12px 20px;
                 border-radius: 8px;
                 border: none;
             }
             QPushButton:hover {
-                background-color: #fdd835;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         coffee_button.clicked.connect(lambda: webbrowser.open("https://ko-fi.com/fadedx"))
@@ -182,7 +197,8 @@ class AboutPanel(QWidget):
         discord_button = QPushButton("💬 Join Discord")
         discord_button.setStyleSheet("""
             QPushButton {
-                background-color: #5865f2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 font-weight: bold;
                 padding: 12px 20px;
@@ -190,7 +206,12 @@ class AboutPanel(QWidget):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #4752c4;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         discord_button.clicked.connect(lambda: webbrowser.open("https://discord.gg/kvAZvdkuuN"))
@@ -200,7 +221,8 @@ class AboutPanel(QWidget):
         review_button = QPushButton("⭐ Write Review")
         review_button.setStyleSheet("""
             QPushButton {
-                background-color: #f57c00;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 font-weight: bold;
                 padding: 12px 20px;
@@ -208,7 +230,12 @@ class AboutPanel(QWidget):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #e65100;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         review_button.clicked.connect(lambda: webbrowser.open("https://forms.gle/wnthyevjkRD41eTFA"))
@@ -249,63 +276,79 @@ class AboutPanel(QWidget):
         
         layout.addWidget(suite_frame)
         
-        # === FadCam Promotion Card ===
+        # === Other Tools Section Title ===
+        tools_title = QLabel("🎯 Other Tools from FadSec Lab")
+        tools_title.setStyleSheet("""
+            QLabel {
+                font-weight: bold;
+                font-size: 14px;
+                color: #ffffff;
+                margin-top: 10px;
+            }
+        """)
+        layout.addWidget(tools_title)
+        
+        tools_desc = QLabel("Explore our suite of complementary security and privacy tools designed to enhance your digital safety")
+        tools_desc.setStyleSheet("color: #888888; font-size: 11px;")
+        tools_desc.setWordWrap(True)
+        layout.addWidget(tools_desc)
+        
+        # === FadCam Promotion Card (Compact) ===
         fadcam_frame = QFrame()
         fadcam_frame.setStyleSheet("""
             QFrame {
                 background-color: #2a2a2a;
-                border-radius: 12px;
-                padding: 20px;
+                border-radius: 8px;
+                padding: 12px 15px;
             }
         """)
         fadcam_layout = QHBoxLayout(fadcam_frame)
-        fadcam_layout.setSpacing(15)
+        fadcam_layout.setSpacing(10)
+        fadcam_layout.setContentsMargins(0, 0, 0, 0)
         
-        # FadCam icon
-        fadcam_icon_path = self.resource_path('img/fadcam.png')
-        if os.path.exists(fadcam_icon_path):
-            fadcam_icon_label = QLabel()
-            fadcam_pixmap = QPixmap(fadcam_icon_path)
-            scaled_fadcam = fadcam_pixmap.scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            fadcam_icon_label.setPixmap(scaled_fadcam)
-            fadcam_icon_label.setCursor(Qt.CursorShape.PointingHandCursor)
-            fadcam_icon_label.mousePressEvent = lambda event: webbrowser.open("https://github.com/anonfaded/FadCam")
-            fadcam_layout.addWidget(fadcam_icon_label)
-        
-        # FadCam info
+        # FadCam title and description (compact)
         fadcam_info_layout = QVBoxLayout()
-        fadcam_info_layout.setSpacing(5)
+        fadcam_info_layout.setSpacing(2)
+        fadcam_info_layout.setContentsMargins(0, 0, 0, 0)
         
         fadcam_title = QLabel("FadCam")
         fadcam_title.setStyleSheet("""
             QLabel {
                 font-weight: bold;
-                font-size: 15px;
+                font-size: 12px;
                 color: #ffffff;
             }
         """)
         fadcam_info_layout.addWidget(fadcam_title)
         
-        fadcam_desc = QLabel("Open Source Ad-Free Offscreen Video Recorder")
-        fadcam_desc.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        fadcam_desc = QLabel("Ad free, open source offscreen video recorder, and screen recorder with many customizations")
+        fadcam_desc.setStyleSheet("color: #aaaaaa; font-size: 10px;")
         fadcam_desc.setWordWrap(True)
         fadcam_info_layout.addWidget(fadcam_desc)
         
         fadcam_layout.addLayout(fadcam_info_layout, 1)
         
-        # Get FadCam button
-        fadcam_button = QPushButton("Get FadCam →")
+        # Get FadCam button (compact)
+        fadcam_button = QPushButton("Get FadCam")
+        fadcam_button.setMaximumWidth(100)
         fadcam_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 font-weight: bold;
-                padding: 10px 20px;
-                border-radius: 8px;
+                padding: 6px 15px;
+                border-radius: 6px;
                 border: none;
+                font-size: 10px;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         fadcam_button.clicked.connect(lambda: webbrowser.open("https://github.com/anonfaded/FadCam"))

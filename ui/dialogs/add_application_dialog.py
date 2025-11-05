@@ -185,18 +185,22 @@ class AddApplicationDialog(QDialog):
         browse_button = QPushButton("📁 Browse")
         browse_button.setStyleSheet("""
             QPushButton {
-                background-color: #4a5568;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #5a6578;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QPushButton:pressed {
-                background-color: #3a4558;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         browse_button.clicked.connect(self.browse_for_file)
@@ -214,18 +218,22 @@ class AddApplicationDialog(QDialog):
         scan_button.setMinimumWidth(130)
         scan_button.setStyleSheet("""
             QPushButton {
-                background-color: #6366f1;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #7c3aed;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
             }
             QPushButton:pressed {
-                background-color: #5b21b6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         scan_button.clicked.connect(self.scan_for_apps)
@@ -236,18 +244,22 @@ class AddApplicationDialog(QDialog):
         save_button.setMinimumWidth(120)
         save_button.setStyleSheet("""
             QPushButton {
-                background-color: #10b981;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #059669;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #047857;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         save_button.clicked.connect(self.save_application)
@@ -454,12 +466,18 @@ class AddApplicationDialog(QDialog):
                 background-color: transparent;
             }
             QMessageBox QPushButton {
-                background-color: #3b82f6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 padding: 8px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 min-width: 80px;
+                border: none;
+            }
+            QMessageBox QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QMessageBox QPushButton:hover {
                 background-color: #2563eb;

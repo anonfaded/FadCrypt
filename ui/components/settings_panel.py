@@ -371,14 +371,21 @@ class SettingsPanel(QWidget):
         recovery_button = QPushButton("Generate Recovery Codes")
         recovery_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         recovery_button.clicked.connect(lambda: self.on_generate_recovery_codes())
@@ -404,14 +411,21 @@ class SettingsPanel(QWidget):
             context_menu_button = QPushButton("Refresh Context Menu")
             context_menu_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #1976d2;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
                     color: white;
                     font-weight: bold;
                     padding: 8px 20px;
                     border-radius: 5px;
+                    border: none;
                 }
                 QPushButton:hover {
-                    background-color: #1565c0;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #0033cc, stop:1 #001a99);
                 }
             """)
             context_menu_button.clicked.connect(lambda: self.on_refresh_context_menu())
@@ -508,14 +522,21 @@ class SettingsPanel(QWidget):
         cleanup_button = QPushButton("Run Uninstall Cleanup")
         cleanup_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         cleanup_button.clicked.connect(lambda: self.on_cleanup_clicked())
@@ -545,14 +566,21 @@ class SettingsPanel(QWidget):
         export_button = QPushButton("📥 Export Config")
         export_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
             }
         """)
         export_button.clicked.connect(self.on_export_config_clicked)
@@ -562,14 +590,21 @@ class SettingsPanel(QWidget):
         import_button = QPushButton("📤 Import Config")
         import_button.setStyleSheet("""
             QPushButton {
-                background-color: #388e3c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #2e7d32;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         import_button.clicked.connect(self.on_import_config_clicked)

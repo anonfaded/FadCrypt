@@ -124,7 +124,8 @@ class LogsTabWidget(QWidget):
         clear_btn = QPushButton("🗑️ Clear Logs")
         clear_btn.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: #ffffff;
                 border: none;
                 border-radius: 6px;
@@ -133,7 +134,12 @@ class LogsTabWidget(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         clear_btn.clicked.connect(self.clear_logs)
@@ -144,7 +150,8 @@ class LogsTabWidget(QWidget):
         self.autoscroll_enabled = True
         self.autoscroll_btn.setStyleSheet("""
             QPushButton {
-                background-color: #10b981;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: #ffffff;
                 border: none;
                 border-radius: 6px;
@@ -153,7 +160,12 @@ class LogsTabWidget(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #059669;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         self.autoscroll_btn.clicked.connect(self.toggle_autoscroll)

@@ -292,7 +292,8 @@ class PasswordDialog(QDialog):
         cancel_button.setFixedSize(120, 36)
         cancel_button.setStyleSheet("""
             QPushButton {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4a4a4a, stop:1 #2a2a2a);
                 color: #e0e0e0;
                 border: none;
                 border-radius: 6px;
@@ -300,10 +301,12 @@ class PasswordDialog(QDialog):
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #464646;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5a5a5a, stop:1 #3a3a3a);
             }
             QPushButton:pressed {
-                background-color: #2e2e2e;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2a2a2a, stop:1 #1a1a1a);
             }
         """)
         cancel_button.clicked.connect(self.reject)
@@ -318,7 +321,8 @@ class PasswordDialog(QDialog):
         ok_button.setFixedSize(120, 36)
         ok_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -326,10 +330,12 @@ class PasswordDialog(QDialog):
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #9a0007;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         ok_button.clicked.connect(self.on_ok)

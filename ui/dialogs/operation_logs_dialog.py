@@ -28,7 +28,8 @@ class OperationLogsDialog(QDialog):
                 border: 1px solid #444444;
             }
             QPushButton {
-                background-color: #0d47a1;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: #ffffff;
                 border: none;
                 border-radius: 4px;
@@ -36,10 +37,12 @@ class OperationLogsDialog(QDialog):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QPushButton:pressed {
-                background-color: #0d3f8f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
             QLabel {
                 color: #ffffff;

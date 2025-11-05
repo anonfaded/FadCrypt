@@ -917,7 +917,8 @@ class EnhancedStatsWindow(QWidget):
                     background-color: transparent;
                 }
                 QMessageBox QPushButton {
-                    background-color: #9C27B0;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
                     color: white;
                     border: none;
                     border-radius: 4px;
@@ -925,7 +926,8 @@ class EnhancedStatsWindow(QWidget):
                     min-width: 80px;
                 }
                 QMessageBox QPushButton:hover {
-                    background-color: #7B1FA2;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
                 }
             """)
             msg.exec()
@@ -982,7 +984,8 @@ class EnhancedStatsWindow(QWidget):
                     background-color: transparent;
                 }
                 QMessageBox QPushButton {
-                    background-color: #9C27B0;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
                     color: white;
                     border: none;
                     border-radius: 4px;
@@ -990,7 +993,8 @@ class EnhancedStatsWindow(QWidget):
                     min-width: 80px;
                 }
                 QMessageBox QPushButton:hover {
-                    background-color: #7B1FA2;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
                 }
             """)
             msg.exec()

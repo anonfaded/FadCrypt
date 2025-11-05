@@ -127,7 +127,8 @@ class FileProtectionAuthDialog(QDialog):
         skip_button = QPushButton("Skip Protection")
         skip_button.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: #e0e0e0;
                 font-weight: bold;
                 padding: 10px 25px;
@@ -135,10 +136,12 @@ class FileProtectionAuthDialog(QDialog):
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #4a4a4a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
             }
             QPushButton:pressed {
-                background-color: #383838;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
             }
         """)
         skip_button.clicked.connect(self.reject)
@@ -147,7 +150,8 @@ class FileProtectionAuthDialog(QDialog):
         grant_button = QPushButton("Grant Permission")
         grant_button.setStyleSheet("""
             QPushButton {
-                background-color: #4caf50;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 font-weight: bold;
                 padding: 10px 25px;
@@ -155,10 +159,12 @@ class FileProtectionAuthDialog(QDialog):
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #5cb860;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
             }
             QPushButton:pressed {
-                background-color: #449d48;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         grant_button.clicked.connect(self.accept)

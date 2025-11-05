@@ -295,16 +295,22 @@ class FileGridWidget(QWidget):
         select_all_btn = QPushButton("☑️  Select All")
         select_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: #ffffff;
-                border: 2px solid #444444;
+                border: none;
                 border-radius: 8px;
                 padding: 8px 16px;
                 font-size: 10pt;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #d32f2f;
-                border: 2px solid #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         select_all_btn.clicked.connect(self.select_all)
@@ -314,16 +320,22 @@ class FileGridWidget(QWidget):
         deselect_all_btn = QPushButton("❌ Deselect All")
         deselect_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: #ffffff;
-                border: 2px solid #444444;
+                border: none;
                 border-radius: 8px;
                 padding: 8px 16px;
                 font-size: 10pt;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #666666;
-                border: 2px solid #666666;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
             }
         """)
         deselect_all_btn.clicked.connect(self.deselect_all)

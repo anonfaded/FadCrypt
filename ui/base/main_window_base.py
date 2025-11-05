@@ -3,6 +3,7 @@
 import sys
 import os
 import json
+import ctypes
 import webbrowser
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
@@ -637,7 +638,8 @@ class MainWindowBase(QMainWindow):
         self.monitoring_button.setFixedSize(180, 44)  # Consistent size
         self.monitoring_button.setStyleSheet("""
             QPushButton {
-                background-color: #2e7d32;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 font-size: 13px;
                 font-weight: bold;
@@ -647,10 +649,16 @@ class MainWindowBase(QMainWindow):
                 text-align: center;
             }
             QPushButton:hover {
-                background-color: #388e3c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
             QPushButton:disabled {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
                 color: #666666;
             }
         """)
@@ -671,7 +679,8 @@ class MainWindowBase(QMainWindow):
         
         button_style = """
             QPushButton {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -680,11 +689,13 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:disabled {
-                background-color: #1a1a1a;
-                color: #555555;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
+                color: #666666;
             }
         """
         
@@ -751,7 +762,8 @@ class MainWindowBase(QMainWindow):
         snake_button.setFixedWidth(180)
         snake_button.setStyleSheet("""
             QPushButton {
-                background-color: #512da8;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #7b2cbf, stop:1 #512da8);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -760,7 +772,8 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #6a3ab2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9d4edd, stop:1 #7b2cbf);
             }
         """)
         snake_button.clicked.connect(self.on_snake_game)
@@ -770,7 +783,8 @@ class MainWindowBase(QMainWindow):
         stats_button.setFixedWidth(180)
         stats_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2196f3, stop:1 #1976d2);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -779,7 +793,8 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #42a5f5, stop:1 #2196f3);
             }
         """)
         stats_button.clicked.connect(self.open_stats_window)
@@ -900,7 +915,7 @@ class MainWindowBase(QMainWindow):
                 font-size: 13px;
             }
             QLineEdit:focus {
-                border: 2px solid #3b82f6;
+                border: 2px solid #ff3333;
             }
         """)
         search_filter_layout.addWidget(self.app_search_input, stretch=1)
@@ -925,7 +940,7 @@ class MainWindowBase(QMainWindow):
                 font-size: 12px;
             }
             QComboBox:hover {
-                border: 2px solid #3b82f6;
+                border: 2px solid #ff3333;
             }
             QComboBox::drop-down {
                 border: none;
@@ -943,7 +958,7 @@ class MainWindowBase(QMainWindow):
             QComboBox QAbstractItemView {
                 background-color: #1a1a1a;
                 color: #e5e7eb;
-                selection-background-color: #3b82f6;
+                selection-background-color: #ff3333;
                 border: 1px solid #333333;
             }
         """)
@@ -1047,8 +1062,9 @@ class MainWindowBase(QMainWindow):
         self.add_file_btn.clicked.connect(self.add_file)
         self.add_file_btn.setStyleSheet("""
             QPushButton {
-                background-color: #10b981;
-                color: #ffffff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
+                color: white;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -1056,7 +1072,12 @@ class MainWindowBase(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #059669;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         file_buttons_layout.addWidget(self.add_file_btn)
@@ -1066,8 +1087,9 @@ class MainWindowBase(QMainWindow):
         self.add_folder_btn.clicked.connect(self.add_folder)
         self.add_folder_btn.setStyleSheet("""
             QPushButton {
-                background-color: #3b82f6;
-                color: #ffffff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
+                color: white;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -1075,7 +1097,12 @@ class MainWindowBase(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #2563eb;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         file_buttons_layout.addWidget(self.add_folder_btn)
@@ -1085,15 +1112,22 @@ class MainWindowBase(QMainWindow):
         self.remove_file_btn.clicked.connect(self.remove_file_item)
         self.remove_file_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2a2a2a;
-                color: #ffffff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
+                color: white;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
                 font-size: 11pt;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         file_buttons_layout.addWidget(self.remove_file_btn)
@@ -1189,60 +1223,6 @@ class MainWindowBase(QMainWindow):
         separator2.setFrameShadow(QFrame.Shadow.Sunken)
         config_layout.addWidget(separator2)
         
-        # Export/Import section
-        export_title = QLabel("Backup & Restore Configurations")
-        export_title.setStyleSheet("font-weight: bold;")
-        config_layout.addWidget(export_title)
-        
-        export_desc = QLabel("Export your complete configuration (applications + locked files/folders) or import a previously saved configuration.")
-        export_desc.setWordWrap(True)
-        export_desc.setStyleSheet("color: gray;")
-        config_layout.addWidget(export_desc)
-        
-        # Export/Import buttons
-        button_layout = QHBoxLayout()
-        
-        export_button = QPushButton("Export Config")
-        export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #d32f2f;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #b71c1c;
-            }
-        """)
-        export_button.clicked.connect(self.on_export_config)
-        button_layout.addWidget(export_button)
-        
-        import_button = QPushButton("Import Config")
-        import_button.setStyleSheet("""
-            QPushButton {
-                background-color: #424242;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-            }
-        """)
-        import_button.clicked.connect(self.on_import_config)
-        button_layout.addWidget(import_button)
-        
-        button_layout.addStretch()
-        config_layout.addLayout(button_layout)
-        
-        # Separator
-        separator3 = QFrame()
-        separator3.setFrameShape(QFrame.Shape.HLine)
-        separator3.setFrameShadow(QFrame.Shadow.Sunken)
-        config_layout.addWidget(separator3)
-        
         # File Locations Section
         locations_title = QLabel("📁 File Locations")
         locations_title.setStyleSheet("font-weight: bold; font-size: 11pt;")
@@ -1272,11 +1252,11 @@ class MainWindowBase(QMainWindow):
             path_label = QLabel(path)
             path_label.setStyleSheet("""
                 QLabel {
-                    color: #3b82f6;
+                    color: #ff3333;
                     text-decoration: underline;
                 }
                 QLabel:hover {
-                    color: #60a5fa;
+                    color: #ff5555;
                 }
             """)
             path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -1308,7 +1288,7 @@ class MainWindowBase(QMainWindow):
                             border: 1px solid #333333;
                         }
                         QMenu::item:selected {
-                            background-color: #3b82f6;
+                            background-color: #ff3333;
                         }
                     """)
                     copy_action = menu.addAction("📋 Copy Path")
@@ -2554,7 +2534,8 @@ class MainWindowBase(QMainWindow):
             self.monitoring_button.setText("⏹ Stop Monitoring")
             self.monitoring_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #d32f2f;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #ff3333, stop:1 #cc0000);
                     color: white;
                     font-size: 13px;
                     font-weight: bold;
@@ -2563,14 +2544,20 @@ class MainWindowBase(QMainWindow):
                     border: none;
                 }
                 QPushButton:hover {
-                    background-color: #b71c1c;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #ff5555, stop:1 #dd0000);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #cc0000, stop:1 #990000);
                 }
             """)
         else:
             self.monitoring_button.setText("▶ Start Monitoring")
             self.monitoring_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #2e7d32;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00cc00, stop:1 #008800);
                     color: white;
                     font-size: 13px;
                     font-weight: bold;
@@ -2579,10 +2566,16 @@ class MainWindowBase(QMainWindow):
                     border: none;
                 }
                 QPushButton:hover {
-                    background-color: #388e3c;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00ff00, stop:1 #00aa00);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #008800, stop:1 #005500);
                 }
                 QPushButton:disabled {
-                    background-color: #2a2a2a;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #555555, stop:1 #333333);
                     color: #666666;
                 }
             """)
