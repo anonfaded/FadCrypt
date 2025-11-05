@@ -54,7 +54,9 @@ class SettingsPanel(QWidget):
         # Separator
         separator1 = QFrame()
         separator1.setFrameShape(QFrame.Shape.HLine)
-        separator1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator1.setFrameShadow(QFrame.Shadow.Plain)
+        separator1.setLineWidth(1)
+        separator1.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator1)
         
         # Top frame (radio buttons + preview)
@@ -206,7 +208,9 @@ class SettingsPanel(QWidget):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator2)
         
         # Bottom frame for checkboxes and info
@@ -254,7 +258,9 @@ class SettingsPanel(QWidget):
         # File Protection Section
         separator_file_protection = QFrame()
         separator_file_protection.setFrameShape(QFrame.Shape.HLine)
-        separator_file_protection.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_file_protection.setFrameShadow(QFrame.Shadow.Plain)
+        separator_file_protection.setLineWidth(1)
+        separator_file_protection.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         bottom_frame.addWidget(separator_file_protection)
         
         file_protection_title = QLabel("🛡️  Critical File Protection")
@@ -299,7 +305,9 @@ class SettingsPanel(QWidget):
         # Process Scanning Interval Section
         separator_scanning = QFrame()
         separator_scanning.setFrameShape(QFrame.Shape.HLine)
-        separator_scanning.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_scanning.setFrameShadow(QFrame.Shadow.Plain)
+        separator_scanning.setLineWidth(1)
+        separator_scanning.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         bottom_frame.addWidget(separator_scanning)
 
         scanning_title = QLabel("⚡ Process Scanning Interval")
@@ -323,7 +331,7 @@ class SettingsPanel(QWidget):
                 border: 1px solid #666666;
                 border-radius: 3px;
                 padding: 4px;
-                min-width: 80px;
+                min-width: 150px;
             }
             QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
                 background-color: #444444;
@@ -352,7 +360,9 @@ class SettingsPanel(QWidget):
         # Uninstall Cleanup
         separator3 = QFrame()
         separator3.setFrameShape(QFrame.Shape.HLine)
-        separator3.setFrameShadow(QFrame.Shadow.Sunken)
+        separator3.setFrameShadow(QFrame.Shadow.Plain)
+        separator3.setLineWidth(1)
+        separator3.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         bottom_frame.addWidget(separator3)
         
         # Recovery Codes Section

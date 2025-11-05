@@ -58,7 +58,9 @@ class EditApplicationDialog(QDialog):
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setFrameShadow(QFrame.Shadow.Plain)
+        separator.setLineWidth(1)
+        separator.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator)
         
         layout.addSpacing(10)
@@ -128,7 +130,9 @@ class EditApplicationDialog(QDialog):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator2)
         
         # Buttons

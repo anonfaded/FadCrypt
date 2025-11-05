@@ -810,7 +810,9 @@ class MainWindowBase(QMainWindow):
         # Vertical separator
         separator_v = QFrame()
         separator_v.setFrameShape(QFrame.Shape.VLine)
-        separator_v.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_v.setFrameShadow(QFrame.Shadow.Plain)
+        separator_v.setLineWidth(1)
+        separator_v.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 0px 10px; max-width: 1px; min-width: 1px;")
         content_layout.addWidget(separator_v)
         
         # Right side - with background flag image at bottom
@@ -838,7 +840,9 @@ class MainWindowBase(QMainWindow):
         # Horizontal Separator before footer
         separator_h = QFrame()
         separator_h.setFrameShape(QFrame.Shape.HLine)
-        separator_h.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_h.setFrameShadow(QFrame.Shadow.Plain)
+        separator_h.setLineWidth(1)
+        separator_h.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         main_layout.addWidget(separator_h)
         
         # Footer with logo, branding, GitHub link
@@ -1179,7 +1183,9 @@ class MainWindowBase(QMainWindow):
         # Separator
         separator1 = QFrame()
         separator1.setFrameShape(QFrame.Shape.HLine)
-        separator1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator1.setFrameShadow(QFrame.Shadow.Plain)
+        separator1.setLineWidth(1)
+        separator1.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         config_layout.addWidget(separator1)
         
         # Config text display
@@ -1220,7 +1226,9 @@ class MainWindowBase(QMainWindow):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         config_layout.addWidget(separator2)
         
         # File Locations Section

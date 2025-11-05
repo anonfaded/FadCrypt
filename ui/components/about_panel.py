@@ -306,6 +306,17 @@ class AboutPanel(QWidget):
         fadcam_layout.setSpacing(10)
         fadcam_layout.setContentsMargins(0, 0, 0, 0)
         
+        # FadCam icon (small)
+        fadcam_icon_path = self.resource_path('img/fadcam.png')
+        if os.path.exists(fadcam_icon_path):
+            fadcam_icon_label = QLabel()
+            fadcam_pixmap = QPixmap(fadcam_icon_path)
+            scaled_fadcam = fadcam_pixmap.scaled(40, 40, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            fadcam_icon_label.setPixmap(scaled_fadcam)
+            fadcam_icon_label.setCursor(Qt.CursorShape.PointingHandCursor)
+            fadcam_icon_label.mousePressEvent = lambda event: webbrowser.open("https://github.com/anonfaded/FadCam")
+            fadcam_layout.addWidget(fadcam_icon_label)
+        
         # FadCam title and description (compact)
         fadcam_info_layout = QVBoxLayout()
         fadcam_info_layout.setSpacing(2)

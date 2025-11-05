@@ -53,8 +53,9 @@ class FileProtectionAuthDialog(QDialog):
         # Separator
         separator1 = QFrame()
         separator1.setFrameShape(QFrame.Shape.HLine)
-        separator1.setFrameShadow(QFrame.Shadow.Sunken)
-        separator1.setStyleSheet("background-color: #444444;")
+        separator1.setFrameShadow(QFrame.Shadow.Plain)
+        separator1.setLineWidth(1)
+        separator1.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator1)
         
         # What will be protected
@@ -105,8 +106,9 @@ class FileProtectionAuthDialog(QDialog):
         # When unlocking
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
-        separator2.setStyleSheet("background-color: #444444;")
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator2)
         
         unlock_warning = QLabel(
