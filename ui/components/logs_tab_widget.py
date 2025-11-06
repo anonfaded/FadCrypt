@@ -4,11 +4,69 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLineEdit, QTextEdit, QLabel
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QTextCursor, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRegularExpression
+from PyQt6.QtGui import QTextCursor, QFont, QSyntaxHighlighter, QTextCharFormat, QColor
 import sys
 from io import StringIO
 from datetime import datetime
+
+
+class LogSyntaxHighlighter(QSyntaxHighlighter):
+    """Syntax highlighter for application logs"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # ERROR format - Red
+        error_format = QTextCharFormat()
+        error_format.setForeground(QColor("#ff6b6b"))  # Red
+        self.error_format = error_format
+        
+        # WARNING format - Yellow/Orange
+        warning_format = QTextCharFormat()
+        warning_format.setForeground(QColor("#ffd93d"))  # Yellow
+        self.warning_format = warning_format
+        
+        # SUCCESS format - Green
+        success_format = QTextCharFormat()
+        success_format.setForeground(QColor("#6bcf7f"))  # Green
+        self.success_format = success_format
+        
+        # DEBUG format - Cyan
+        debug_format = QTextCharFormat()
+        debug_format.setForeground(QColor("#4ecdc4"))  # Cyan
+        self.debug_format = debug_format
+        
+        # INFO format - Gray (default)
+        info_format = QTextCharFormat()
+        info_format.setForeground(QColor("#888888"))  # Gray
+        self.info_format = info_format
+        
+    def highlightBlock(self, text):
+        """Apply syntax highlighting based on log content type"""
+        # Error patterns: ❌, ERROR, FATAL, CRITICAL, Exception, Traceback
+        if any(pattern in text for pattern in ["❌", "ERROR", "FATAL", "CRITICAL", "Exception", "Traceback"]):
+            self.setFormat(0, len(text), self.error_format)
+            return
+        
+        # Warning patterns: ⚠️, WARNING, WARN, Warning
+        if any(pattern in text for pattern in ["⚠️", "WARNING", "WARN", "Warning"]):
+            self.setFormat(0, len(text), self.warning_format)
+            return
+        
+        # Success patterns: ✅, SUCCESS, Loaded, started, initialized, Unprotected, Recreated, Deleted
+        if any(pattern in text for pattern in ["✅", "SUCCESS", "Loaded", "started", "initialized", "Unprotected", "Recreated", "Deleted", "Created"]):
+            self.setFormat(0, len(text), self.success_format)
+            return
+        
+        # Debug patterns: [, DEBUG, TRACE
+        if any(pattern in text for pattern in ["[", "DEBUG", "TRACE"]):
+            self.setFormat(0, len(text), self.debug_format)
+            return
+        
+        # Default: Info (gray)
+        self.setFormat(0, len(text), self.info_format)
+
 
 
 class LogCapture:
@@ -179,7 +237,7 @@ class LogsTabWidget(QWidget):
         self.log_viewer.setStyleSheet("""
             QTextEdit {
                 background-color: #0a0a0a;
-                color: #00ff00;
+                color: #888888;
                 font-family: 'Courier New', Consolas, monospace;
                 font-size: 9pt;
                 border: none;
@@ -191,6 +249,9 @@ class LogsTabWidget(QWidget):
         font = QFont("Courier New", 9)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.log_viewer.setFont(font)
+        
+        # Apply log syntax highlighting
+        self.log_highlighter = LogSyntaxHighlighter(self.log_viewer.document())
         
         layout.addWidget(self.log_viewer)
         

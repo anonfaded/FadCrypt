@@ -83,6 +83,72 @@ class JsonSyntaxHighlighter(QSyntaxHighlighter):
             start = match.capturedStart() + text[match.capturedStart():].index('"')
             length = match.capturedEnd() - start
             self.setFormat(start, length, self.formats['string'])
+
+
+class LogSyntaxHighlighter(QSyntaxHighlighter):
+    """Syntax highlighter for application logs"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # Define formats for log elements
+        self.formats = {}
+        
+        # Log levels
+        error_format = QTextCharFormat()
+        error_format.setForeground(QColor("#ff6b6b"))  # Red
+        self.formats['error'] = error_format
+        
+        warning_format = QTextCharFormat()
+        warning_format.setForeground(QColor("#ffd93d"))  # Yellow
+        self.formats['warning'] = warning_format
+        
+        info_format = QTextCharFormat()
+        info_format.setForeground(QColor("#6bcf7f"))  # Green
+        self.formats['info'] = info_format
+        
+        debug_format = QTextCharFormat()
+        debug_format.setForeground(QColor("#4ecdc4"))  # Cyan
+        self.formats['debug'] = debug_format
+        
+        # Timestamps and paths (gray)
+        timestamp_format = QTextCharFormat()
+        timestamp_format.setForeground(QColor("#888888"))  # Gray
+        self.formats['timestamp'] = timestamp_format
+        
+    def highlightBlock(self, text):
+        """Apply syntax highlighting to a block of text"""
+        # Highlight log levels
+        error_pattern = QRegularExpression(r'\b(ERROR|FATAL|CRITICAL)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = error_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['error'])
+        
+        warning_pattern = QRegularExpression(r'\b(WARNING|WARN)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = warning_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['warning'])
+        
+        info_pattern = QRegularExpression(r'\b(INFO|INFORMATION)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = info_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['info'])
+        
+        debug_pattern = QRegularExpression(r'\b(DEBUG|TRACE)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = debug_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['debug'])
+        
+        # Highlight timestamps (HH:MM:SS or ISO format)
+        timestamp_pattern = QRegularExpression(r'\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}')
+        iterator = timestamp_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['timestamp'])
         
         # Highlight numbers
         number_pattern = QRegularExpression(r'\b\d+\.?\d*\b')
@@ -187,66 +253,6 @@ class MainWindowBase(QMainWindow):
         # SEAMLESS ENCRYPTION: Master password persists in encrypted_password.bin
         # At monitoring start, we auto-use cached password (from PasswordManager) - no new file needed
         print("[Startup] Encryption setup: Will use persistent master password (encrypted_password.bin) for seamless operation")
-        
-        # Ensure config files are NOT protected (they need UI access)
-        
-        config_files_to_unprotect = [
-            os.path.join(fadcrypt_folder, "apps_config.json"),
-            os.path.join(fadcrypt_folder, "monitoring_state.json"),
-        ]
-        
-        for config_file in config_files_to_unprotect:
-            if os.path.exists(config_file):
-                # Check if file is protected (HIDDEN+SYSTEM+READONLY)
-                try:
-                    attrs = ctypes.windll.kernel32.GetFileAttributesW(config_file)
-                    is_protected = bool(attrs & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
-                    
-                    if is_protected:
-                        print(f"⚠️  {os.path.basename(config_file)} is protected (attrs={attrs:08x})")
-                        
-                        # Try to unprotect it
-                        if hasattr(file_protection, 'unprotect_file'):
-                            success, error = file_protection.unprotect_file(config_file)
-                            if success:
-                                print(f"✅ Unprotected: {os.path.basename(config_file)}")
-                            else:
-                                # Unprotecting failed - need to force delete and recreate
-                                print(f"❌ Unprotect failed ({error}), force-recreating file...")
-                                
-                                # Try to read current content first
-                                content = None
-                                try:
-                                    with open(config_file, 'r') as f:
-                                        content = f.read()
-                                    print(f"📖 Saved content from protected file ({len(content)} bytes)")
-                                except Exception as e:
-                                    print(f"⚠️  Could not read protected file: {e}")
-                                
-                                # Force remove the protected file (run as admin via elevated service if needed)
-                                try:
-                                    # First try direct removal (may fail if file is truly locked)
-                                    os.remove(config_file)
-                                    print(f"🗑️  Deleted protected file: {os.path.basename(config_file)}")
-                                except PermissionError:
-                                    print(f"❌ Direct deletion failed (permissions), file may be locked by another process")
-                                    # Note: Elevated service approach removed - using ACL locking instead
-                                
-                                # Recreate the file if we have content
-                                if os.path.exists(config_file):
-                                    print(f"ℹ️  Protected file still exists, will retry on next startup")
-                                elif content is not None:
-                                    try:
-                                        with open(config_file, 'w') as f:
-                                            f.write(content)
-                                        print(f"✅ Recreated: {os.path.basename(config_file)}")
-                                    except Exception as e:
-                                        print(f"❌ Failed to recreate: {e}")
-                    else:
-                        print(f"✅ Config file is unprotected: {os.path.basename(config_file)}")
-                        
-                except Exception as e:
-                    print(f"⚠️  Error checking protection status: {e}")
         
         # Log important paths at startup
         print("\n📁 FadCrypt File Locations:")
