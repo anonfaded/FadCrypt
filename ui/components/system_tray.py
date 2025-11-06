@@ -16,6 +16,7 @@ class SystemTray(QObject):
     stop_monitoring_requested = pyqtSignal()
     snake_game_requested = pyqtSignal()
     stats_requested = pyqtSignal()
+    fadguide_requested = pyqtSignal()
     exit_requested = pyqtSignal()
     
     def __init__(self, resource_path_func, parent=None):
@@ -83,6 +84,11 @@ class SystemTray(QObject):
         self.stats_action = QAction('📊 Statistics & Activity', self)
         self.stats_action.triggered.connect(self.stats_requested.emit)
         menu.addAction(self.stats_action)
+        
+        # FadGuide action
+        fadguide_action = QAction('📖 FadGuide - CLI Reference', self)
+        fadguide_action.triggered.connect(self.fadguide_requested.emit)
+        menu.addAction(fadguide_action)
         
         menu.addSeparator()
         

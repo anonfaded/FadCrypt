@@ -291,55 +291,7 @@ class FileGridWidget(QWidget):
         self.type_filter.currentTextChanged.connect(self.filter_items)
         toolbar_layout.addWidget(self.type_filter)
         
-        # Select All button
-        select_all_btn = QPushButton("☑️  Select All")
-        select_all_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3366ff, stop:1 #0033cc);
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-size: 10pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #5588ff, stop:1 #0055ff);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #0033cc, stop:1 #001a99);
-            }
-        """)
-        select_all_btn.clicked.connect(self.select_all)
-        toolbar_layout.addWidget(select_all_btn)
-        
-        # Deselect All button
-        deselect_all_btn = QPushButton("❌ Deselect All")
-        deselect_all_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #666666, stop:1 #444444);
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
-                font-size: 10pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #777777, stop:1 #555555);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #555555, stop:1 #333333);
-            }
-        """)
-        deselect_all_btn.clicked.connect(self.deselect_all)
-        toolbar_layout.addWidget(deselect_all_btn)
+        toolbar_layout.addStretch()
         
         layout.addWidget(toolbar)
         
@@ -641,7 +593,7 @@ class FileGridWidget(QWidget):
         placeholder_layout.addWidget(msg_label)
         
         # Hint
-        hint_label = QLabel("Use 'Add File' or 'Add Folder' buttons below to start protecting")
+        hint_label = QLabel("Use CLI to manage protected files. See FadGuide for commands.")
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint_label.setStyleSheet("""
             color: #666666;
