@@ -4029,7 +4029,17 @@ class MainWindowBase(QMainWindow):
             traceback.print_exc()
     
     def open_fadguide(self):
-        """Open FadGuide help window with CLI command instructions"""
+        """Open FadGuide help window with CLI command instructions (password-protected)"""
+        # Require password to open FadGuide
+        if not self.verify_password_with_recovery(
+            "FadGuide Access",
+            "Enter your password to access FadGuide:"
+        ):
+            print("[FadGuide] Access denied - password verification failed")
+            return
+        
+        print("[FadGuide] Password verified - opening FadGuide window")
+        
         try:
             import platform
             import os

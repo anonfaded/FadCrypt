@@ -1276,19 +1276,23 @@ class AppScannerDialog(QDialog):
         self.clear_search_btn.clicked.connect(self.clear_search)
         self.clear_search_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #64748b, stop:1 #334155);
                 color: #e5e7eb;
-                border: 1px solid #44464f;
+                border: none;
                 padding: 8px 12px;
                 border-radius: 6px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 80px;
             }
             QPushButton:hover {
-                background-color: #3b3f46;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #94a3b8, stop:1 #475569);
             }
             QPushButton:pressed {
-                background-color: #32353a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #334155, stop:1 #1e293b);
             }
         """)
         search_layout.addWidget(self.clear_search_btn)
@@ -1503,20 +1507,24 @@ class AppScannerDialog(QDialog):
         self.select_all_btn.clicked.connect(self.select_all)
         self.select_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #3b82f6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3b82f6, stop:1 #1d4ed8);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 90px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #2563eb;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #60a5fa, stop:1 #2563eb);
             }
             QPushButton:pressed {
-                background-color: #1d4ed8;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1d4ed8, stop:1 #1e40af);
             }
         """)
         button_layout.addWidget(self.select_all_btn)
@@ -1525,20 +1533,24 @@ class AppScannerDialog(QDialog):
         self.deselect_all_btn.clicked.connect(self.deselect_all)
         self.deselect_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #6b7280;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6b7280, stop:1 #374151);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 100px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #4b5563;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9ca3af, stop:1 #4b5563);
             }
             QPushButton:pressed {
-                background-color: #374151;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1f2937);
             }
         """)
         button_layout.addWidget(self.deselect_all_btn)
@@ -1550,20 +1562,24 @@ class AppScannerDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc2626;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #dc2626, stop:1 #991b1b);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 90px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #b91c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ef4444, stop:1 #b91c1c);
             }
             QPushButton:pressed {
-                background-color: #991b1b;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #991b1b, stop:1 #7f1d1d);
             }
         """)
         button_layout.addWidget(cancel_btn)
@@ -1575,7 +1591,8 @@ class AppScannerDialog(QDialog):
         self.add_btn.setDefault(True)
         self.add_btn.setStyleSheet("""
             QPushButton {
-                background-color: #009E60;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #009E60, stop:1 #005c3d);
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -1585,14 +1602,17 @@ class AppScannerDialog(QDialog):
                 min-width: 120px;
                 min-height: 32px;
             }
-            QPushButton:hover {
-                background-color: #00b56f;
+            QPushButton:hover:enabled {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00b56f, stop:1 #008852);
             }
-            QPushButton:pressed {
-                background-color: #008852;
+            QPushButton:pressed:enabled {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #005c3d, stop:1 #003d28);
             }
             QPushButton:disabled {
-                background-color: #d1d5db;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #d1d5db, stop:1 #9ca3af);
                 color: #9ca3af;
             }
         """)
