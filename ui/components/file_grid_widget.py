@@ -16,12 +16,11 @@ class FileCard(QFrame):
     double_clicked = pyqtSignal(str)  # path
     context_menu_requested = pyqtSignal(str, object)  # path, position
     
-    def __init__(self, item_name, item_path, item_type="file", unlock_count=0, date_added=None, parent=None):
+    def __init__(self, item_name, item_path, item_type="file", date_added=None, parent=None):
         super().__init__(parent)
         self.item_name = item_name
         self.item_path = item_path
         self.item_type = item_type  # "file" or "folder"
-        self.unlock_count = unlock_count
         self.date_added = date_added
         self.is_selected = False
         
@@ -149,16 +148,6 @@ class FileCard(QFrame):
         """)
         layout.addWidget(type_label)
         
-        # Unlock count (new metadata)
-        unlock_label = QLabel(f"🔓 Unlocked {self.unlock_count}x")
-        unlock_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        unlock_label.setStyleSheet("""
-            color: #888888;
-            font-size: 8pt;
-            background-color: transparent;
-        """)
-        layout.addWidget(unlock_label)
-        
         self.setLayout(layout)
     
     def mousePressEvent(self, event: QMouseEvent):
@@ -174,45 +163,14 @@ class FileCard(QFrame):
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self.item_path)
         super().mouseDoubleClickEvent(event)
-    
-    def set_selected(self, selected: bool):
-        """Set selected state"""
-        self.is_selected = selected
-        if selected:
-            self.setStyleSheet("""
-                FileCard {
-                    background-color: #3a3a3a;
-                    border: 2px solid #d32f2f;
-                    border-radius: 10px;
-                    padding: 12px;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                FileCard {
-                    background-color: #2a2a2a;
-                    border: 2px solid #444444;
-                    border-radius: 10px;
-                    padding: 12px;
-                }
-                FileCard:hover {
-                    border: 2px solid #d32f2f;
-                    background-color: #333333;
-                }
-            """)
 
 
 class FileGridWidget(QWidget):
-    """Grid widget for displaying locked files and folders"""
-    
-    item_selected = pyqtSignal(str)  # path
-    item_double_clicked = pyqtSignal(str)  # path
+    """Grid widget for displaying locked files and folders (read-only display)"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.cards = {}  # path -> FileCard
-        self.selected_paths = []  # Multiple selection support
-        self.selected_path = None  # Backwards compatibility
+        self.cards = {}  # path -> FileCard (read-only display)
         self.all_items = []  # Store all items for search filtering
         self.current_columns = 4  # Track current column count for responsive resize
         self.init_ui()
@@ -229,25 +187,51 @@ class FileGridWidget(QWidget):
         # Only rebuild grid if column count changed
         if new_columns != self.current_columns:
             self.current_columns = new_columns
-            self._rebuild_grid()
+            self._refresh_grid_layout()
+    
+    def _refresh_grid_layout(self):
+        """Refresh grid layout with current column count"""
+        if not self.cards:
+            return
+        
+        try:
+            # Remove all cards from layout
+            for i in reversed(range(self.grid_layout.count())):
+                item = self.grid_layout.itemAt(i)
+                if item and item.widget() and item.widget() != self.placeholder_container:
+                    self.grid_layout.removeWidget(item.widget())
+            
+            # Re-add cards in responsive grid with new column count
+            for idx, (path, card) in enumerate(self.cards.items()):
+                row = idx // self.current_columns
+                col = idx % self.current_columns
+                self.grid_layout.addWidget(card, row, col)
+            
+            # Ensure placeholder container is properly positioned
+            self.grid_layout.removeWidget(self.placeholder_container)
+            self.grid_layout.addWidget(self.placeholder_container, 0, 0, 1, self.current_columns)
+        except Exception as e:
+            print(f"[FileGrid] Error in _refresh_grid_layout: {e}")
+            import traceback
+            traceback.print_exc()
     
     def init_ui(self):
-        """Initialize UI"""
-        from PyQt6.QtWidgets import QLineEdit, QPushButton, QComboBox
+        """Initialize UI - read-only display with search only"""
+        from PyQt6.QtWidgets import QLineEdit
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)  # Reduced from 10 to 5
+        layout.setSpacing(5)
         
-        # Toolbar with search and buttons
-        toolbar = QWidget()
-        toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(10, 5, 10, 5)  # Reduced vertical padding
-        toolbar.setStyleSheet("background-color: #1a1a1a;")
+        # Simple search bar (no type filter)
+        search_container = QWidget()
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(10, 5, 10, 5)
+        search_container.setStyleSheet("background-color: #1a1a1a;")
         
-        # Search bar
+        # Search bar only
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Search files and folders...")
+        self.search_input.setPlaceholderText("🔍 Search locked files and folders...")
         self.search_input.setStyleSheet("""
             QLineEdit {
                 background-color: #2a2a2a;
@@ -262,38 +246,9 @@ class FileGridWidget(QWidget):
             }
         """)
         self.search_input.textChanged.connect(self.filter_items)
-        toolbar_layout.addWidget(self.search_input, stretch=2)
+        search_layout.addWidget(self.search_input)
         
-        # Filter dropdown (Files/Folders/All)
-        self.type_filter = QComboBox()
-        self.type_filter.addItems(["All Items", "Files Only", "Folders Only"])
-        self.type_filter.setStyleSheet("""
-            QComboBox {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: 2px solid #444444;
-                border-radius: 8px;
-                padding: 6px 12px;
-                font-size: 10pt;
-            }
-            QComboBox:hover {
-                border: 2px solid #d32f2f;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                selection-background-color: #d32f2f;
-            }
-        """)
-        self.type_filter.currentTextChanged.connect(self.filter_items)
-        toolbar_layout.addWidget(self.type_filter)
-        
-        toolbar_layout.addStretch()
-        
-        layout.addWidget(toolbar)
+        layout.addWidget(search_container)
         
         # Scroll area
         scroll = QScrollArea()
@@ -348,138 +303,85 @@ class FileGridWidget(QWidget):
         scroll.setWidget(self.grid_container)
         layout.addWidget(scroll)
     
-    def add_item(self, item_path: str, item_type: str, unlock_count=0, date_added=None):
-        """Add file or folder to grid"""
-        if item_path in self.cards:
-            return
-        
-        item_name = os.path.basename(item_path) or item_path
-        
-        card = FileCard(item_name, item_path, item_type, unlock_count, date_added)
-        card.clicked.connect(self.on_card_clicked)
-        card.double_clicked.connect(self.on_card_double_clicked)
-        card.context_menu_requested.connect(self.on_context_menu)
-        
-        # Calculate grid position using current column count
-        num_cards = len(self.cards)
-        row = num_cards // self.current_columns
-        col = num_cards % self.current_columns
-        
-        self.grid_layout.addWidget(card, row, col)
-        self.cards[item_path] = card
-        
-        # Store in all_items for filtering
-        self.all_items.append({
-            'path': item_path,
-            'type': item_type,
-            'unlock_count': unlock_count,
-            'date_added': date_added
-        })
-        
-        # Update placeholder visibility
-        self._update_placeholder_visibility()
-    
-    def remove_item(self, item_path: str, defer_refresh=False):
-        """Remove file or folder from grid
+    def display_items(self, items: list):
+        """Display read-only items from config (CLI-managed files only)
         
         Args:
-            item_path: Path of the item to remove
-            defer_refresh: If True, skip grid refresh (for bulk operations)
+            items: List of item dicts with 'path', 'type', 'added_at'
         """
-        if item_path not in self.cards:
-            return
-        
-        card = self.cards[item_path]
-        self.grid_layout.removeWidget(card)
-        card.deleteLater()
-        del self.cards[item_path]
-        
-        # Remove from all_items
-        self.all_items = [item for item in self.all_items if item['path'] != item_path]
-        
-        # Remove from selected paths
-        if item_path in self.selected_paths:
-            self.selected_paths.remove(item_path)
-        if self.selected_path == item_path:
-            self.selected_path = None
-        
-        # Only refresh if not deferred (optimization for bulk removes)
-        if not defer_refresh:
-            self.refresh_grid()
-        
-        # Update placeholder visibility
-        self._update_placeholder_visibility()
-    
-    def refresh_grid(self):
-        """Refresh grid layout with current column count"""
-        # Remove all widgets except placeholder container
-        for i in reversed(range(self.grid_layout.count())):
-            item = self.grid_layout.itemAt(i)
-            if item:
-                widget = item.widget()
-                if widget and widget != self.placeholder_container:
-                    self.grid_layout.removeWidget(widget)
-        
-        # Re-add cards in responsive grid
-        for idx, (path, card) in enumerate(self.cards.items()):
-            row = idx // self.current_columns
-            col = idx % self.current_columns
-            self.grid_layout.addWidget(card, row, col)
-        
-        # Re-add placeholder container spanning all columns
-        self.grid_layout.removeWidget(self.placeholder_container)
-        self.grid_layout.addWidget(self.placeholder_container, 0, 0, 1, self.current_columns)
-    
-    def _rebuild_grid(self):
-        """Rebuild grid when column count changes (responsive behavior)"""
-        if not self.cards:
-            return
-        self.refresh_grid()
-    
-    def clear(self):
-        """Clear all items"""
-        for card in self.cards.values():
-            card.deleteLater()
-        self.cards.clear()
-        self.all_items.clear()
-        self.selected_paths.clear()
-        self.selected_path = None
-        self._update_placeholder_visibility()
-    
-    def get_selected_path(self) -> str:
-        """Get currently selected path (single selection for backwards compatibility)"""
-        return self.selected_path
-    
-    def get_selected_paths(self) -> list:
-        """Get all selected paths (multi-selection)"""
-        return self.selected_paths.copy()
+        try:
+            print(f"[FileGrid] display_items called with {len(items)} items")
+            
+            # Clear existing cards
+            for path, card in list(self.cards.items()):
+                try:
+                    self.grid_layout.removeWidget(card)
+                    card.deleteLater()
+                except Exception as e:
+                    print(f"[FileGrid] Error removing card {path}: {e}")
+            self.cards.clear()
+            self.all_items.clear()
+            print(f"[FileGrid] Cleared {len(self.cards)} old cards")
+            
+            # Display each item as read-only card
+            for i, item in enumerate(items):
+                try:
+                    item_path = item.get('path')
+                    item_type = item.get('type', 'file')
+                    date_added = item.get('added_at')
+                    
+                    if not item_path:
+                        print(f"[FileGrid] Skipping item {i}: no path")
+                        continue
+                    
+                    item_name = os.path.basename(item_path) or item_path
+                    
+                    card = FileCard(item_name, item_path, item_type, date_added)
+                    card.clicked.connect(self.on_card_clicked)
+                    card.double_clicked.connect(self.on_card_double_clicked)
+                    card.context_menu_requested.connect(self.on_context_menu)
+                    
+                    # Calculate grid position using current column count
+                    num_cards = len(self.cards)
+                    row = num_cards // self.current_columns
+                    col = num_cards % self.current_columns
+                    
+                    self.grid_layout.addWidget(card, row, col)
+                    self.cards[item_path] = card
+                    
+                    # Store for filtering
+                    self.all_items.append({
+                        'path': item_path,
+                        'type': item_type,
+                        'added_at': date_added
+                    })
+                    print(f"[FileGrid] Added card {i}: {item_name}")
+                except Exception as e:
+                    print(f"[FileGrid] Error adding item {i}: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            print(f"[FileGrid] display_items completed: {len(self.cards)} cards displayed")
+            
+            # Update placeholder visibility
+            self._update_placeholder_visibility()
+        except Exception as e:
+            print(f"[FileGrid] ERROR in display_items: {e}")
+            import traceback
+            traceback.print_exc()
     
     def on_card_clicked(self, path: str):
-        """Handle card click - supports multi-selection"""
-        # Multi-select: clicking adds to selection, doesn't clear others
-        if path in self.selected_paths:
-            # Already selected - deselect it
-            self.selected_paths.remove(path)
-            if path in self.cards:
-                self.cards[path].set_selected(False)
-            if self.selected_path == path:
-                self.selected_path = self.selected_paths[0] if self.selected_paths else None
-        else:
-            # Not selected - add to selection
-            self.selected_paths.append(path)
-            if path in self.cards:
-                self.cards[path].set_selected(True)
-            self.selected_path = path  # Update single selection for backwards compat
-        
-        self.item_selected.emit(path)
-        print(f"Selected: {len(self.selected_paths)} items")
+        """Handle card click - read-only display, no selection"""
+        # Just print for debugging, no selection logic
+        print(f"[FileGrid] Card clicked (read-only): {os.path.basename(path)}")
     
     def on_card_double_clicked(self, path: str):
-        """Handle card double click"""
-        self.item_double_clicked.emit(path)
+        """Handle card double click - read-only display"""
+        # Just print for debugging, no action
+        print(f"[FileGrid] Card double-clicked (read-only): {os.path.basename(path)}")
     
     def on_context_menu(self, path: str, position):
-        """Show context menu"""
+        """Show context menu - only "Open Location" option"""
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
@@ -492,14 +394,12 @@ class FileGridWidget(QWidget):
             }
         """)
         
-        remove_action = menu.addAction("🗑️  Remove")
-        open_location_action = menu.addAction("📁 Open Location")
+        # Only option: open location (no remove/selection options)
+        open_location_action = menu.addAction("📁 Open File Location")
         
         action = menu.exec(position)
         
-        if action == remove_action:
-            self.remove_item(path)
-        elif action == open_location_action:
+        if action == open_location_action:
             self.open_file_location(path)
     
     def open_file_location(self, path: str):
@@ -514,57 +414,33 @@ class FileGridWidget(QWidget):
                 subprocess.Popen(['xdg-open', parent])
             elif platform.system() == "Windows":
                 subprocess.Popen(['explorer', '/select,', path])
+            print(f"[FileGrid] Opened location: {path}")
         except Exception as e:
-            print(f"Error opening location: {e}")
-    
-    def select_all(self):
-        """Select all cards"""
-        for path, card in self.cards.items():
-            card.set_selected(True)
-            if path not in self.selected_paths:
-                self.selected_paths.append(path)
-        print(f"Selected {len(self.selected_paths)} items")
-    
-    def deselect_all(self):
-        """Deselect all cards"""
-        for card in self.cards.values():
-            card.set_selected(False)
-        self.selected_paths.clear()
-        self.selected_path = None
-        print("Deselected all items")
+            print(f"[FileGrid] Error opening location: {e}")
     
     def filter_items(self, text: str = None):
-        """Filter displayed items by search text and type filter"""
+        """Filter displayed items by search text"""
         search_term = self.search_input.text().lower().strip()
-        filter_type = self.type_filter.currentText()
         
-        # Filter cards by both search and type
+        # Filter cards by search
         visible_count = 0
         for path, card in self.cards.items():
             # Check search match
             item_name = os.path.basename(path).lower()
-            name_match = (not search_term) or (search_term in item_name)
+            name_match = (not search_term) or (search_term in item_name) or (search_term in path.lower())
             
-            # Check type match - use card's stored type, not filesystem
-            if filter_type == "Files Only":
-                type_match = card.item_type == "file"
-            elif filter_type == "Folders Only":
-                type_match = card.item_type == "folder"
-            else:  # "All Items"
-                type_match = True
-            
-            # Show card only if both conditions match
-            if name_match and type_match:
+            # Show card only if it matches search
+            if name_match:
                 card.show()
                 visible_count += 1
             else:
                 card.hide()
         
         # Show placeholder if no results
-        has_active_filter = (search_term != "" or filter_type != "All Items")
-        self._update_placeholder_visibility(visible_count == 0 and has_active_filter)
+        has_active_search = search_term != ""
+        self._update_placeholder_visibility(visible_count == 0 and has_active_search)
         
-        print(f"Filtered: {visible_count} items (search: '{search_term}', type: {filter_type})")
+        print(f"[FileGrid] Filtered: {visible_count} items (search: '{search_term}')")
     
     def _create_placeholder(self) -> QWidget:
         """Create placeholder widget shown when no items"""

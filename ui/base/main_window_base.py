@@ -1973,28 +1973,35 @@ class MainWindowBase(QMainWindow):
         pass
     
     def load_locked_files(self):
-        """Load locked files/folders from config and display in grid"""
+        """Load locked files/folders from config and display in grid (read-only display)"""
         if not self.file_lock_manager:
+            print("[UI] file_lock_manager is None, skipping load_locked_files")
             return
         
-        # CRITICAL: Reload from file first to get fresh data
-        self.file_lock_manager._load_locked_items()
+        if not hasattr(self, 'file_grid_widget'):
+            print("[UI] file_grid_widget not initialized yet, skipping load_locked_files")
+            return
         
-        self.file_grid_widget.clear()
-        items = self.file_lock_manager.get_locked_items()
-        
-        for item in items:
-            self.file_grid_widget.add_item(
-                item['path'],
-                item['type'],
-                item.get('unlock_count', 0),  # Pass unlock_count as 3rd param
-                item.get('added_at')          # Pass added_at as 4th param
-            )
-        
-        # Update count label
-        if hasattr(self, 'files_count_label'):
-            count = len(items)
-            self.files_count_label.setText(f"Protected Files: {count}")
+        try:
+            # CRITICAL: Reload from file first to get fresh data
+            self.file_lock_manager._load_locked_items()
+            
+            items = self.file_lock_manager.get_locked_items()
+            print(f"[UI] Loaded {len(items)} locked items from file_lock_manager")
+            
+            # Display items in read-only grid (CLI-managed, not GUI-managed)
+            self.file_grid_widget.display_items(items)
+            print(f"[UI] Displayed {len(items)} items in file_grid_widget")
+            
+            # Update count label
+            if hasattr(self, 'files_count_label'):
+                count = len(items)
+                self.files_count_label.setText(f"Protected Files: {count}")
+        except Exception as e:
+            print(f"[UI] ERROR in load_locked_files: {e}")
+            import traceback
+            traceback.print_exc()
+
     
     def save_locked_files_config(self):
         """Save locked files/folders config while preserving applications - DO NOT reload from file"""
@@ -2461,7 +2468,7 @@ class MainWindowBase(QMainWindow):
     
     def on_start_monitoring(self):
         """Handle start monitoring button click - monitors applications only"""
-        # Check if password is set
+        # Check if password is set (overall security requirement)
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         if not os.path.exists(password_file):
             self.show_message(
@@ -2470,53 +2477,6 @@ class MainWindowBase(QMainWindow):
                 "info"
             )
             return
-
-        # CRITICAL: If encryption is enabled, password MUST be cached/available
-        # This ensures seamless encryption without prompts
-        config_file = os.path.join(self.get_fadcrypt_folder(), "apps_config.json")
-        try:
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    import json
-                    config = json.load(f)
-                    dangerous_ops = config.get("dangerous_operations", {})
-                    encryption_enabled = dangerous_ops.get("encryption", False)
-                    
-                    if encryption_enabled:
-                        # SEAMLESS ENCRYPTION: Get cached password
-                        # If not cached yet, prompt user ONCE
-                        cached_pwd = self.password_manager.get_password_bytes()
-                        if not cached_pwd:
-                            print("[Monitoring] Encryption enabled but password not cached - prompting for verification")
-                            from ui.dialogs.password_dialog import ask_password
-                            pwd, accepted = ask_password(
-                                "Encryption Enabled",
-                                "Encryption is enabled. Enter your password:",
-                                self.resource_path,
-                                style=self.password_dialog_style,
-                                wallpaper=self.wallpaper_choice,
-                                parent=self
-                            )
-                            if accepted and pwd:
-                                # Verify the password (this will cache it if correct)
-                                if self.password_manager.verify_password(pwd):
-                                    cached_pwd = self.password_manager.get_password_bytes()
-                                    print("✅ [Monitoring] Password verified and cached for encryption")
-                                else:
-                                    print("❌ [Monitoring] Password verification failed")
-                                    self.show_message("Invalid Password", "The password you entered is incorrect.", "error")
-                                    return
-                            else:
-                                print("[Monitoring] User cancelled password entry - cannot start monitoring with encryption enabled")
-                                self.show_message("Password Required", "Password is required to start monitoring with encryption enabled.", "error")
-                                return
-                        
-                        if cached_pwd:
-                            # Password available - use for encryption seamlessly
-                            self.file_lock_manager.set_password(cached_pwd)
-                            print("[Monitoring] ✅ Encryption enabled - using master password")
-        except Exception as e:
-            print(f"[Monitoring] Warning: Could not check encryption setting: {e}")
 
         # Check if any apps are added (file/folder management is CLI-only, not monitored in UI)
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
@@ -2904,11 +2864,6 @@ class MainWindowBase(QMainWindow):
                     self.set_monitoring_state('unlocked_files', unlocked_files)
                     print(f"📝 Added {filename} to unlocked files state")
                 
-                # Increment unlock count for tracking
-                if self.file_lock_manager:
-                    self.file_lock_manager.increment_unlock_count(abs_path)
-                    print(f"📊 Incremented unlock count for {filename}")
-                
                 # Log successful unlock activity
                 item_type = 'folder' if is_dir else 'file'
                 self.log_activity(
@@ -2996,10 +2951,6 @@ class MainWindowBase(QMainWindow):
                 if abs_path not in unlocked_files:
                     unlocked_files.append(abs_path)
                     self.set_monitoring_state('unlocked_files', unlocked_files)
-                
-                # Increment unlock count
-                if self.file_lock_manager:
-                    self.file_lock_manager.increment_unlock_count(abs_path)
                 
                 # Log activity
                 item_type = 'folder' if os.path.isdir(file_path) else 'file'
