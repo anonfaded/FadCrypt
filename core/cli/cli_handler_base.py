@@ -7,6 +7,9 @@ Abstract base class for platform-specific lock/unlock operations.
 from abc import ABC, abstractmethod
 from typing import List, Dict, Tuple, Optional
 import os
+import json
+import curses
+import platform
 from core.verbose_logger import vlog
 
 
@@ -150,309 +153,368 @@ class CLIHandlerBase(ABC):
         estimated_time = self._calculate_encryption_time(size_bytes)
         file_count, folder_count = self._count_items(path)
         
-        # Use curses for beautiful menu-style confirmation (always show)
-        import curses
-        def show_confirmation_menu(stdscr):
-            from .colors import Colors
-            
-            # Setup curses
-            curses.start_color()
-            try:
-                curses.use_default_colors()
-            except:
-                pass
-            
-            # Initialize colors matching TUI theme
-            curses.init_pair(1, curses.COLOR_RED, -1)                  # Red border
-            curses.init_pair(2, curses.COLOR_WHITE, -1)                # White text
-            curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_RED)  # White on red (selected)
-            curses.init_pair(4, curses.COLOR_YELLOW, -1)               # Yellow warning
-            curses.init_pair(5, curses.COLOR_GREEN, -1)                # Green success
-            curses.init_pair(6, curses.COLOR_CYAN, -1)                 # Cyan info
-            
-            stdscr.clear()
-            height, width = stdscr.getmaxyx()
-            
-            # Calculate centered box position
-            box_width = 75
-            box_height = 28
-            box_start_x = max(0, (width - box_width) // 2)
-            box_start_y = max(0, (height - box_height) // 2)
-            
-            cursor_pos = 0
-            options = [("✓ Lock This Item", True), ("✗ Cancel - Don't Lock", False)]
-            
-            while True:
-                stdscr.clear()
-                
-                # Draw red bordered box
-                try:
-                    # Top border
-                    stdscr.addstr(box_start_y, box_start_x, "┌" + "─" * (box_width - 2) + "┐", curses.color_pair(1) | curses.A_BOLD)
-                    
-                    # Content lines
-                    line_y = box_start_y + 1
-                    
-                    # Title
-                    if is_large:
-                        title = "📦 Large File Detected - Lock Confirmation"
-                    else:
-                        title = "🔒 Lock Confirmation"
-                    stdscr.addstr(line_y, box_start_x + 2, title, curses.color_pair(4) | curses.A_BOLD)
-                    line_y += 2
-                    
-                    # Size info
-                    size_info = f"Data Size: {size_mb:.1f} MB"
-                    stdscr.addstr(line_y, box_start_x + 4, size_info, curses.color_pair(6))
-                    line_y += 1
-                    
-                    # Item counts
-                    if file_count == 1 and folder_count == 1:
-                        # Single file
-                        items_info = "Items: 1 file"
-                    elif file_count > 1 and folder_count == 1:
-                        # Single folder with multiple files
-                        items_info = f"Items: {file_count} files in 1 folder"
-                    else:
-                        # Multiple folders
-                        items_info = f"Items: {file_count} files, {folder_count} folders"
-                    
-                    stdscr.addstr(line_y, box_start_x + 4, items_info, curses.color_pair(6))
-                    line_y += 1
-                    
-                    # Time estimate
-                    time_info = f"Est. Encryption Time: ~{estimated_time:.0f} seconds"
-                    stdscr.addstr(line_y, box_start_x + 4, time_info, curses.color_pair(6))
-                    line_y += 2
-                    
-                    # Separator
-                    stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
-                    line_y += 1
-                    
-                    # Warning: Tamper-Proof
-                    stdscr.addstr(line_y, box_start_x + 2, "⚠️  TAMPER-PROOF ENCRYPTION:", curses.color_pair(4) | curses.A_BOLD)
-                    line_y += 1
-                    
-                    warning1 = "Once locked, this file CANNOT be:"
-                    stdscr.addstr(line_y, box_start_x + 4, warning1[:box_width-6], curses.color_pair(6))
-                    line_y += 1
-                    
-                    warning2 = "• Copied  • Moved  • Edited  • Deleted"
-                    stdscr.addstr(line_y, box_start_x + 4, warning2[:box_width-6], curses.color_pair(2))
-                    line_y += 1
-                    
-                    guide_hint = "Press G to see how to disable this behavior →"
-                    stdscr.addstr(line_y, box_start_x + 4, guide_hint[:box_width-6], curses.color_pair(4))
-                    line_y += 2
-                    
-                    # Recommendations (always show)
-                    stdscr.addstr(line_y, box_start_x + 2, "💡 Recommendations:", curses.color_pair(5) | curses.A_BOLD)
-                    line_y += 1
-                    
-                    rec1 = "• Optimal: Lock files ≤500 MB for faster processing"
-                    stdscr.addstr(line_y, box_start_x + 4, rec1[:box_width-6], curses.color_pair(2))
-                    line_y += 1
-                    
-                    rec2 = "• Split at OUTER level: lock separate folders"
-                    stdscr.addstr(line_y, box_start_x + 4, rec2[:box_width-6], curses.color_pair(2))
-                    line_y += 1
-                    
-                    rec3 = "  NOT inside the folder (still makes it large)"
-                    stdscr.addstr(line_y, box_start_x + 4, rec3[:box_width-6], curses.color_pair(2))
-                    line_y += 1
-                    
-                    msg1 = "💬 Faded says: You can skip splitting if you want—"
-                    stdscr.addstr(line_y, box_start_x + 4, msg1[:box_width-6], curses.color_pair(5))
-                    line_y += 1
-                    
-                    msg2 = "   let FadCrypt encrypt tons of files in one folder,"
-                    stdscr.addstr(line_y, box_start_x + 4, msg2[:box_width-6], curses.color_pair(5))
-                    line_y += 1
-                    
-                    msg3 = "   just expect slow encryption and a boring wait! 😴"
-                    stdscr.addstr(line_y, box_start_x + 4, msg3[:box_width-6], curses.color_pair(5))
-                    line_y += 1
-                    
-                    # Separator
-                    stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
-                    line_y += 1
-                    
-                    # Options
-                    for idx, (text, _) in enumerate(options):
-                        if idx == cursor_pos:
-                            # Highlighted option - fill entire row with red background
-                            prefix = "► "
-                            option_text = prefix + text
-                            # Fill entire row width with the color
-                            padding = box_width - 4 - len(option_text)
-                            full_text = option_text + " " * padding
-                            stdscr.addstr(line_y, box_start_x + 2, full_text, curses.color_pair(3) | curses.A_BOLD)
-                        else:
-                            prefix = "  "
-                            stdscr.addstr(line_y, box_start_x + 2, prefix + text, curses.color_pair(2))
-                        line_y += 1
-                    
-                    # Bottom border
-                    stdscr.addstr(box_start_y + box_height - 1, box_start_x, "└" + "─" * (box_width - 2) + "┘", curses.color_pair(1) | curses.A_BOLD)
-                    
-                    # Instructions at bottom
-                    instr = "Use ↑↓ Arrow Keys or Y/N | Press ENTER to Confirm"
-                    if height > box_start_y + box_height + 2:
-                        stdscr.addstr(box_start_y + box_height + 2, max(0, (width - len(instr)) // 2), instr, curses.color_pair(1))
-                    
-                except curses.error:
-                    pass  # Silently handle drawing errors
-                
-                stdscr.refresh()
-                
-                # Handle input
-                try:
-                    ch = stdscr.getch()
-                    if ch == curses.KEY_UP:
-                        cursor_pos = (cursor_pos - 1) % len(options)
-                    elif ch == curses.KEY_DOWN:
-                        cursor_pos = (cursor_pos + 1) % len(options)
-                    elif ch == ord('y') or ch == ord('Y'):
-                        return True
-                    elif ch == ord('n') or ch == ord('N'):
-                        return False
-                    elif ch == ord('\n') or ch == ord('\r'):
-                        return options[cursor_pos][1]
-                    elif ch == ord('q') or ch == 27:  # q or ESC
-                        return False
-                    elif ch == ord('g') or ch == ord('G'):
-                        # Show tamper-proof guide (call it directly, we're already in curses)
-                        show_guide_screen(stdscr, height, width)
-                        # Don't return, continue the menu loop
-                except:
-                    pass
-        
-        def show_guide_screen(stdscr, height, width):
-            """Display guide about tamper-proof options and --0/--1 flags with cursor menu."""
-            # Menu options at bottom
-            options = [("← Back to Lock Confirmation", False)]
-            cursor_pos = 0
-            
-            while True:
-                stdscr.clear()
-                
-                # Guide box
-                box_width = min(75, width - 4)
-                box_height = min(30, height - 6)
-                box_start_x = max(0, (width - box_width) // 2)
-                box_start_y = max(0, 1)
-                
-                try:
-                    # Top border
-                    stdscr.addstr(box_start_y, box_start_x, "┌" + "─" * (box_width - 2) + "┐", curses.color_pair(1) | curses.A_BOLD)
-                    
-                    line_y = box_start_y + 1
-                    
-                    # Title
-                    title = "🔐 TAMPER-PROOF OPTIONS GUIDE"
-                    title_x = box_start_x + max(2, (box_width - len(title)) // 2)
-                    stdscr.addstr(line_y, title_x, title, curses.color_pair(5) | curses.A_BOLD)
-                    line_y += 2
-                    
-                    # Content lines
-                    lines = [
-                        ("TAMPER-PROOF: Like a Switch (OFF=0, ON=1)", curses.color_pair(4) | curses.A_BOLD),
-                        ("By default, FadCrypt locks files with FULL", curses.color_pair(2)),
-                        ("tamper-proof protection (ON). Encrypted files", curses.color_pair(2)),
-                        ("CANNOT be copied, moved, edited, or deleted.", curses.color_pair(2)),
-                        ("", curses.color_pair(2)),
-                        ("TURN OFF (--0 or --off):", curses.color_pair(4) | curses.A_BOLD),
-                        ("Disable tamper-proof protections from encrypted files.", curses.color_pair(2)),
-                        ("Files become MOVEABLE, COPYABLE, & DELETABLE.", curses.color_pair(2)),
-                        ("Examples: fadcrypt --0 file.txt  OR  fadcrypt --off file.txt", curses.color_pair(6)),
-                        ("", curses.color_pair(2)),
-                        ("TURN ON (--1 or --on):", curses.color_pair(4) | curses.A_BOLD),
-                        ("Re-enable full tamper-proof protections.", curses.color_pair(2)),
-                        ("Returns file to fully protected state.", curses.color_pair(2)),
-                        ("Examples: fadcrypt --1 TestFolder  OR  fadcrypt --on TestFolder", curses.color_pair(6)),
-                    ]
-                    
-                    for text, attr in lines:
-                        if line_y < box_start_y + box_height - 3:
-                            display_text = text[:box_width-6] if text else ""
-                            
-                            # Special handling for "OR" - render it in gray (dimmed)
-                            if "OR" in display_text:
-                                # Split and render with different colors for OR
-                                parts = display_text.split("  OR  ")
-                                if len(parts) == 2:
-                                    # Render first part
-                                    stdscr.addstr(line_y, box_start_x + 2, parts[0], attr)
-                                    # Render OR in gray
-                                    or_pos = box_start_x + 2 + len(parts[0])
-                                    stdscr.addstr(line_y, or_pos, "  OR  ", curses.color_pair(4))
-                                    # Render second part
-                                    second_pos = or_pos + 6
-                                    stdscr.addstr(line_y, second_pos, parts[1], attr)
-                                else:
-                                    stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
-                            else:
-                                stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
-                            line_y += 1
-                    
-                    # Separator before options
-                    stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
-                    line_y += 1
-                    
-                    # Back option
-                    for idx, (text, _) in enumerate(options):
-                        if idx == cursor_pos:
-                            prefix = "► "
-                            option_text = prefix + text
-                            padding = box_width - 4 - len(option_text)
-                            full_text = option_text + " " * padding
-                            stdscr.addstr(line_y, box_start_x + 2, full_text, curses.color_pair(3) | curses.A_BOLD)
-                        else:
-                            prefix = "  "
-                            stdscr.addstr(line_y, box_start_x + 2, prefix + text, curses.color_pair(2))
-                        line_y += 1
-                    
-                    # Bottom border
-                    stdscr.addstr(box_start_y + box_height - 1, box_start_x, "└" + "─" * (box_width - 2) + "┘", curses.color_pair(1) | curses.A_BOLD)
-                    
-                    # Instructions
-                    instr = "Use ↑↓ Arrow Keys or ENTER to go back"
-                    if height > box_start_y + box_height + 1:
-                        instr_x = max(0, (width - len(instr)) // 2)
-                        stdscr.addstr(box_start_y + box_height + 1, instr_x, instr, curses.color_pair(1))
-                    
-                except curses.error:
-                    pass
-                
-                stdscr.refresh()
-                
-                # Handle input
-                try:
-                    ch = stdscr.getch()
-                    if ch == curses.KEY_UP:
-                        cursor_pos = (cursor_pos - 1) % len(options)
-                    elif ch == curses.KEY_DOWN:
-                        cursor_pos = (cursor_pos + 1) % len(options)
-                    elif ch == ord('\n') or ch == ord('\r'):
-                        return  # Go back to main menu
-                    elif ch == ord('q') or ch == 27:  # q or ESC
-                        return  # Go back
-                except:
-                    pass
-        
-            
+        # Read encryption and platform settings
+        encryption_enabled = True
+        is_linux = platform.system() == "Linux"
+        try:
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+                encryption_enabled = config.get("dangerous_operations", {}).get("encryption", True)
+        except:
+            encryption_enabled = True
         
         # Run the curses menu
-        user_confirmed = curses.wrapper(show_confirmation_menu)
+        user_confirmed = curses.wrapper(self._show_confirmation_menu, path, size_mb, is_large, 
+                                        estimated_time, file_count, folder_count, 
+                                        encryption_enabled, is_linux)
         return (user_confirmed, is_large)
+    
+    def _show_confirmation_menu(self, stdscr, path, size_mb, is_large, estimated_time, 
+                                file_count, folder_count, encryption_enabled, is_linux):
+        """Display the lock confirmation menu with platform-specific protection info."""
+        from .colors import Colors
+        
+        # Setup curses
+        curses.start_color()
+        try:
+            curses.use_default_colors()
+        except:
+            pass
+        
+        # Initialize colors matching TUI theme
+        curses.init_pair(1, curses.COLOR_RED, -1)                  # Red border
+        curses.init_pair(2, curses.COLOR_WHITE, -1)                # White text
+        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_RED)  # White on red (selected)
+        curses.init_pair(4, curses.COLOR_YELLOW, -1)               # Yellow warning
+        curses.init_pair(5, curses.COLOR_GREEN, -1)                # Green success
+        curses.init_pair(6, curses.COLOR_CYAN, -1)                 # Cyan info
+        
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
+        
+        # Calculate centered box position
+        box_width = 75
+        box_height = 28
+        box_start_x = max(0, (width - box_width) // 2)
+        box_start_y = max(0, (height - box_height) // 2)
+        
+        cursor_pos = 0
+        options = [("✓ Lock This Item", True), ("✗ Cancel - Don't Lock", False)]
+        
+        while True:
+            stdscr.clear()
+            
+            # Draw red bordered box
+            try:
+                # Top border
+                stdscr.addstr(box_start_y, box_start_x, "┌" + "─" * (box_width - 2) + "┐", curses.color_pair(1) | curses.A_BOLD)
+                
+                # Content lines
+                line_y = box_start_y + 1
+                
+                # Title
+                if is_large:
+                    title = "📦 Large File Detected - Lock Confirmation"
+                else:
+                    title = "🔒 Lock Confirmation"
+                stdscr.addstr(line_y, box_start_x + 2, title, curses.color_pair(4) | curses.A_BOLD)
+                line_y += 2
+                
+                # Size info
+                size_info = f"Data Size: {size_mb:.1f} MB"
+                stdscr.addstr(line_y, box_start_x + 4, size_info, curses.color_pair(6))
+                line_y += 1
+                
+                # Item counts
+                if file_count == 1 and folder_count == 1:
+                    items_info = "Items: 1 file"
+                elif file_count > 1 and folder_count == 1:
+                    items_info = f"Items: {file_count} files in 1 folder"
+                else:
+                    items_info = f"Items: {file_count} files, {folder_count} folders"
+                
+                stdscr.addstr(line_y, box_start_x + 4, items_info, curses.color_pair(6))
+                line_y += 1
+                
+                # Time estimate
+                time_info = f"Est. Encryption Time: ~{estimated_time:.0f} seconds"
+                stdscr.addstr(line_y, box_start_x + 4, time_info, curses.color_pair(6))
+                line_y += 2
+                
+                # Separator
+                stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
+                line_y += 1
+                
+                # Warning: Conditional based on encryption setting and platform
+                self._render_protection_info(stdscr, line_y, box_start_x, box_width, 
+                                            encryption_enabled, is_linux)
+                line_y = self._get_protection_info_lines(encryption_enabled, is_linux) + line_y + 2
+                
+                # Recommendations (always show)
+                stdscr.addstr(line_y, box_start_x + 2, "💡 Recommendations:", curses.color_pair(5) | curses.A_BOLD)
+                line_y += 1
+                
+                rec1 = "• Optimal: Lock files ≤500 MB for faster processing"
+                stdscr.addstr(line_y, box_start_x + 4, rec1[:box_width-6], curses.color_pair(2))
+                line_y += 1
+                
+                rec2 = "• Split at OUTER level: lock separate folders"
+                stdscr.addstr(line_y, box_start_x + 4, rec2[:box_width-6], curses.color_pair(2))
+                line_y += 1
+                
+                rec3 = "  NOT inside the folder (still makes it large)"
+                stdscr.addstr(line_y, box_start_x + 4, rec3[:box_width-6], curses.color_pair(2))
+                line_y += 1
+                
+                msg1 = "💬 Faded says: You can skip splitting if you want—"
+                stdscr.addstr(line_y, box_start_x + 4, msg1[:box_width-6], curses.color_pair(5))
+                line_y += 1
+                
+                msg2 = "   let FadCrypt encrypt tons of files in one folder,"
+                stdscr.addstr(line_y, box_start_x + 4, msg2[:box_width-6], curses.color_pair(5))
+                line_y += 1
+                
+                msg3 = "   just expect slow encryption and a boring wait! 😴"
+                stdscr.addstr(line_y, box_start_x + 4, msg3[:box_width-6], curses.color_pair(5))
+                line_y += 1
+                
+                # Separator
+                stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
+                line_y += 1
+                
+                # Options
+                for idx, (text, _) in enumerate(options):
+                    if idx == cursor_pos:
+                        prefix = "► "
+                        option_text = prefix + text
+                        padding = box_width - 4 - len(option_text)
+                        full_text = option_text + " " * padding
+                        stdscr.addstr(line_y, box_start_x + 2, full_text, curses.color_pair(3) | curses.A_BOLD)
+                    else:
+                        prefix = "  "
+                        stdscr.addstr(line_y, box_start_x + 2, prefix + text, curses.color_pair(2))
+                    line_y += 1
+                
+                # Bottom border
+                stdscr.addstr(box_start_y + box_height - 1, box_start_x, "└" + "─" * (box_width - 2) + "┘", curses.color_pair(1) | curses.A_BOLD)
+                
+                # Instructions at bottom
+                instr = "Use ↑↓ Arrow Keys or Y/N | Press ENTER to Confirm"
+                if height > box_start_y + box_height + 2:
+                    stdscr.addstr(box_start_y + box_height + 2, max(0, (width - len(instr)) // 2), instr, curses.color_pair(1))
+                
+            except curses.error:
+                pass  # Silently handle drawing errors
+            
+            stdscr.refresh()
+            
+            # Handle input
+            try:
+                ch = stdscr.getch()
+                if ch == curses.KEY_UP:
+                    cursor_pos = (cursor_pos - 1) % len(options)
+                elif ch == curses.KEY_DOWN:
+                    cursor_pos = (cursor_pos + 1) % len(options)
+                elif ch == ord('y') or ch == ord('Y'):
+                    return True
+                elif ch == ord('n') or ch == ord('N'):
+                    return False
+                elif ch == ord('\n') or ch == ord('\r'):
+                    return options[cursor_pos][1]
+                elif ch == ord('q') or ch == 27:  # q or ESC
+                    return False
+                elif ch == ord('g') or ch == ord('G'):
+                    self._show_guide_screen(stdscr, height, width, is_linux)
+            except:
+                pass
+    
+    def _get_protection_info_lines(self, encryption_enabled, is_linux):
+        """Return number of lines needed for protection info."""
+        if encryption_enabled:
+            return 4
+        else:
+            if is_linux:
+                return 5
+            else:
+                return 5
+    
+    def _render_protection_info(self, stdscr, line_y, box_start_x, box_width, 
+                               encryption_enabled, is_linux):
+        """Render protection info based on encryption and platform."""
+        if encryption_enabled:
+            # Encryption enabled - show tamper-proof message
+            stdscr.addstr(line_y, box_start_x + 2, "⚠️  TAMPER-PROOF ENCRYPTION:", curses.color_pair(4) | curses.A_BOLD)
+            line_y += 1
+            
+            warning1 = "Once locked, this file CANNOT be:"
+            stdscr.addstr(line_y, box_start_x + 4, warning1[:box_width-6], curses.color_pair(6))
+            line_y += 1
+            
+            warning2 = "• Copied  • Moved  • Edited  • Deleted"
+            stdscr.addstr(line_y, box_start_x + 4, warning2[:box_width-6], curses.color_pair(2))
+            line_y += 1
+            
+            guide_hint = "Press G to see how to manage this behavior →"
+            stdscr.addstr(line_y, box_start_x + 4, guide_hint[:box_width-6], curses.color_pair(4))
+        else:
+            # Encryption disabled - show platform-specific protection info
+            if is_linux:
+                stdscr.addstr(line_y, box_start_x + 2, "⚠️  CHMOD+CHATTR PROTECTION ONLY (NOT ENCRYPTED):", curses.color_pair(4) | curses.A_BOLD)
+                line_y += 1
+                
+                warning1 = "File will be protected with chmod & chattr immutable"
+                stdscr.addstr(line_y, box_start_x + 4, warning1[:box_width-6], curses.color_pair(6))
+                line_y += 1
+                
+                warning2 = "flags. If protection is removed with --0/--off, file"
+                stdscr.addstr(line_y, box_start_x + 4, warning2[:box_width-6], curses.color_pair(6))
+                line_y += 1
+                
+                warning3 = "becomes readable & modifiable. Enable encryption in settings."
+                stdscr.addstr(line_y, box_start_x + 4, warning3[:box_width-6], curses.color_pair(1))
+                line_y += 1
+                
+                guide_hint = "Press G to learn more about protection options →"
+                stdscr.addstr(line_y, box_start_x + 4, guide_hint[:box_width-6], curses.color_pair(4))
+            else:
+                stdscr.addstr(line_y, box_start_x + 2, "⚠️  ACL PROTECTION ONLY (NOT ENCRYPTED):", curses.color_pair(4) | curses.A_BOLD)
+                line_y += 1
+                
+                warning1 = "File will be protected with Windows ACLs. If protection"
+                stdscr.addstr(line_y, box_start_x + 4, warning1[:box_width-6], curses.color_pair(6))
+                line_y += 1
+                
+                warning2 = "is removed with --0/--off, file becomes readable &"
+                stdscr.addstr(line_y, box_start_x + 4, warning2[:box_width-6], curses.color_pair(6))
+                line_y += 1
+                
+                warning3 = "modifiable. Enable encryption in settings for tamper-proof."
+                stdscr.addstr(line_y, box_start_x + 4, warning3[:box_width-6], curses.color_pair(1))
+                line_y += 1
+                
+                guide_hint = "Press G to learn more about protection options →"
+                stdscr.addstr(line_y, box_start_x + 4, guide_hint[:box_width-6], curses.color_pair(4))
+    
+    def _show_guide_screen(self, stdscr, height, width, is_linux):
+        """Display guide about protection options with platform-specific info."""
+        options = [("← Back to Lock Confirmation", False)]
+        cursor_pos = 0
+        
+        while True:
+            stdscr.clear()
+            
+            # Guide box
+            box_width = min(75, width - 4)
+            box_height = min(30, height - 6)
+            box_start_x = max(0, (width - box_width) // 2)
+            box_start_y = max(0, 1)
+            
+            try:
+                # Top border
+                stdscr.addstr(box_start_y, box_start_x, "┌" + "─" * (box_width - 2) + "┐", curses.color_pair(1) | curses.A_BOLD)
+                
+                line_y = box_start_y + 1
+                
+                # Title and content based on platform and encryption
+                if is_linux:
+                    title = "🔐 PROTECTION OPTIONS (Linux)"
+                    stdscr.addstr(line_y, box_start_x + 2, title, curses.color_pair(5) | curses.A_BOLD)
+                    line_y += 2
+                    
+                    lines = [
+                        ("ENCRYPTION (DEFAULT - Enabled by default):", curses.color_pair(4) | curses.A_BOLD),
+                        ("AES-256-GCM encryption. Files become tamper-proof and", curses.color_pair(2)),
+                        ("immutable. Disable in Settings if you need chmod+chattr", curses.color_pair(2)),
+                        ("protection only.", curses.color_pair(2)),
+                        ("", curses.color_pair(2)),
+                        ("chmod+chattr Protection (No encryption mode):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Uses Linux permissions & immutable flag. File protected", curses.color_pair(2)),
+                        ("but not encrypted (weaker security).", curses.color_pair(2)),
+                        ("", curses.color_pair(2)),
+                        ("TOGGLE PROTECTIONS (--0/--off and --1/--on):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Disable:  fadcrypt --0 file.txt  (or --off)", curses.color_pair(6)),
+                        ("Enable:   fadcrypt --1 file.txt  (or --on)", curses.color_pair(6)),
+                        ("", curses.color_pair(2)),
+                        ("For more info: fadcrypt --help or FadGuide (Tray/GUI)", curses.color_pair(5)),
+                    ]
+                else:
+                    title = "🔐 PROTECTION OPTIONS (Windows)"
+                    stdscr.addstr(line_y, box_start_x + 2, title, curses.color_pair(5) | curses.A_BOLD)
+                    line_y += 2
+                    
+                    lines = [
+                        ("ENCRYPTION (DEFAULT - Enabled by default):", curses.color_pair(4) | curses.A_BOLD),
+                        ("AES-256-GCM encryption. Files become tamper-proof", curses.color_pair(2)),
+                        ("(cannot move, copy, edit, or delete). Disable in", curses.color_pair(2)),
+                        ("Settings if you need ACL-only protection.", curses.color_pair(2)),
+                        ("", curses.color_pair(2)),
+                        ("ACL Protection (No encryption mode):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Uses Windows Access Control Lists only. File access", curses.color_pair(2)),
+                        ("restricted but not encrypted (weaker security).", curses.color_pair(2)),
+                        ("", curses.color_pair(2)),
+                        ("TOGGLE PROTECTIONS (--0/--off and --1/--on):", curses.color_pair(4) | curses.A_BOLD),
+                        ("Disable:  fadcrypt --0 file.txt  (or --off)", curses.color_pair(6)),
+                        ("Enable:   fadcrypt --1 file.txt  (or --on)", curses.color_pair(6)),
+                        ("", curses.color_pair(2)),
+                        ("For more info: fadcrypt --help or FadGuide (Tray/GUI)", curses.color_pair(5)),
+                    ]
+                
+                for text, attr in lines:
+                    if line_y < box_start_y + box_height - 3:
+                        display_text = text[:box_width-6] if text else ""
+                        stdscr.addstr(line_y, box_start_x + 2, display_text, attr)
+                        line_y += 1
+                
+                # Separator before options
+                stdscr.addstr(line_y, box_start_x + 2, "─" * (box_width - 4), curses.color_pair(1))
+                line_y += 1
+                
+                # Back option
+                for idx, (text, _) in enumerate(options):
+                    if idx == cursor_pos:
+                        prefix = "► "
+                        option_text = prefix + text
+                        padding = box_width - 4 - len(option_text)
+                        full_text = option_text + " " * padding
+                        stdscr.addstr(line_y, box_start_x + 2, full_text, curses.color_pair(3) | curses.A_BOLD)
+                    else:
+                        prefix = "  "
+                        stdscr.addstr(line_y, box_start_x + 2, prefix + text, curses.color_pair(2))
+                    line_y += 1
+                
+                # Bottom border
+                stdscr.addstr(box_start_y + box_height - 1, box_start_x, "└" + "─" * (box_width - 2) + "┘", curses.color_pair(1) | curses.A_BOLD)
+                
+                # Instructions
+                instr = "Use ↑↓ Arrow Keys or ENTER to go back"
+                if height > box_start_y + box_height + 1:
+                    instr_x = max(0, (width - len(instr)) // 2)
+                    stdscr.addstr(box_start_y + box_height + 1, instr_x, instr, curses.color_pair(1))
+                
+            except curses.error:
+                pass
+            
+            stdscr.refresh()
+            
+            # Handle input
+            try:
+                ch = stdscr.getch()
+                if ch == curses.KEY_UP:
+                    cursor_pos = (cursor_pos - 1) % len(options)
+                elif ch == curses.KEY_DOWN:
+                    cursor_pos = (cursor_pos + 1) % len(options)
+                elif ch == ord('\n') or ch == ord('\r'):
+                    return  # Go back to main menu
+                elif ch == ord('q') or ch == 27:  # q or ESC
+                    return  # Go back
+            except:
+                pass
     
     def _ensure_password_for_encryption(self):
         """
         Ensure password is set in file_lock_manager if encryption is enabled.
         This is called before locking operations.
         """
-        import json
-        import os
         from .password_prompt import PasswordPrompt
         from core.password_manager import PasswordManager
         from core.crypto_manager import CryptoManager
@@ -579,7 +641,6 @@ class CLIHandlerBase(ABC):
         Ensure the config file exists with all required keys.
         This prevents KeyError exceptions when accessing config values.
         """
-        import json
         from core.file_protection import safe_write_to_protected_file
         
         # Default config structure
