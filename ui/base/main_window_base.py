@@ -4257,16 +4257,32 @@ class MainWindowBase(QMainWindow):
                 cmd_layout.setSpacing(8)
                 
                 # Use QLabel instead of QTextEdit - simpler, cleaner code block appearance
-                # Format command text: make # comment lines gray
                 import html
-                formatted_text = ""
+                import re
+                
+                def colorize_command(text):
+                    escaped = html.escape(text)
+                    # Flags (blue)
+                    escaped = re.sub(r'(--lock|--unlock|--0|--1|--on|--off)', r'<span style="color: #5ea8ff;">\1</span>', escaped)
+                    # Filenames (yellow)
+                    escaped = re.sub(r'([a-zA-Z0-9_\-~][a-zA-Z0-9_.\-~]*\.[a-zA-Z0-9]+)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                    # Quoted paths (yellow)
+                    escaped = re.sub(r'&quot;(.*?)&quot;', r'&quot;<span style="color: #f0d747;">\1</span>&quot;', escaped)
+                    # Placeholders (yellow): &lt;path&gt;, &lt;file&gt;, etc.
+                    escaped = re.sub(r'(&lt;[a-z]+&gt;)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                    # fadcrypt (green) - avoid replacing inside already colored spans
+                    escaped = re.sub(r'(?<!</span>)(\bfadcrypt\b)(?!</span>)', r'<span style="color: #00d700;">\1</span>', escaped)
+                    return escaped
+                
+                formatted_lines = []
                 for line in command.split('\n'):
-                    escaped_line = html.escape(line)
                     if line.strip().startswith('#'):
-                        formatted_text += f'<span style="color: #888888;">{escaped_line}</span><br>'
+                        formatted_lines.append(f'<span style="color: #888888;">{html.escape(line)}</span>')
                     else:
-                        formatted_text += f'{escaped_line}<br>'
-                formatted_text = formatted_text.rstrip('<br>')
+                        formatted_lines.append(colorize_command(line))
+                
+                formatted_text = '<br>'.join(formatted_lines)
+
                 
                 cmd_label = QLabel(formatted_text)
                 cmd_label.setTextFormat(QtEnum.TextFormat.RichText)
@@ -4464,17 +4480,31 @@ class MainWindowBase(QMainWindow):
                     cmd_layout.setContentsMargins(0, 0, 0, 0)
                     cmd_layout.setSpacing(8)
                     
-                    # Use QLabel instead of QTextEdit - simpler, cleaner code block appearance
-                    # Format command text: make # comment lines gray
                     import html
-                    formatted_text = ""
+                    import re
+                    
+                    def colorize_command(text):
+                        escaped = html.escape(text)
+                        # Flags (blue)
+                        escaped = re.sub(r'(--lock|--unlock|--0|--1|--on|--off)', r'<span style="color: #5ea8ff;">\1</span>', escaped)
+                        # Filenames (yellow)
+                        escaped = re.sub(r'([a-zA-Z0-9_\-~][a-zA-Z0-9_.\-~]*\.[a-zA-Z0-9]+)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                        # Quoted paths (yellow)
+                        escaped = re.sub(r'&quot;(.*?)&quot;', r'&quot;<span style="color: #f0d747;">\1</span>&quot;', escaped)
+                        # Placeholders (yellow): &lt;path&gt;, &lt;file&gt;, etc.
+                        escaped = re.sub(r'(&lt;[a-z]+&gt;)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                        # fadcrypt (green) - avoid replacing inside already colored spans
+                        escaped = re.sub(r'(?<!</span>)(\bfadcrypt\b)(?!</span>)', r'<span style="color: #00d700;">\1</span>', escaped)
+                        return escaped
+                    
+                    formatted_lines = []
                     for line in command.split('\n'):
-                        escaped_line = html.escape(line)
                         if line.strip().startswith('#'):
-                            formatted_text += f'<span style="color: #888888;">{escaped_line}</span><br>'
+                            formatted_lines.append(f'<span style="color: #888888;">{html.escape(line)}</span>')
                         else:
-                            formatted_text += f'{escaped_line}<br>'
-                    formatted_text = formatted_text.rstrip('<br>')
+                            formatted_lines.append(colorize_command(line))
+                    
+                    formatted_text = '<br>'.join(formatted_lines)
                     
                     cmd_label = QLabel(formatted_text)
                     cmd_label.setTextFormat(QtEnum.TextFormat.RichText)
@@ -4621,7 +4651,28 @@ class MainWindowBase(QMainWindow):
             help_layout.setSpacing(8)
             
             # Use QLabel instead of QTextEdit - simpler, cleaner code block appearance
-            help_label = QLabel("fadcrypt --help")
+            # Format command text with syntax highlighting
+            import html
+            import re
+            
+            def colorize_help_command(command_text):
+                """Apply syntax highlighting to command text"""
+                escaped_line = html.escape(command_text)
+                # Pattern: fadcrypt command
+                highlighted = escaped_line.replace(
+                    'fadcrypt',
+                    '<span style="color: #00d700;">fadcrypt</span>'
+                )
+                # Pattern: --help flag
+                highlighted = highlighted.replace(
+                    '--help',
+                    '<span style="color: #5ea8ff;">--help</span>'
+                )
+                return highlighted
+            
+            highlighted_help = colorize_help_command("fadcrypt --help")
+            help_label = QLabel(highlighted_help)
+            help_label.setTextFormat(QtEnum.TextFormat.RichText)
             help_label.setStyleSheet("""
                 QLabel {
                     background-color: #1a1a1a;
