@@ -281,7 +281,7 @@ class LogsTabWidget(QWidget):
             else:
                 self.log_viewer.setPlainText(self.all_logs)
                 
-            # Auto-scroll to bottom if enabled
+            # Auto-scroll to bottom if enabled (regardless of filter)
             if self.autoscroll_enabled:
                 self.scroll_to_bottom()
             
@@ -313,6 +313,10 @@ class LogsTabWidget(QWidget):
             match_count = len(filtered_lines)
             total_count = self.all_logs.count('\n')
             self.status_label.setText(f"📊 Logs: {match_count}/{total_count} lines (filtered)")
+        
+        # Auto-scroll after filtering if enabled
+        if self.autoscroll_enabled:
+            self.scroll_to_bottom()
     
     def clear_logs(self):
         """Clear all logs"""
@@ -329,7 +333,8 @@ class LogsTabWidget(QWidget):
             self.autoscroll_btn.setText("📌 Auto-scroll: ON")
             self.autoscroll_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #10b981;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00cc00, stop:1 #008800);
                     color: #ffffff;
                     border: none;
                     border-radius: 6px;
@@ -338,15 +343,22 @@ class LogsTabWidget(QWidget):
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #059669;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00ff00, stop:1 #00aa00);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #008800, stop:1 #005500);
                 }
             """)
+            # Immediately scroll to bottom when enabling
             self.scroll_to_bottom()
         else:
             self.autoscroll_btn.setText("📌 Auto-scroll: OFF")
             self.autoscroll_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #6b7280;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #666666, stop:1 #444444);
                     color: #ffffff;
                     border: none;
                     border-radius: 6px;
@@ -355,7 +367,12 @@ class LogsTabWidget(QWidget):
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #4b5563;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #777777, stop:1 #555555);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #444444, stop:1 #222222);
                 }
             """)
     

@@ -564,7 +564,7 @@ class TUIManager:
                 
                 # Ensure dangerous_operations key exists
                 if "dangerous_operations" not in config:
-                    config["dangerous_operations"] = {"encryption": False}
+                    config["dangerous_operations"] = {"encryption": True}
                 
                 dangerous_ops = config.get("dangerous_operations", {})
                 encryption_enabled = dangerous_ops.get("encryption", False)
@@ -634,7 +634,6 @@ class TUIManager:
                 import traceback
                 traceback.print_exc()
                 input("\nPress Enter to continue...")
-                break
     
     def show_about(self):
         """Show about information with menu navigation at bottom"""

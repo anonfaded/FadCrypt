@@ -1416,7 +1416,7 @@ class MainWindowBase(QMainWindow):
     
     def on_settings_changed(self):
         """Handle settings changes from SettingsPanel"""
-        # Get current settings
+        # Get current settings (encryption is now managed separately)
         settings = self.settings_panel.get_settings()
         print(f"[DEBUG] on_settings_changed called with: {settings}")
         
@@ -1428,26 +1428,61 @@ class MainWindowBase(QMainWindow):
         autostart_enabled = settings.get('autostart', False)
         self.handle_autostart_setting(autostart_enabled)
         
-        # CRITICAL: Handle encryption enable/disable
-        encryption_enabled = settings.get('encryption_enabled', False)
-        if encryption_enabled:
-            # When encryption is ENABLED, try to load existing master password
-            cached_pwd = self.password_manager.get_password_bytes()
-            if not cached_pwd:
-                print("[Settings] Encryption enabled but no password cached - loading from encrypted_password.bin")
-                # Try to load from encrypted_password.bin (already stores the master password)
-                # The password_manager should handle this seamlessly
-                cached_pwd = self.password_manager.get_password_bytes()
-            
-            if cached_pwd:
-                print("✅ [Settings] Master password available for encryption")
-            else:
-                print("⚠️  [Settings] No master password found - encryption cannot work until user logs in")
-        
-        # Save settings to file (includes all settings like encryption)
+        # Save settings to file (settings.json for UI prefs only - encryption is in apps_config.json)
         self.save_settings(settings)
         
-        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}, encryption={encryption_enabled}")
+        # Handle encryption separately if it was changed in the UI
+        current_encryption = self.settings_panel.encryption_checkbox.isChecked()
+        print(f"[DEBUG] Encryption checkbox state: {current_encryption}")
+        self._handle_encryption_change_from_ui()
+        
+        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}")
+    
+    def _handle_encryption_change_from_ui(self):
+        """Handle encryption toggle change from UI and save to apps_config.json"""
+        import json
+        from core.file_protection import safe_write_to_protected_file
+        
+        encryption_enabled = self.settings_panel.encryption_checkbox.isChecked()
+        fadcrypt_folder = self.get_fadcrypt_folder()
+        config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+        
+        try:
+            # Load current config
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            else:
+                config = {"applications": [], "locked_files_and_folders": [], "dangerous_operations": {}}
+            
+            # Ensure dangerous_operations exists
+            if "dangerous_operations" not in config:
+                config["dangerous_operations"] = {}
+            
+            # Update encryption setting
+            current_encryption = config["dangerous_operations"].get("encryption", False)
+            if current_encryption != encryption_enabled:
+                config["dangerous_operations"]["encryption"] = encryption_enabled
+                print(f"[Settings] Encryption toggled in UI: {encryption_enabled}")
+                
+                # Save updated config
+                content = json.dumps(config, indent=2)
+                success, error = safe_write_to_protected_file(config_file, content)
+                if success:
+                    print(f"✅ [Settings] Encryption saved to config: {encryption_enabled}")
+                else:
+                    print(f"⚠️  [Settings] Failed to save encryption setting: {error}")
+            
+            # When encryption is toggled ON, ensure password is available
+            if encryption_enabled:
+                cached_pwd = self.password_manager.get_password_bytes()
+                if cached_pwd:
+                    print("✅ [Settings] Master password available for encryption")
+                else:
+                    print("⚠️  [Settings] No master password found - encryption cannot work until user logs in")
+                    
+        except Exception as e:
+            print(f"⚠️  [Settings] Error handling encryption change: {e}")
     
     def handle_autostart_setting(self, enable):
         """
@@ -1461,46 +1496,18 @@ class MainWindowBase(QMainWindow):
         pass
     
     def save_settings(self, settings):
-        """Save settings to JSON file and update app config"""
+        """Save UI settings to settings.json (encryption is now handled separately in apps_config.json)"""
         import json
-        from core.file_protection import safe_write_to_protected_file
         
         fadcrypt_folder = self.get_fadcrypt_folder()
         settings_file = os.path.join(fadcrypt_folder, 'settings.json')
-        config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
         
         try:
-            # Save general settings
+            # Save general settings (dialog_style, wallpaper, file_protection_enabled, etc.)
+            # NOTE: encryption_enabled is NO LONGER stored here - it's unified in apps_config.json
             with open(settings_file, 'w') as f:
                 json.dump(settings, f, indent=4)
             print(f"Settings saved to {settings_file}")
-            
-            # Update dangerous_operations in apps_config.json
-            try:
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-            except:
-                config = {"applications": [], "locked_files_and_folders": []}
-            
-            # Update dangerous operations section
-            if "dangerous_operations" not in config:
-                config["dangerous_operations"] = {}
-            
-            encryption_enabled = settings.get('encryption_enabled', False)
-            print(f"[DEBUG] Saving encryption setting to config: {encryption_enabled}")
-            config["dangerous_operations"]["encryption"] = encryption_enabled
-            
-            # Save updated config
-            content = json.dumps(config, indent=2)
-            print(f"[DEBUG] Config content before save: {config}")
-            success, error = safe_write_to_protected_file(config_file, content)
-            print(f"[DEBUG] Save result: success={success}, error={error}")
-            if success:
-                from core.verbose_logger import vlog
-                vlog(f"[MainWindow] Encryption setting saved: {encryption_enabled}")
-                print(f"[DEBUG] Encryption setting successfully saved to disk")
-            else:
-                print(f"Warning: Could not save encryption setting: {error}")
                 
         except Exception as e:
             print(f"Error saving settings: {e}")
@@ -1523,6 +1530,39 @@ class MainWindowBase(QMainWindow):
                     print(f"Settings loaded: {settings}")
         except Exception as e:
             print(f"Error loading settings: {e}")
+        
+        # CRITICAL: Load encryption_enabled from apps_config.json (unified location)
+        self._load_encryption_from_config()
+    
+    def _load_encryption_from_config(self):
+        """Load encryption_enabled from apps_config.json and set in GUI"""
+        import json
+        
+        try:
+            fadcrypt_folder = self.get_fadcrypt_folder()
+            config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+            
+            # Determine if encryption is enabled
+            encryption_enabled = True  # NEW DEFAULT: True instead of False
+            
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                        dangerous_ops = config.get("dangerous_operations", {})
+                        encryption_enabled = dangerous_ops.get("encryption", True)  # Default to True
+                except Exception as e:
+                    print(f"[Settings] Error reading encryption from config: {e}")
+                    encryption_enabled = True  # Default to True if error
+            
+            print(f"[Settings] Loaded encryption_enabled from config: {encryption_enabled}")
+            
+            # Set in settings panel
+            if hasattr(self, 'settings_panel'):
+                self.settings_panel.set_encryption_enabled(encryption_enabled)
+            
+        except Exception as e:
+            print(f"[Settings] Error loading encryption setting: {e}")
     
     def center_on_screen(self):
         """Center the main window on the screen (Wayland-aware)"""

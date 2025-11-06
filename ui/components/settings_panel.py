@@ -709,7 +709,7 @@ class SettingsPanel(QWidget):
             'lock_tools': self.lock_tools_checkbox.isChecked(),
             'file_protection_enabled': self.file_protection_checkbox.isChecked(),
             'scanning_interval': self.scanning_interval_spinbox.value(),
-            'encryption_enabled': self.encryption_checkbox.isChecked()
+            # NOTE: encryption_enabled is now managed separately from settings.json (lives in apps_config.json)
         }
         
     def get_wallpaper_choice(self):
@@ -745,9 +745,15 @@ class SettingsPanel(QWidget):
         self.lock_tools_checkbox.setChecked(settings.get('lock_tools', False))  # Default: False for safety
         self.file_protection_checkbox.setChecked(settings.get('file_protection_enabled', True))  # Default: True (enabled)
         self.scanning_interval_spinbox.setValue(settings.get('scanning_interval', 1.0))  # Default: 1.0 seconds
-        self.encryption_checkbox.setChecked(settings.get('encryption_enabled', False))  # Default: False for safety
+        
+        # NOTE: encryption_enabled is now read from apps_config.json, not from settings.json
+        # It will be set separately by the main window via set_encryption_enabled()
         
         self.on_settings_changed()
+    
+    def set_encryption_enabled(self, enabled):
+        """Set encryption checkbox state from apps_config.json"""
+        self.encryption_checkbox.setChecked(enabled)
     
     def apply_settings(self, settings):
         """Alias for set_settings - apply settings from dictionary"""

@@ -587,7 +587,7 @@ class CLIHandlerBase(ABC):
             "applications": [],
             "locked_files_and_folders": [],
             "dangerous_operations": {
-                "encryption": False
+                "encryption": True
             }
         }
         

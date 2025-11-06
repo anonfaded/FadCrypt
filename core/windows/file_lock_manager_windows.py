@@ -165,6 +165,38 @@ class FileLockManagerWindows(FileLockManager):
             vlog(f"[Item] Path no longer exists: {path}")
             return False
         
+        # Pre-check: If file is already locked (has read-only or ACLs), unlock first to clean state
+        # This handles re-locking of files that failed to lock before
+        try:
+            import subprocess
+            # Check if file is read-only
+            result = subprocess.run(
+                ['attrib', path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and 'R' in result.stdout:
+                vlog(f"[Item] Pre-check: File is read-only, removing lock attributes...")
+                # Remove read-only flag
+                subprocess.run(
+                    ['attrib', '-r', path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5
+                )
+                # Remove ACLs if any
+                subprocess.run(
+                    ['icacls', path, '/reset', '/T'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10
+                )
+                vlog(f"[Item] Pre-check: Cleaned up lock attributes from previous attempt")
+        except Exception as e:
+            vlog(f"[Item] Pre-check warning: {e}")
+        
         # Step 0: Encrypt if feature is enabled
         config = self._get_config()
         dangerous_ops = config.get("dangerous_operations", {})

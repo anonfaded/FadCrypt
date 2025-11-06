@@ -50,12 +50,12 @@ class FileLockManager(ABC):
                 return {
                     "applications": [], 
                     "locked_files_and_folders": [],
-                    "dangerous_operations": {"encryption": False}
+                    "dangerous_operations": {"encryption": True}
                 }
         return {
             "applications": [], 
             "locked_files_and_folders": [],
-            "dangerous_operations": {"encryption": False}
+            "dangerous_operations": {"encryption": True}
         }
     
     def _load_locked_items(self):

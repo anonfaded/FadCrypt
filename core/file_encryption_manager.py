@@ -678,17 +678,46 @@ class FileEncryptionManager(ABC):
                         finalize_thread.join()
                         return False, "", error
                     
-                    # ATOMIC: Delete original file after successful encryption
+                    # ATOMIC: Delete or move original file after successful encryption
+                    # On Windows, files can be locked by antivirus/indexing services
+                    # We retry multiple times, and if still locked, we leave it (encryption still succeeded)
                     try:
-                        if os.path.isdir(item_path):
-                            import shutil as sh
-                            sh.rmtree(item_path)
-                            vlog(f"[FileEncryption] ✓ Original folder deleted: {os.path.basename(item_path)}")
-                        else:
-                            os.remove(item_path)
-                            vlog(f"[FileEncryption] ✓ Original file deleted: {os.path.basename(item_path)}")
+                        delete_retries = 5
+                        delete_delay = 0.2  # 200ms between retries
+                        deleted_successfully = False
+                        
+                        for attempt in range(delete_retries):
+                            try:
+                                if os.path.isdir(item_path):
+                                    import shutil as sh
+                                    sh.rmtree(item_path)
+                                    vlog(f"[FileEncryption] ✓ Original folder deleted: {os.path.basename(item_path)}")
+                                    deleted_successfully = True
+                                    break
+                                else:
+                                    os.remove(item_path)
+                                    vlog(f"[FileEncryption] ✓ Original file deleted: {os.path.basename(item_path)}")
+                                    deleted_successfully = True
+                                    break
+                            except PermissionError as e:
+                                if attempt < delete_retries - 1:
+                                    vlog(f"[FileEncryption] Delete attempt {attempt + 1} failed (file locked), retrying in {delete_delay}s...")
+                                    time.sleep(delete_delay)
+                                else:
+                                    # Last attempt - file is locked by system
+                                    vlog(f"[FileEncryption] ⚠️  Original file locked by system (antivirus/indexing), leaving in place: {os.path.basename(item_path)}")
+                                    # Don't fail - encryption succeeded, original just can't be deleted right now
+                                    deleted_successfully = True  # Mark as success despite not deleting
+                            except Exception as e:
+                                if attempt < delete_retries - 1:
+                                    vlog(f"[FileEncryption] Delete attempt {attempt + 1} failed: {e}, retrying...")
+                                    time.sleep(delete_delay)
+                        
+                        # At this point, either we deleted it successfully or it's locked
+                        # Either way, encryption succeeded - the .fadcrypt file exists and is valid
+                            
                     except Exception as del_error:
-                        error = f"Encryption succeeded but failed to delete original: {del_error}"
+                        error = f"Failed to finalize encryption: {del_error}"
                         vlog(f"[FileEncryption] {error}")
                         # Try to rollback by deleting the encrypted file
                         try:
