@@ -40,10 +40,27 @@ class ContextMenuManager:
         if is_packaged:
             # Running from PyInstaller bundle
             if exe_path is None:
-                exe_path = sys.executable  # Use the actual executable path
+                # IMPORTANT: Always use GUI exe for context menu (not CLI exe)
+                # Even if running from CLI exe, context menu must use GUI exe with --gui flag
+                exe_dir = os.path.dirname(sys.executable)
+                parent_dir = os.path.dirname(exe_dir)  # Go up one level (from cli/ or gui/ to parent)
+                gui_exe = os.path.join(parent_dir, 'gui', 'FadCrypt.exe')
+                
+                # Check if GUI exe exists at expected location
+                if os.path.exists(gui_exe):
+                    exe_path = gui_exe  # Use GUI exe path
+                else:
+                    # Fallback: use current executable (might be GUI already, or running from source)
+                    exe_path = sys.executable
+            
             if fadcrypt_folder is None:
                 exe_dir = os.path.dirname(sys.executable)
-                fadcrypt_folder = exe_dir
+                # Try to find parent FadCrypt folder if we're in cli/ or gui/ subdirectory
+                parent_dir = os.path.dirname(exe_dir)
+                if os.path.basename(exe_dir) in ['cli', 'gui']:
+                    fadcrypt_folder = parent_dir
+                else:
+                    fadcrypt_folder = exe_dir
                 # Check if we're running from an installed location (not development dist)
                 # If fadcrypt is in PATH, use the command name instead of full path
                 self.use_command_name = self._is_fadcrypt_in_path()
@@ -140,18 +157,18 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Direct execution without start wrapper - fastest (50ms) and most reliable
+            # Use START command to launch GUI without showing terminal window
+            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - ALWAYS use GUI exe path (not CLI command name)
-                    # Context menu must not show terminal window
-                    # Use the GUI exe directly with --gui flag to ensure no console
-                    cmd = f'cmd.exe /c "{self.exe_path}" --gui --context-lock "%1"'
+                    # Packaged app - use GUI exe with --gui flag
+                    # Direct exe path without cmd/powershell wrapper for context menu reliability
+                    cmd = f'"{self.exe_path}" --gui --context-lock "%1"'
                 else:
-                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
+                    cmd = f'"{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file lock context menu: {key_path}")
@@ -168,18 +185,17 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Direct execution without start wrapper - fastest (50ms) and most reliable
+            # Use START command to launch GUI without showing terminal window
+            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - ALWAYS use GUI exe path (not CLI command name)
-                    # Context menu must not show terminal window
-                    # Use the GUI exe directly with --gui flag to ensure no console
-                    cmd = f'cmd.exe /c "{self.exe_path}" --gui --context-unlock "%1"'
+                    # Packaged app - use GUI exe with --gui flag
+                    cmd = f'"{self.exe_path}" --gui --context-unlock "%1"'
                 else:
-                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
+                    cmd = f'"{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered file unlock context menu: {key_path}")
@@ -196,18 +212,17 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Direct execution without start wrapper - fastest (50ms) and most reliable
+            # Use START command to launch GUI without showing terminal window
+            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - ALWAYS use GUI exe path (not CLI command name)
-                    # Context menu must not show terminal window
-                    # Use the GUI exe directly with --gui flag to ensure no console
-                    cmd = f'cmd.exe /c "{self.exe_path}" --gui --context-lock "%1"'
+                    # Packaged app - use GUI exe with --gui flag
+                    cmd = f'"{self.exe_path}" --gui --context-lock "%1"'
                 else:
-                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
+                    cmd = f'"{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder lock context menu: {key_path}")
@@ -224,18 +239,17 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Direct execution without start wrapper - fastest (50ms) and most reliable
+            # Use START command to launch GUI without showing terminal window
+            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - ALWAYS use GUI exe path (not CLI command name)
-                    # Context menu must not show terminal window
-                    # Use the GUI exe directly with --gui flag to ensure no console
-                    cmd = f'cmd.exe /c "{self.exe_path}" --gui --context-unlock "%1"'
+                    # Packaged app - use GUI exe with --gui flag
+                    cmd = f'"{self.exe_path}" --gui --context-unlock "%1"'
                 else:
-                    # Script execution - use python.exe (not pythonw.exe) so dialog can show
+                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
-                    cmd = f'cmd.exe /c "{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
+                    cmd = f'"{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
             
             logger.debug(f"Registered folder unlock context menu: {key_path}")
