@@ -199,26 +199,31 @@ class FileLockManager(ABC):
             True if removed successfully, False otherwise
         """
         
+        # Normalize path for comparison (Windows is case-insensitive)
+        path = os.path.normpath(os.path.abspath(path))
+        
         # Find the item to unlock
         item_to_unlock = None
         actual_item_path = None  # Track the actual path stored in the list
         vlog(f"[FileLockManager] Attempting to remove: {path}")
         vlog(f"[FileLockManager] Current locked_items count: {len(self.locked_items)}")
         
-        # Try to find exact match first
+        # Try to find exact match first (case-insensitive on Windows)
         for i, item in enumerate(self.locked_items):
-            vlog(f"[FileLockManager]   Item {i}: {item['path']}")
-            if item['path'] == path:
+            item_path = os.path.normpath(item['path'])
+            vlog(f"[FileLockManager]   Item {i}: {item_path}")
+            if item_path.lower() == path.lower():
                 item_to_unlock = item
                 actual_item_path = item['path']
                 break
         
         # If not found and path ends with .fadcrypt, try stripping it
-        if not item_to_unlock and path.endswith('.fadcrypt'):
+        if not item_to_unlock and path.lower().endswith('.fadcrypt'):
             original_path = path[:-9]  # Remove .fadcrypt extension
             vlog(f"[FileLockManager] Not found with .fadcrypt extension, trying: {original_path}")
             for i, item in enumerate(self.locked_items):
-                if item['path'] == original_path:
+                item_path = os.path.normpath(item['path'])
+                if item_path.lower() == original_path.lower():
                     item_to_unlock = item
                     actual_item_path = item['path']  # Use the actual path from the item
                     vlog(f"[FileLockManager] Found match by stripping .fadcrypt extension")

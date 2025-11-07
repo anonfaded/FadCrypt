@@ -214,15 +214,11 @@ def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         # Save original print before redirecting
         original_print = print
         
-        # Define print redirect with event processing - ONLY send to dialog, not terminal
-        from PyQt6.QtWidgets import QApplication
-        
-        def print_with_logs_and_events(*args, **kwargs):
+        # Define print redirect - send to dialog only (thread-safe via signal)
+        def print_with_logs(*args, **kwargs):
             msg = ' '.join(str(a) for a in args)
             if pwd_dialog:
                 pwd_dialog.update_logs(msg)
-                # Process GUI events so logs appear in real-time
-                QApplication.processEvents()
             # Do NOT print to terminal during operation - show ONLY in dialog
         
         # Redirect print BEFORE importing file_lock_manager
@@ -236,7 +232,7 @@ def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         
         # Create dummy streams to suppress non-dialog output
         dummy_stream = io.StringIO()
-        builtins.print = print_with_logs_and_events
+        builtins.print = print_with_logs
         
         try:
             # Suppress stdout/stderr during operation - all output should go to dialog
@@ -270,10 +266,6 @@ def perform_lock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             sys.stdout = original_stdout
             sys.stderr = original_stderr
             builtins.print = original_print
-            # Process events to show final logs in dialog
-            if pwd_dialog:
-                for _ in range(10):  # Process multiple times to ensure all updates show
-                    QApplication.processEvents()
     except Exception as e:
         logger.error(f"Lock operation error: {e}")
         if pwd_dialog:
@@ -369,15 +361,11 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         # Save original print before redirecting
         original_print = print
         
-        # Define print redirect with event processing - send to dialog, not terminal
-        from PyQt6.QtWidgets import QApplication
-        
-        def print_with_logs_and_events(*args, **kwargs):
+        # Define print redirect - send to dialog only (thread-safe via signal)
+        def print_with_logs(*args, **kwargs):
             msg = ' '.join(str(a) for a in args)
             if pwd_dialog:
                 pwd_dialog.update_logs(msg)
-                # Process GUI events so logs appear in real-time
-                QApplication.processEvents()
             # Do NOT print to terminal during operation - show ONLY in dialog
         
         # Redirect print BEFORE importing file_lock_manager
@@ -391,7 +379,7 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
         
         # Create dummy streams to suppress non-dialog output
         dummy_stream = io.StringIO()
-        builtins.print = print_with_logs_and_events
+        builtins.print = print_with_logs
         
         try:
             # Suppress stdout/stderr during operation - all output should go to dialog
@@ -400,6 +388,7 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             
             # Use the full file lock manager flow (matches CLI behavior)
             logger.info("Using full file lock manager with decryption support")
+            logger.info(f"[DEBUG] Absolute file path for unlock: {abs_file_path}")
             from core.windows.file_lock_manager_windows import FileLockManagerWindows
             
             config_folder = os.path.dirname(password_manager.password_file)
@@ -407,6 +396,14 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             
             # Set password bytes for decryption (this was cached when password was verified)
             file_lock_mgr.password_bytes = password_manager.get_password_bytes()
+            
+            # Log current locked items for debugging (write to stderr to avoid redirection)
+            import sys as sys_module
+            sys_module.stderr.write(f"[DEBUG] Current locked items count: {len(file_lock_mgr.locked_items)}\n")
+            for i, item in enumerate(file_lock_mgr.locked_items):
+                sys_module.stderr.write(f"[DEBUG]   Item {i}: path='{item['path']}'\n")
+            sys_module.stderr.write(f"[DEBUG] Trying to remove: '{abs_file_path}'\n")
+            sys_module.stderr.flush()
             
             # Unlock the item using the full remove_item() flow (handles decryption, ACL removal, config persistence)
             # Pass absolute path to match how items are stored
@@ -426,10 +423,6 @@ def perform_unlock_operation(file_path: str, password: str, pwd_dialog) -> bool:
             sys.stdout = original_stdout
             sys.stderr = original_stderr
             builtins.print = original_print
-            # Process events to show final logs in dialog
-            if pwd_dialog:
-                for _ in range(10):  # Process multiple times to ensure all updates show
-                    QApplication.processEvents()
     except Exception as e:
         logger.error(f"Unlock operation error: {e}")
         import traceback

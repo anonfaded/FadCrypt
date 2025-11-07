@@ -219,7 +219,7 @@ class ContextMenuPasswordDialog(QDialog):
         self.password_input.setFocus()
     
     def accept_dialog(self):
-        """Handle accept - set password, execute operation, and keep dialog open for logs"""
+        """Handle accept - set password, execute operation in background thread"""
         password = self.password_input.text()
         if not password:
             self.update_logs("❌ Password is required")
@@ -235,42 +235,50 @@ class ContextMenuPasswordDialog(QDialog):
         self.update_logs("")
         self.update_logs("🔄 Initializing operation...")
         
-        # Process events to show the messages
-        from PyQt6.QtWidgets import QApplication
-        QApplication.processEvents()
-        
-        # Call the operation callback if provided
-        success = False
+        # Use QTimer to defer operation start - ensures UI is responsive first
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self.start_operation(password))
+    
+    def start_operation(self, password):
+        """Start the operation in a background thread"""
+        # Call the operation callback in a BACKGROUND THREAD to prevent UI hanging
         if self.operation_callback:
-            try:
-                success = self.operation_callback(password, self)
-                
-                if success:
-                    self.update_logs("\n✓ Operation completed successfully")
-                    self.update_logs("\n📋 Review the logs above to see what was done")
-                    # Mark complete with success status
-                    self.mark_operation_complete(success)
-                else:
-                    # Check if it was password error (logs will show it)
-                    if "Incorrect password" in self.logs_text:
-                        self.update_logs("\n⚠️ Please try again with the correct password")
-                        # Re-enable password input for retry
-                        self.password_input.setEnabled(True)
-                        self.password_input.clear()
-                        self.password_input.setPlaceholderText("Enter password...")
-                        self.password_input.setFocus()
-                        self.unlock_btn.setEnabled(True)
-                        # Clear the operation logs but keep error message (HTML format)
-                        self.logs_text = '<span style="color: #ff4444; font-weight: bold;">❌ Incorrect password!</span><br><br><span style="color: #ffaa00; font-weight: bold;">⚠️ Please try again with the correct password</span><br>'
-                        # Force update display
-                        if self.logs_display:
-                            self.logs_display.setHtml(self.logs_text)
-                    else:
-                        self.update_logs("\n✗ Operation failed - see logs above")
-                        self.mark_operation_complete(False)
-                        
-            except Exception as e:
-                self.update_logs(f"\n❌ Error: {str(e)}")
+            def run_operation():
+                """Run operation in background thread"""
+                try:
+                    return self.operation_callback(password, self)
+                except Exception as e:
+                    self.update_logs(f"\n❌ Error: {str(e)}")
+                    return False
+            
+            # Create worker thread
+            self.worker = OperationWorker(run_operation)
+            self.worker.finished.connect(self.on_operation_finished)
+            self.worker.start()
+    
+    def on_operation_finished(self, success: bool):
+        """Handle operation completion from worker thread"""
+        if success:
+            self.update_logs("\n✓ Operation completed successfully")
+            self.update_logs("\n📋 Review the logs above to see what was done")
+            self.mark_operation_complete(success)
+        else:
+            # Check if it was password error (logs will show it)
+            if "Incorrect password" in self.logs_text:
+                self.update_logs("\n⚠️ Please try again with the correct password")
+                # Re-enable password input for retry
+                self.password_input.setEnabled(True)
+                self.password_input.clear()
+                self.password_input.setPlaceholderText("Enter password...")
+                self.password_input.setFocus()
+                self.unlock_btn.setEnabled(True)
+                # Clear the operation logs but keep error message (HTML format)
+                self.logs_text = '<span style="color: #ff4444; font-weight: bold;">❌ Incorrect password!</span><br><br><span style="color: #ffaa00; font-weight: bold;">⚠️ Please try again with the correct password</span><br>'
+                # Force update display
+                if self.logs_display:
+                    self.logs_display.setHtml(self.logs_text)
+            else:
+                self.update_logs("\n✗ Operation failed - see logs above")
                 self.mark_operation_complete(False)
     
     def accept(self):

@@ -341,8 +341,13 @@ class FileEncryptionManager(ABC):
         """
         global interrupted
         
-        # Set up signal handler for graceful interruption
-        old_handler = signal.signal(signal.SIGINT, signal_handler)
+        # Set up signal handler for graceful interruption (only works in main thread)
+        old_handler = None
+        try:
+            old_handler = signal.signal(signal.SIGINT, signal_handler)
+        except ValueError:
+            # Signal only works in main thread - skip handler setup if in worker thread
+            vlog("[FileEncryption] Skipping signal handler setup (not in main thread)")
         
         try:
             interrupted = False  # Reset interruption flag
@@ -769,8 +774,13 @@ class FileEncryptionManager(ABC):
             vlog(f"[FileEncryption] {error}")
             return False, "", error
         finally:
-            # Restore original signal handler
-            signal.signal(signal.SIGINT, old_handler)
+            # Restore original signal handler (only if it was set)
+            if old_handler is not None:
+                try:
+                    signal.signal(signal.SIGINT, old_handler)
+                except ValueError:
+                    # Not in main thread, ignore
+                    pass
             
             # Comprehensive cleanup of temporary resources
             if 'temp_encrypted_path' in locals() and os.path.exists(temp_encrypted_path):
@@ -804,8 +814,13 @@ class FileEncryptionManager(ABC):
         """
         global interrupted
         
-        # Set up signal handler for graceful interruption
-        old_handler = signal.signal(signal.SIGINT, signal_handler)
+        # Set up signal handler for graceful interruption (only works in main thread)
+        old_handler = None
+        try:
+            old_handler = signal.signal(signal.SIGINT, signal_handler)
+        except ValueError:
+            # Signal only works in main thread - skip handler setup if in worker thread
+            vlog("[FileEncryption] Skipping signal handler setup (not in main thread)")
         
         try:
             interrupted = False  # Reset interruption flag
@@ -1041,8 +1056,13 @@ class FileEncryptionManager(ABC):
             vlog(f"[FileEncryption] {error}")
             return False, error
         finally:
-            # Restore original signal handler
-            signal.signal(signal.SIGINT, old_handler)
+            # Restore original signal handler (only if it was set)
+            if old_handler is not None:
+                try:
+                    signal.signal(signal.SIGINT, old_handler)
+                except ValueError:
+                    # Not in main thread, ignore
+                    pass
             
             # Comprehensive cleanup of temporary resources
             # temp_extract_dir no longer needed - extracting directly to output path
