@@ -45,6 +45,12 @@ class ContextMenuPasswordDialog(QDialog):
         self.log_signal.connect(self._update_logs_slot)
         
         self.setWindowTitle("FadCrypt - Security Authorization")
+        
+        # Set window icon
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'img', 'icon.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         self.setGeometry(100, 100, 600, 450)
         self.setMinimumSize(600, 450)
         self.setStyleSheet("""
@@ -133,24 +139,6 @@ class ContextMenuPasswordDialog(QDialog):
     
     def init_ui(self):
         """Initialize UI"""
-        # Set window icon
-        try:
-            import sys
-            import os
-            def resource_path(relative_path):
-                try:
-                    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
-                except Exception:
-                    base_path = os.path.abspath(".")
-                return os.path.join(base_path, relative_path)
-            
-            icon_path = resource_path("img/icon.ico")
-            if os.path.exists(icon_path):
-                from PyQt6.QtGui import QIcon
-                self.setWindowIcon(QIcon(icon_path))
-        except:
-            pass
-        
         layout = QVBoxLayout()
         layout.setSpacing(12)
         layout.setContentsMargins(15, 15, 15, 15)
