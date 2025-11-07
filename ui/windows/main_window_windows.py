@@ -13,6 +13,8 @@ except ImportError:
     WINDOWS_AVAILABLE = False
 
 from ui.base.main_window_base import MainWindowBase
+from core.windows.elevation_manager import get_elevation_manager
+from core.windows.elevated_service_client import get_elevated_client
 
 
 class MainWindowWindows(MainWindowBase):
@@ -32,8 +34,73 @@ class MainWindowWindows(MainWindowBase):
     
     def setup_windows_specifics(self):
         """Initialize Windows-specific features"""
+        # Initialize elevation manager for fallback operations
+        self.elevation_manager = get_elevation_manager()
+
+        # Initialize elevated service client for persistent admin rights
+        self.elevated_client = get_elevated_client()
+
+        # Check if elevated service is available
+        if self.elevated_client.is_available():
+            print("[MainWindowWindows] ✅ Elevated service available - persistent admin rights ready")
+        else:
+            print("[MainWindowWindows] ⚠️  Elevated service not available - using fallback elevation")
+            self._setup_persistent_elevation()
+
+        # Check and fix autostart registry entry if needed
+        self._check_autostart_registry()
+        
         # Platform-specific initialization complete
         pass
+    
+    def _setup_persistent_elevation(self):
+        """Set up persistent elevated access across reboots"""
+        try:
+            # Elevation manager is ready for on-demand elevated operations
+            print("[MainWindowWindows] Elevation manager ready for persistent admin operations")
+        except Exception as e:
+            print(f"[MainWindowWindows] Error setting up elevation: {e}")
+    
+    def _check_autostart_registry(self):
+        """Check if autostart registry entry exists and points to valid executable"""
+        if not WINDOWS_AVAILABLE:
+            return
+            
+        try:
+            # Check if autostart is currently enabled
+            if self.is_autostart_enabled_windows():
+                # Get current registry value
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Run",
+                    0,
+                    winreg.KEY_READ
+                )
+                
+                try:
+                    current_value, _ = winreg.QueryValueEx(key, "FadCrypt")
+                    winreg.CloseKey(key)
+                    
+                    # Get what the registry value should be
+                    if getattr(sys, 'frozen', False):
+                        expected_exec_path = sys.executable
+                    else:
+                        expected_exec_path = f'pythonw "{os.path.abspath(sys.argv[0])}"'
+                    
+                    expected_value = f'"{expected_exec_path}" --auto-monitor'
+                    
+                    # If registry doesn't match current executable, update it
+                    if current_value != expected_value:
+                        print(f"[MainWindowWindows] Updating autostart registry from '{current_value}' to '{expected_value}'")
+                        self.setup_autostart_windows(enable=True)
+                        
+                except FileNotFoundError:
+                    # Registry value doesn't exist, re-enable it
+                    print("[MainWindowWindows] Autostart registry entry missing, re-enabling...")
+                    self.setup_autostart_windows(enable=True)
+                    
+        except Exception as e:
+            print(f"[MainWindowWindows] Error checking autostart registry: {e}")
     
     def get_platform_name(self):
         """Override to always return Windows for this implementation"""
@@ -188,10 +255,10 @@ class MainWindowWindows(MainWindowBase):
         Get the FadCrypt configuration folder for Windows.
         
         Returns:
-            str: Path to %APPDATA%\\FadCrypt\\
+            str: Path to %APPDATA%\\FadCrypt\\config\\
         """
         appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        config_dir = os.path.join(appdata, 'FadCrypt')
+        config_dir = os.path.join(appdata, 'FadCrypt', 'config')
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
     
@@ -200,106 +267,159 @@ class MainWindowWindows(MainWindowBase):
         Get the backup folder for Windows.
         
         Returns:
-            str: Path to C:\\ProgramData\\FadCrypt\\Backup\\
+            str: Path to %APPDATA%\\FadCrypt\\backup\\
         """
-        programdata = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        backup_dir = os.path.join(programdata, 'FadCrypt', 'Backup')
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        backup_dir = os.path.join(appdata, 'FadCrypt', 'backup')
         os.makedirs(backup_dir, exist_ok=True)
         return backup_dir
+    
+    def get_logs_folder(self):
+        """
+        Get the logs folder for Windows.
+        
+        Returns:
+            str: Path to %APPDATA%\\FadCrypt\\logs\\
+        """
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        logs_dir = os.path.join(appdata, 'FadCrypt', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        return logs_dir
+    
+    def get_temp_folder(self):
+        """
+        Get the temp folder for Windows.
+        
+        Returns:
+            str: Path to %APPDATA%\\FadCrypt\\temp\\
+        """
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        temp_dir = os.path.join(appdata, 'FadCrypt', 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        return temp_dir
     
     def disable_system_tools(self):
         """
         Disable Command Prompt, Task Manager, Control Panel, and Registry Editor.
-        This is called when "Disable Main loopholes" is enabled before monitoring starts.
-        Note: Does NOT disable PowerShell as it's harder to detect and manage.
+        Uses elevated service for seamless operation without admin prompts.
         """
-        if not WINDOWS_AVAILABLE:
-            print("Warning: Windows registry tools not available on this platform")
-            return False
-        
+        print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
+
+        # Try elevated service first (persistent admin rights)
+        if self.elevated_client.is_available():
+            success, error = self.elevated_client.disable_system_tools()
+            if success:
+                print("✅ System tools disabled successfully via elevated service")
+                return True
+            else:
+                print(f"⚠️  Elevated service failed: {error}, trying fallback...")
+
+        # Fallback to elevation manager
         try:
-            # Check for admin privileges
-            if not ctypes.windll.shell32.IsUserAnAdmin():
-                print("Warning: Administrative privileges required to disable system tools.")
-                QMessageBox.warning(
-                    self,
-                    "Admin Required",
-                    "Administrator privileges are required to disable system tools.\n"
-                    "Please run FadCrypt as Administrator."
-                )
+            success, error = self.elevation_manager.disable_system_tools()
+            if success:
+                print("✅ System tools disabled successfully via elevation manager")
+                return True
+            else:
+                print(f"⚠️  Failed to disable system tools: {error}")
+                print("ℹ️  Elevation manager may need setup or admin approval")
                 return False
 
-            # Registry keys to modify
-            keys_to_modify = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
-            ]
-
-            for reg_path, value_name in keys_to_modify:
-                try:
-                    # Create/open the registry key
-                    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-                    # Set the value to disable
-                    winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, 1)
-                    winreg.CloseKey(key)
-                    print(f"✓ {value_name} disabled successfully")
-                except Exception as e:
-                    print(f"✗ Error disabling {value_name}: {e}")
-
-            print("System tools disabled successfully")
-            return True
-
         except Exception as e:
-            print(f"Failed to disable system tools: {e}")
+            print(f"❌ Error disabling system tools: {e}")
             return False
     
     def enable_system_tools(self):
         """
         Re-enable Command Prompt, Task Manager, Control Panel, and Registry Editor.
-        This is called when monitoring stops or during cleanup.
+        Uses elevated service for seamless operation without admin prompts.
         """
-        if not WINDOWS_AVAILABLE:
-            print("Warning: Windows registry tools not available on this platform")
-            return False
-        
+        print("🔓 Re-enabling system tools...")
+
+        # Try elevated service first (persistent admin rights)
+        if self.elevated_client.is_available():
+            success, error = self.elevated_client.enable_system_tools()
+            if success:
+                print("✅ System tools re-enabled successfully via elevated service")
+                return True
+            else:
+                print(f"⚠️  Elevated service failed: {error}, trying fallback...")
+
+        # Fallback to elevation manager
         try:
-            if not ctypes.windll.shell32.IsUserAnAdmin():
-                print("Warning: Administrative privileges required to enable system tools.")
-                QMessageBox.warning(
-                    self,
-                    "Admin Required",
-                    "Administrator privileges are required to enable system tools.\n"
-                    "Please run FadCrypt as Administrator."
-                )
+            success, error = self.elevation_manager.enable_system_tools()
+            if success:
+                print("✅ System tools re-enabled successfully via elevation manager")
+                return True
+            else:
+                print(f"⚠️  Failed to re-enable system tools: {error}")
+                print("ℹ️  Elevation manager may need setup or admin approval")
                 return False
 
-            keys_to_modify = [
-                (r'Software\Policies\Microsoft\Windows\System', 'DisableCMD'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
-                (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
-            ]
-
-            for reg_path, value_name in keys_to_modify:
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
-                    try:
-                        winreg.DeleteValue(key, value_name)
-                        print(f"✓ {value_name} enabled successfully")
-                    except FileNotFoundError:
-                        print(f"ℹ {value_name} was not disabled (already enabled)")
-                    winreg.CloseKey(key)
-                except FileNotFoundError:
-                    print(f"ℹ Registry key for {value_name} doesn't exist (already enabled)")
-                except Exception as e:
-                    print(f"✗ Error enabling {value_name}: {e}")
-
-            print("System tools enabled successfully")
-            return True
-
         except Exception as e:
-            print(f"Failed to enable system tools: {e}")
+            print(f"❌ Error re-enabling system tools: {e}")
+            return False
+    
+    def cleanup_context_menu(self):
+        """
+        Remove FadCrypt context menu entries from Windows registry.
+        Called during uninstall cleanup.
+        """
+        try:
+            from core.windows.shell_extension import ContextMenuManager
+            manager = ContextMenuManager()
+            if manager.unregister_context_menu():
+                print("Context menu entries removed successfully")
+                return True
+            else:
+                print("No context menu entries found to remove")
+                return True
+        except Exception as e:
+            print(f"Failed to remove context menu entries: {e}")
+            return False
+    
+    def refresh_context_menu(self):
+        """
+        Force refresh FadCrypt context menu entries in Windows registry.
+        Called when user clicks the refresh button in settings.
+        """
+        try:
+            from core.windows.shell_extension import ContextMenuManager
+            import subprocess
+            manager = ContextMenuManager()
+            
+            print("[CONTEXT MENU] Starting force refresh of context menu entries...", flush=True)
+            
+            # Show progress message
+            QMessageBox.information(
+                self,
+                "Refreshing Context Menu",
+                "Refreshing Windows Explorer context menu entries...\n\nThis will restart Windows Explorer."
+            )
+            
+            if manager.force_register_context_menu():
+                print("[CONTEXT MENU] Context menu refreshed successfully", flush=True)
+                
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    "Context menu entries refreshed successfully!"
+                )
+                return True
+            else:
+                print("[CONTEXT MENU] Failed to refresh context menu entries", flush=True)
+                QMessageBox.warning(
+                    self,
+                    "Refresh Failed",
+                    "Failed to refresh context menu entries.\n\nPlease check the console for error details."
+                )
+                return False
+        except Exception as e:
+            print(f"[CONTEXT MENU] Failed to refresh context menu entries: {e}", flush=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to refresh context menu entries:\n{str(e)}"
+            )
             return False
 

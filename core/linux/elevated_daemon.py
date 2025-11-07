@@ -9,7 +9,6 @@ Enables seamless elevated operations across reboots without password prompts
 Operations:
 - chattr: Set/unset immutable flag on files
 - chmod: Change file permissions
-- restore: Restore file from backup
 - fanotify_watch: Monitor file/folder access with kernel-level interception
 - fanotify_unwatch: Stop monitoring files/folders
 

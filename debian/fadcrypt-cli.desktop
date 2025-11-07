@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=FadCrypt CLI
+Comment=FadCrypt Terminal Interface
+Exec=fadcrypt-cli
+Icon=fadcrypt_cli
+Terminal=false
+Categories=Utility;Security;
+StartupNotify=true
+Keywords=lock;monitor;security;password;cli;terminal;

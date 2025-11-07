@@ -1,10 +1,11 @@
 """Password Dialog for FadCrypt"""
 
+import os
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QFrame, QProgressBar, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QIcon
 
 
 class PasswordDialog(QDialog):
@@ -25,6 +26,12 @@ class PasswordDialog(QDialog):
         self.has_recovery_codes = has_recovery_codes
         
         self.setWindowTitle(title)
+        
+        # Set window icon
+        icon_path = self.resource_path('img/icon.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         self.init_ui(title, prompt)
         
     def init_ui(self, title, prompt):
@@ -34,21 +41,35 @@ class PasswordDialog(QDialog):
             self.setWindowFlags(
                 Qt.WindowType.Window |  # Independent window (not child)
                 Qt.WindowType.FramelessWindowHint |  # No title bar
-                Qt.WindowType.WindowStaysOnTopHint |  # Always on top
-                Qt.WindowType.BypassWindowManagerHint  # Bypass window manager (ensures visibility)
+                Qt.WindowType.WindowStaysOnTopHint  # Always on top
+                # Removed BypassWindowManagerHint as it can cause positioning issues
             )
             # Make dialog modal to block all other windows
             self.setModal(True)
             
-            # Show fullscreen on all screens
-            self.showFullScreen()
+            # Get screen size and manually set fullscreen
+            from PyQt6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            if screen:
+                screen_geometry = screen.geometry()
+                print(f"[Fullscreen] Setting dialog to screen geometry: {screen_geometry.width()}x{screen_geometry.height()}")
+                self.setGeometry(screen_geometry)  # Set to full screen geometry
+                self.move(0, 0)  # Ensure positioned at top-left
+                self.show()  # Show first, then set wallpaper
+                print(f"[Fullscreen] Dialog geometry after show: {self.geometry()}")
+            else:
+                # Fallback if no screen found
+                print("[Fullscreen] No primary screen found, using showFullScreen()")
+                self.showFullScreen()
             
             # Force activation and raise to top
             self.activateWindow()
             self.raise_()
             
-            # Set wallpaper background
-            self.set_wallpaper_background()
+            print(f"[Fullscreen] Dialog visible: {self.isVisible()}, active: {self.isActiveWindow()}")
+            print(f"[Fullscreen] Dialog modal: {self.isModal()}")
+            
+            # Wallpaper will be set after UI initialization
         else:
             # Simple dialog mode - responsive design
             self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
@@ -67,13 +88,23 @@ class PasswordDialog(QDialog):
         
         # Content frame - compact dark theme without border
         content_frame = QFrame()
-        content_frame.setStyleSheet("""
-            QFrame {
-                background-color: #1e1e1e;
-                border: none;
-                border-radius: 10px;
-            }
-        """)
+        if self.fullscreen:
+            print(f"[Fullscreen] Creating content frame for fullscreen mode")
+            content_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #1e1e1e;
+                    border: none;
+                    border-radius: 15px;
+                }
+            """)
+        else:
+            content_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #1e1e1e;
+                    border: none;
+                    border-radius: 10px;
+                }
+            """)
         
         if self.fullscreen:
             # Set minimum size but allow dynamic expansion
@@ -233,7 +264,7 @@ class PasswordDialog(QDialog):
             # Warning if no recovery codes
             if not self.has_recovery_codes:
                 warning_label = QLabel(
-                    "⚠️  No recovery codes generated!\n"
+                    "WARN  No recovery codes generated!\n"
                     "Generate them from Settings → Generate Recovery Codes"
                 )
                 warning_label.setStyleSheet("""
@@ -261,7 +292,8 @@ class PasswordDialog(QDialog):
         cancel_button.setFixedSize(120, 36)
         cancel_button.setStyleSheet("""
             QPushButton {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4a4a4a, stop:1 #2a2a2a);
                 color: #e0e0e0;
                 border: none;
                 border-radius: 6px;
@@ -269,10 +301,12 @@ class PasswordDialog(QDialog):
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #464646;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5a5a5a, stop:1 #3a3a3a);
             }
             QPushButton:pressed {
-                background-color: #2e2e2e;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2a2a2a, stop:1 #1a1a1a);
             }
         """)
         cancel_button.clicked.connect(self.reject)
@@ -287,7 +321,8 @@ class PasswordDialog(QDialog):
         ok_button.setFixedSize(120, 36)
         ok_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -295,10 +330,12 @@ class PasswordDialog(QDialog):
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #9a0007;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         ok_button.clicked.connect(self.on_ok)
@@ -313,14 +350,21 @@ class PasswordDialog(QDialog):
         main_layout.addWidget(content_frame)
         self.setLayout(main_layout)
         
-        # Adjust dialog size to fit content
-        self.adjustSize()
+        if self.fullscreen:
+            print(f"[Fullscreen] Content frame added to layout, frame size: {content_frame.size()}")
+            print(f"[Fullscreen] Main layout alignment: {main_layout.alignment()}")
+        else:
+            # Adjust dialog size to fit content (only for non-fullscreen mode)
+            self.adjustSize()
         
-        # Set minimum size after calculating content size
-        min_width = max(440, self.width())
-        min_height = max(240, self.height())
-        self.setMinimumSize(min_width, min_height)
-        self.resize(min_width, min_height)
+        if self.fullscreen:
+            print(f"[Fullscreen] Skipping size adjustment for fullscreen mode")
+        else:
+            # Set minimum size after calculating content size (only for non-fullscreen mode)
+            min_width = max(440, self.width())
+            min_height = max(240, self.height())
+            self.setMinimumSize(min_width, min_height)
+            self.resize(min_width, min_height)
         
         # Center dialog on screen (must be done after setLayout and adjustSize)
         if not self.fullscreen:
@@ -328,6 +372,11 @@ class PasswordDialog(QDialog):
         
         # Focus on password input
         self.password_input.setFocus()
+        
+        # For fullscreen mode, set wallpaper after everything is initialized
+        if self.fullscreen:
+            print(f"[Fullscreen] Setting wallpaper after UI initialization")
+            self.set_wallpaper_background()
     
     def center_on_screen(self):
         """Center the dialog on the screen"""
@@ -342,10 +391,11 @@ class PasswordDialog(QDialog):
             print(f"   Dialog size: {self.width()}x{self.height()}")
             self.move(x, y)
         else:
-            print("[PasswordDialog] ⚠️  No screen found, cannot center")
+            print("[PasswordDialog] WARN  No screen found, cannot center")
         
     def set_wallpaper_background(self):
         """Set wallpaper background for fullscreen mode"""
+        print(f"[Wallpaper] Setting wallpaper background, choice: {self.wallpaper_choice}")
         try:
             # Map wallpaper choices to actual wallpaper image files (.jpg, not preview .png)
             wallpaper_map = {
@@ -355,7 +405,7 @@ class PasswordDialog(QDialog):
                 'encrypted': 'wall4.jpg'
             }
             
-            wallpaper_file = wallpaper_map.get(self.wallpaper_choice, 'wall1.jpg')
+            wallpaper_file = wallpaper_map.get(self.wallpaper_choice or 'default', 'wall1.jpg')
             wallpaper_path = self.resource_path(f"img/{wallpaper_file}")
             
             pixmap = QPixmap(wallpaper_path)
@@ -396,6 +446,10 @@ class PasswordDialog(QDialog):
                 palette.setBrush(QPalette.ColorRole.Window, QBrush(full_pixmap))
                 self.setPalette(palette)
                 
+                # Also try setting stylesheet as backup
+                self.setStyleSheet("")
+                
+                print(f"[Wallpaper] Applied wallpaper via palette to dialog")
                 print(f"[Wallpaper] Loaded: {wallpaper_file}")
                 print(f"   Original: {pixmap.width()}x{pixmap.height()}")
                 print(f"   Scaled: {scaled_pixmap.width()}x{scaled_pixmap.height()}")

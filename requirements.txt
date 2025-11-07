@@ -5,8 +5,13 @@ pystray
 watchdog
 pygame
 requests
+colorama  # For colored TUI output
 
 # PyQt6 dependencies (modern UI framework)
 PyQt6
 PyQtGraph
 numpy>=1.20.0  # Required by PyQtGraph for charts
+
+# Windows-specific dependencies
+pywin32 ; sys_platform == "win32"  # Required for Windows services and registry operations
+windows-curses ; sys_platform == "win32"

@@ -25,13 +25,23 @@ command -v pyinstaller >/dev/null 2>&1 || { echo "Error: pyinstaller not found. 
 echo "Cleaning previous builds..."
 rm -rf build dist fadcrypt-deb
 
-# Build with PyInstaller
-echo "Building executable with PyInstaller..."
+# Build GUI executable with PyInstaller (console=False)
+echo "Building GUI executable with PyInstaller..."
 pyinstaller --clean FadCrypt_Linux.spec
 
-# Check if build succeeded
+# Check if GUI build succeeded
 if [ ! -f "dist/fadcrypt" ]; then
-    echo "Error: Build failed - executable not found"
+    echo "Error: GUI build failed - executable not found"
+    exit 1
+fi
+
+# Build CLI executable with PyInstaller (console=True)
+echo "Building CLI executable with PyInstaller..."
+pyinstaller --clean FadCrypt_Linux_CLI.spec
+
+# Check if CLI build succeeded
+if [ ! -f "dist/fadcrypt-cli" ]; then
+    echo "Error: CLI build failed - executable not found"
     exit 1
 fi
 
@@ -48,8 +58,11 @@ mkdir -p fadcrypt-deb/usr/share/fadcrypt
 # Copy files
 echo "Copying files..."
 cp dist/fadcrypt fadcrypt-deb/usr/bin/
+cp dist/fadcrypt-cli fadcrypt-deb/usr/bin/
 cp debian/fadcrypt.desktop fadcrypt-deb/usr/share/applications/
+cp debian/fadcrypt-cli.desktop fadcrypt-deb/usr/share/applications/
 cp img/1.png fadcrypt-deb/usr/share/pixmaps/fadcrypt.png
+cp img/fadcrypt_cli.png fadcrypt-deb/usr/share/pixmaps/fadcrypt_cli.png
 cp LICENSE fadcrypt-deb/usr/share/doc/fadcrypt/
 cp README.md fadcrypt-deb/usr/share/doc/fadcrypt/
 
@@ -78,7 +91,9 @@ fi
 
 # Set permissions
 chmod 755 fadcrypt-deb/usr/bin/fadcrypt
+chmod 755 fadcrypt-deb/usr/bin/fadcrypt-cli
 chmod 644 fadcrypt-deb/usr/share/applications/fadcrypt.desktop
+chmod 644 fadcrypt-deb/usr/share/applications/fadcrypt-cli.desktop
 
 # Create control file with dynamic size
 INSTALLED_SIZE=$(du -sk fadcrypt-deb/usr | cut -f1)

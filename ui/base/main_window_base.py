@@ -3,6 +3,7 @@
 import sys
 import os
 import json
+import ctypes
 import webbrowser
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
@@ -23,13 +24,12 @@ from ui.dialogs.password_dialog import ask_password
 from core.crypto_manager import CryptoManager
 from core.password_manager import PasswordManager
 from core.config_manager import ConfigManager
-from core.application_manager import ApplicationManager
 from core.activity_manager import ActivityManager
 from core.statistics_manager import StatisticsManager
 from core.file_protection import get_file_protection_manager
 
 # Import version info
-from version import __version__, __version_code__
+from core.version import __version__, __version_code__
 
 
 class JsonSyntaxHighlighter(QSyntaxHighlighter):
@@ -83,6 +83,72 @@ class JsonSyntaxHighlighter(QSyntaxHighlighter):
             start = match.capturedStart() + text[match.capturedStart():].index('"')
             length = match.capturedEnd() - start
             self.setFormat(start, length, self.formats['string'])
+
+
+class LogSyntaxHighlighter(QSyntaxHighlighter):
+    """Syntax highlighter for application logs"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # Define formats for log elements
+        self.formats = {}
+        
+        # Log levels
+        error_format = QTextCharFormat()
+        error_format.setForeground(QColor("#ff6b6b"))  # Red
+        self.formats['error'] = error_format
+        
+        warning_format = QTextCharFormat()
+        warning_format.setForeground(QColor("#ffd93d"))  # Yellow
+        self.formats['warning'] = warning_format
+        
+        info_format = QTextCharFormat()
+        info_format.setForeground(QColor("#6bcf7f"))  # Green
+        self.formats['info'] = info_format
+        
+        debug_format = QTextCharFormat()
+        debug_format.setForeground(QColor("#4ecdc4"))  # Cyan
+        self.formats['debug'] = debug_format
+        
+        # Timestamps and paths (gray)
+        timestamp_format = QTextCharFormat()
+        timestamp_format.setForeground(QColor("#888888"))  # Gray
+        self.formats['timestamp'] = timestamp_format
+        
+    def highlightBlock(self, text):
+        """Apply syntax highlighting to a block of text"""
+        # Highlight log levels
+        error_pattern = QRegularExpression(r'\b(ERROR|FATAL|CRITICAL)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = error_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['error'])
+        
+        warning_pattern = QRegularExpression(r'\b(WARNING|WARN)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = warning_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['warning'])
+        
+        info_pattern = QRegularExpression(r'\b(INFO|INFORMATION)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = info_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['info'])
+        
+        debug_pattern = QRegularExpression(r'\b(DEBUG|TRACE)\b', QRegularExpression.CaseInsensitiveOption)
+        iterator = debug_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['debug'])
+        
+        # Highlight timestamps (HH:MM:SS or ISO format)
+        timestamp_pattern = QRegularExpression(r'\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}')
+        iterator = timestamp_pattern.globalMatch(text)
+        while iterator.hasNext():
+            match = iterator.next()
+            self.setFormat(match.capturedStart(), match.capturedLength(), self.formats['timestamp'])
         
         # Highlight numbers
         number_pattern = QRegularExpression(r'\b\d+\.?\d*\b')
@@ -162,6 +228,32 @@ class MainWindowBase(QMainWindow):
             self.file_lock_manager.set_password_callback(self._handle_file_access_permission)
             print("✅ Fanotify password callback set (Linux)")
         
+        # Initialize flag to track if we've verified password for encryption this session
+        self._encryption_password_verified = False
+        
+        # PRE-LOAD PASSWORD FOR ENCRYPTION: Check if encryption is enabled and load password
+        # This ensures seamless encryption without prompts at monitoring start
+        try:
+            config_file = os.path.join(fadcrypt_folder, "apps_config.json")
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    import json
+                    config = json.load(f)
+                    dangerous_ops = config.get("dangerous_operations", {})
+                    encryption_enabled = dangerous_ops.get("encryption", False)
+                    
+                    if encryption_enabled and os.path.exists(password_file):
+                        print("[Init] Encryption is enabled - password will be loaded at first monitoring start")
+        except Exception as e:
+            print(f"[Init] Warning checking encryption: {e}")
+        
+        # Update file lock manager with cached password for encryption operations
+        self._update_file_lock_manager_password()
+        
+        # SEAMLESS ENCRYPTION: Master password persists in encrypted_password.bin
+        # At monitoring start, we auto-use cached password (from PasswordManager) - no new file needed
+        print("[Startup] Encryption setup: Will use persistent master password (encrypted_password.bin) for seamless operation")
+        
         # Log important paths at startup
         print("\n📁 FadCrypt File Locations:")
         print(f"   Main Config Folder: {fadcrypt_folder}")
@@ -225,6 +317,14 @@ class MainWindowBase(QMainWindow):
         
         # Connect cleanup button to cleanup handler
         self.settings_panel.on_cleanup_clicked = self.cleanup_before_uninstall
+        
+        # Connect export/import config buttons
+        self.settings_panel.export_config_requested.connect(self.on_export_config)
+        self.settings_panel.import_config_requested.connect(self.on_import_config)
+        
+        # Connect context menu refresh button (Windows only)
+        if hasattr(self.settings_panel, 'on_refresh_context_menu'):
+            self.settings_panel.on_refresh_context_menu = self.refresh_context_menu
         
         # Center window after everything is initialized
         from PyQt6.QtCore import QTimer
@@ -351,6 +451,49 @@ class MainWindowBase(QMainWindow):
         self.create_settings_tab()
         self.create_about_tab()
         
+        # Setup file watcher for config file to auto-refresh Files & Folders tab
+        self.setup_config_file_watcher()
+    
+    def setup_config_file_watcher(self):
+        """Setup file watcher to auto-refresh Files & Folders tab when config changes"""
+        from PyQt6.QtCore import QFileSystemWatcher, QTimer
+        
+        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+        
+        self.config_watcher = QFileSystemWatcher()
+        self.config_watcher.addPath(config_file)
+        
+        # Use a timer to debounce rapid file changes
+        self.config_refresh_timer = QTimer()
+        self.config_refresh_timer.setSingleShot(True)
+        self.config_refresh_timer.timeout.connect(self.refresh_files_tab)
+        
+        # Flag to prevent refresh loops
+        self._refreshing_files = False
+        
+        # Connect file watcher to debounced refresh
+        self.config_watcher.fileChanged.connect(lambda: self.config_refresh_timer.start(500))
+        
+        print(f"✅ Config file watcher setup for: {config_file}")
+    
+    def refresh_files_tab(self):
+        """Refresh the Files & Folders tab from disk"""
+        if self._refreshing_files:
+            return
+            
+        try:
+            self._refreshing_files = True
+            print("[UI] Auto-refreshing Files & Folders tab...")
+            self.load_locked_files()
+            
+            # Re-add the file to watcher (it gets removed after file changes)
+            config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+            if config_file not in self.config_watcher.files():
+                self.config_watcher.addPath(config_file)
+        except Exception as e:
+            print(f"[UI] Error refreshing files tab: {e}")
+        finally:
+            self._refreshing_files = False
     
     def init_system_tray(self):
         """Initialize system tray icon"""
@@ -364,6 +507,7 @@ class MainWindowBase(QMainWindow):
         self.system_tray.stop_monitoring_requested.connect(self.on_stop_monitoring)
         self.system_tray.snake_game_requested.connect(self.on_snake_game)
         self.system_tray.stats_requested.connect(self.open_stats_window)
+        self.system_tray.fadguide_requested.connect(self.open_fadguide)
         self.system_tray.exit_requested.connect(self.on_exit_requested)
         
         # Show tray icon
@@ -501,7 +645,8 @@ class MainWindowBase(QMainWindow):
         self.monitoring_button.setFixedSize(180, 44)  # Consistent size
         self.monitoring_button.setStyleSheet("""
             QPushButton {
-                background-color: #2e7d32;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 font-size: 13px;
                 font-weight: bold;
@@ -511,10 +656,16 @@ class MainWindowBase(QMainWindow):
                 text-align: center;
             }
             QPushButton:hover {
-                background-color: #388e3c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
             QPushButton:disabled {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
                 color: #666666;
             }
         """)
@@ -535,7 +686,8 @@ class MainWindowBase(QMainWindow):
         
         button_style = """
             QPushButton {
-                background-color: #2a2a2a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -544,11 +696,13 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #3a3a3a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:disabled {
-                background-color: #1a1a1a;
-                color: #555555;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
+                color: #666666;
             }
         """
         
@@ -615,7 +769,8 @@ class MainWindowBase(QMainWindow):
         snake_button.setFixedWidth(180)
         snake_button.setStyleSheet("""
             QPushButton {
-                background-color: #512da8;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #7b2cbf, stop:1 #512da8);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -624,7 +779,8 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #6a3ab2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9d4edd, stop:1 #7b2cbf);
             }
         """)
         snake_button.clicked.connect(self.on_snake_game)
@@ -634,7 +790,8 @@ class MainWindowBase(QMainWindow):
         stats_button.setFixedWidth(180)
         stats_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2196f3, stop:1 #1976d2);
                 color: white;
                 font-weight: bold;
                 padding: 8px 12px;
@@ -643,11 +800,37 @@ class MainWindowBase(QMainWindow):
                 border: none;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #42a5f5, stop:1 #2196f3);
             }
         """)
         stats_button.clicked.connect(self.open_stats_window)
         sidebar_layout.addWidget(stats_button)
+        
+        fadguide_button = QPushButton("FadGuide")
+        fadguide_button.setFixedWidth(180)
+        fadguide_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #e73656, stop:1 #c41e3a);
+                color: white;
+                font-weight: bold;
+                padding: 8px 12px;
+                border-radius: 5px;
+                text-align: center;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff4466, stop:1 #e73656);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #c41e3a, stop:1 #a01729);
+            }
+        """)
+        fadguide_button.clicked.connect(self.open_fadguide)
+        sidebar_layout.addWidget(fadguide_button)
         
         sidebar_layout.addStretch()
         
@@ -659,7 +842,9 @@ class MainWindowBase(QMainWindow):
         # Vertical separator
         separator_v = QFrame()
         separator_v.setFrameShape(QFrame.Shape.VLine)
-        separator_v.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_v.setFrameShadow(QFrame.Shadow.Plain)
+        separator_v.setLineWidth(1)
+        separator_v.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 0px 10px; max-width: 1px; min-width: 1px;")
         content_layout.addWidget(separator_v)
         
         # Right side - with background flag image at bottom
@@ -687,7 +872,9 @@ class MainWindowBase(QMainWindow):
         # Horizontal Separator before footer
         separator_h = QFrame()
         separator_h.setFrameShape(QFrame.Shape.HLine)
-        separator_h.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_h.setFrameShadow(QFrame.Shadow.Plain)
+        separator_h.setLineWidth(1)
+        separator_h.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         main_layout.addWidget(separator_h)
         
         # Footer with logo, branding, GitHub link
@@ -764,7 +951,7 @@ class MainWindowBase(QMainWindow):
                 font-size: 13px;
             }
             QLineEdit:focus {
-                border: 2px solid #3b82f6;
+                border: 2px solid #ff3333;
             }
         """)
         search_filter_layout.addWidget(self.app_search_input, stretch=1)
@@ -789,7 +976,7 @@ class MainWindowBase(QMainWindow):
                 font-size: 12px;
             }
             QComboBox:hover {
-                border: 2px solid #3b82f6;
+                border: 2px solid #ff3333;
             }
             QComboBox::drop-down {
                 border: none;
@@ -807,7 +994,7 @@ class MainWindowBase(QMainWindow):
             QComboBox QAbstractItemView {
                 background-color: #1a1a1a;
                 color: #e5e7eb;
-                selection-background-color: #3b82f6;
+                selection-background-color: #ff3333;
                 border: 1px solid #333333;
             }
         """)
@@ -867,105 +1054,100 @@ class MainWindowBase(QMainWindow):
         # ============================================
         files_tab = QWidget()
         files_layout = QVBoxLayout(files_tab)
-        files_layout.setContentsMargins(20, 20, 20, 20)
-        files_layout.setSpacing(15)
+        files_layout.setContentsMargins(10, 10, 10, 10)
+        files_layout.setSpacing(8)
         
-        # Header
-        files_header = QLabel("🔒 Protected Files & Folders")
-        files_header.setStyleSheet("""
-            QLabel {
-                font-size: 18pt;
-                font-weight: bold;
-                color: #ffffff;
-                padding: 10px;
-            }
+        # Header with count
+        header_layout = QHBoxLayout()
+        self.files_count_label = QLabel("Protected Items: 0")
+        self.files_count_label.setStyleSheet("""
+            color: #ffffff;
+            font-size: 13pt;
+            font-weight: bold;
         """)
-        files_layout.addWidget(files_header)
+        header_layout.addWidget(self.files_count_label)
+        header_layout.addStretch()
+        files_layout.addLayout(header_layout)
         
-        # Description
+        # Description + FadGuide button (2 columns)
+        desc_button_layout = QHBoxLayout()
+        desc_button_layout.setSpacing(10)
+        
+        # Description (left side - no examples, just brief info)
         files_desc = QLabel(
-            "Lock files and folders to prevent read, write, delete, or rename operations. "
-            "Locked items are completely inaccessible until monitoring is stopped."
+            "🔒 Manage encrypted files and folders via CLI. "
+            "Enable encryption in Settings for AES-256-GCM protection. "
+            "Click FadGuide for commands and full documentation."
         )
         files_desc.setWordWrap(True)
         files_desc.setStyleSheet("""
             QLabel {
-                color: #888888;
+                color: #aaaaaa;
                 font-size: 10pt;
-                padding: 5px;
+                padding: 6px 8px;
+                background-color: #1a1a1a;
+                border: 1px solid #333333;
+                border-radius: 4px;
             }
         """)
-        files_layout.addWidget(files_desc)
+        desc_button_layout.addWidget(files_desc, stretch=1)
         
-        # File grid widget
+        # FadGuide button (right side, compact)
+        fadguide_button = QPushButton("FadGuide")
+        fadguide_button.setMaximumWidth(120)
+        fadguide_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #e73656, stop:1 #c41e3a);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 7px 15px;
+                font-size: 10pt;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff4466, stop:1 #e73656);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #c41e3a, stop:1 #a01729);
+            }
+        """)
+        fadguide_button.clicked.connect(self.open_fadguide)
+        desc_button_layout.addWidget(fadguide_button, stretch=0)
+        
+        files_layout.addLayout(desc_button_layout)
+        
+        # File grid widget (read-only display)
         from ui.components.file_grid_widget import FileGridWidget
         self.file_grid_widget = FileGridWidget()
         files_layout.addWidget(self.file_grid_widget)
         
-        # File action buttons
-        file_buttons_layout = QHBoxLayout()
-        file_buttons_layout.setSpacing(10)
-        
-        # Add File button (green)
-        self.add_file_btn = QPushButton("📄 Add File")
-        self.add_file_btn.clicked.connect(self.add_file)
-        self.add_file_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
+        # Command examples (compact info box with examples only)
+        info_label = QLabel(
+            "💡 CLI Commands:\n"
+            "  fadcrypt --lock C:\\Users\\Documents\\secret.txt\n"
+            "  fadcrypt --unlock C:\\Users\\Documents\\projects\n"
+            "  fadcrypt --list"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("""
+            QLabel {
                 color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 11pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #059669;
+                font-size: 9pt;
+                padding: 8px 10px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3d0000, stop:1 #1a0000);
+                border-left: 3px solid #ff4444;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
             }
         """)
-        file_buttons_layout.addWidget(self.add_file_btn)
+        files_layout.addWidget(info_label)
         
-        # Add Folder button (blue)
-        self.add_folder_btn = QPushButton("📁 Add Folder")
-        self.add_folder_btn.clicked.connect(self.add_folder)
-        self.add_folder_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6;
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 11pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2563eb;
-            }
-        """)
-        file_buttons_layout.addWidget(self.add_folder_btn)
-        
-        # Remove button
-        self.remove_file_btn = QPushButton("🗑️  Remove")
-        self.remove_file_btn.clicked.connect(self.remove_file_item)
-        self.remove_file_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 11pt;
-            }
-            QPushButton:hover {
-                background-color: #b71c1c;
-            }
-        """)
-        file_buttons_layout.addWidget(self.remove_file_btn)
-        
-        file_buttons_layout.addStretch()
-        files_layout.addLayout(file_buttons_layout)
-        
-        self.tabs.addTab(files_tab, "Protected Files")
+        self.tabs.addTab(files_tab, "Files && Folders")
         
         # Load locked files after widget is created
         self.load_locked_files()
@@ -1009,7 +1191,9 @@ class MainWindowBase(QMainWindow):
         # Separator
         separator1 = QFrame()
         separator1.setFrameShape(QFrame.Shape.HLine)
-        separator1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator1.setFrameShadow(QFrame.Shadow.Plain)
+        separator1.setLineWidth(1)
+        separator1.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         config_layout.addWidget(separator1)
         
         # Config text display
@@ -1050,62 +1234,10 @@ class MainWindowBase(QMainWindow):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         config_layout.addWidget(separator2)
-        
-        # Export/Import section
-        export_title = QLabel("Backup & Restore Configurations")
-        export_title.setStyleSheet("font-weight: bold;")
-        config_layout.addWidget(export_title)
-        
-        export_desc = QLabel("Export your complete configuration (applications + locked files/folders) or import a previously saved configuration.")
-        export_desc.setWordWrap(True)
-        export_desc.setStyleSheet("color: gray;")
-        config_layout.addWidget(export_desc)
-        
-        # Export/Import buttons
-        button_layout = QHBoxLayout()
-        
-        export_button = QPushButton("Export Config")
-        export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #d32f2f;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #b71c1c;
-            }
-        """)
-        export_button.clicked.connect(self.on_export_config)
-        button_layout.addWidget(export_button)
-        
-        import_button = QPushButton("Import Config")
-        import_button.setStyleSheet("""
-            QPushButton {
-                background-color: #424242;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-            }
-        """)
-        import_button.clicked.connect(self.on_import_config)
-        button_layout.addWidget(import_button)
-        
-        button_layout.addStretch()
-        config_layout.addLayout(button_layout)
-        
-        # Separator
-        separator3 = QFrame()
-        separator3.setFrameShape(QFrame.Shape.HLine)
-        separator3.setFrameShadow(QFrame.Shadow.Sunken)
-        config_layout.addWidget(separator3)
         
         # File Locations Section
         locations_title = QLabel("📁 File Locations")
@@ -1136,11 +1268,11 @@ class MainWindowBase(QMainWindow):
             path_label = QLabel(path)
             path_label.setStyleSheet("""
                 QLabel {
-                    color: #3b82f6;
+                    color: #ff3333;
                     text-decoration: underline;
                 }
                 QLabel:hover {
-                    color: #60a5fa;
+                    color: #ff5555;
                 }
             """)
             path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -1172,7 +1304,7 @@ class MainWindowBase(QMainWindow):
                             border: 1px solid #333333;
                         }
                         QMenu::item:selected {
-                            background-color: #3b82f6;
+                            background-color: #ff3333;
                         }
                     """)
                     copy_action = menu.addAction("📋 Copy Path")
@@ -1190,9 +1322,7 @@ class MainWindowBase(QMainWindow):
         # Get actual paths - will use platform-specific paths
         fadcrypt_folder = self.get_fadcrypt_folder()
         backup_folder = self.get_backup_folder() if hasattr(self, 'get_backup_folder') else (
-            os.path.join(os.path.expanduser("~/.local/share/FadCrypt/Backup"))
-            if not sys.platform.startswith('win')
-            else os.path.join(os.getenv('PROGRAMDATA', 'C:\\ProgramData'), 'FadCrypt', 'Backup')
+            os.path.expanduser("~/.config/FadCrypt/backup")
         )
         
         # Add path labels
@@ -1286,8 +1416,9 @@ class MainWindowBase(QMainWindow):
     
     def on_settings_changed(self):
         """Handle settings changes from SettingsPanel"""
-        # Get current settings
+        # Get current settings (encryption is now managed separately)
         settings = self.settings_panel.get_settings()
+        print(f"[DEBUG] on_settings_changed called with: {settings}")
         
         # Update instance variables
         self.password_dialog_style = settings.get('dialog_style', 'simple')
@@ -1297,10 +1428,61 @@ class MainWindowBase(QMainWindow):
         autostart_enabled = settings.get('autostart', False)
         self.handle_autostart_setting(autostart_enabled)
         
-        # Save settings to file
+        # Save settings to file (settings.json for UI prefs only - encryption is in apps_config.json)
         self.save_settings(settings)
         
-        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}, autostart={autostart_enabled}")
+        # Handle encryption separately if it was changed in the UI
+        current_encryption = self.settings_panel.encryption_checkbox.isChecked()
+        print(f"[DEBUG] Encryption checkbox state: {current_encryption}")
+        self._handle_encryption_change_from_ui()
+        
+        print(f"Settings updated: style={self.password_dialog_style}, wallpaper={self.wallpaper_choice}")
+    
+    def _handle_encryption_change_from_ui(self):
+        """Handle encryption toggle change from UI and save to apps_config.json"""
+        import json
+        from core.file_protection import safe_write_to_protected_file
+        
+        encryption_enabled = self.settings_panel.encryption_checkbox.isChecked()
+        fadcrypt_folder = self.get_fadcrypt_folder()
+        config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+        
+        try:
+            # Load current config
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            else:
+                config = {"applications": [], "locked_files_and_folders": [], "dangerous_operations": {}}
+            
+            # Ensure dangerous_operations exists
+            if "dangerous_operations" not in config:
+                config["dangerous_operations"] = {}
+            
+            # Update encryption setting
+            current_encryption = config["dangerous_operations"].get("encryption", False)
+            if current_encryption != encryption_enabled:
+                config["dangerous_operations"]["encryption"] = encryption_enabled
+                print(f"[Settings] Encryption toggled in UI: {encryption_enabled}")
+                
+                # Save updated config
+                content = json.dumps(config, indent=2)
+                success, error = safe_write_to_protected_file(config_file, content)
+                if success:
+                    print(f"✅ [Settings] Encryption saved to config: {encryption_enabled}")
+                else:
+                    print(f"⚠️  [Settings] Failed to save encryption setting: {error}")
+            
+            # When encryption is toggled ON, ensure password is available
+            if encryption_enabled:
+                cached_pwd = self.password_manager.get_password_bytes()
+                if cached_pwd:
+                    print("✅ [Settings] Master password available for encryption")
+                else:
+                    print("⚠️  [Settings] No master password found - encryption cannot work until user logs in")
+                    
+        except Exception as e:
+            print(f"⚠️  [Settings] Error handling encryption change: {e}")
     
     def handle_autostart_setting(self, enable):
         """
@@ -1314,13 +1496,23 @@ class MainWindowBase(QMainWindow):
         pass
     
     def save_settings(self, settings):
-        """Save settings to JSON file"""
+        """Save UI settings to settings.json (encryption is now handled separately in apps_config.json)"""
         import json
-        settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+        from core.file_protection import safe_write_to_protected_file
+        
+        fadcrypt_folder = self.get_fadcrypt_folder()
+        settings_file = os.path.join(fadcrypt_folder, 'settings.json')
+        
         try:
-            with open(settings_file, 'w') as f:
-                json.dump(settings, f, indent=4)
-            print(f"Settings saved to {settings_file}")
+            # Save general settings (dialog_style, wallpaper, file_protection_enabled, etc.)
+            # NOTE: encryption_enabled is NO LONGER stored here - it's unified in apps_config.json
+            content = json.dumps(settings, indent=4)
+            success, error_msg = safe_write_to_protected_file(settings_file, content)
+            if success:
+                print(f"Settings saved to {settings_file}")
+            else:
+                print(f"Error saving settings: {error_msg}")
+                
         except Exception as e:
             print(f"Error saving settings: {e}")
     
@@ -1342,6 +1534,39 @@ class MainWindowBase(QMainWindow):
                     print(f"Settings loaded: {settings}")
         except Exception as e:
             print(f"Error loading settings: {e}")
+        
+        # CRITICAL: Load encryption_enabled from apps_config.json (unified location)
+        self._load_encryption_from_config()
+    
+    def _load_encryption_from_config(self):
+        """Load encryption_enabled from apps_config.json and set in GUI"""
+        import json
+        
+        try:
+            fadcrypt_folder = self.get_fadcrypt_folder()
+            config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+            
+            # Determine if encryption is enabled
+            encryption_enabled = True  # NEW DEFAULT: True instead of False
+            
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                        dangerous_ops = config.get("dangerous_operations", {})
+                        encryption_enabled = dangerous_ops.get("encryption", True)  # Default to True
+                except Exception as e:
+                    print(f"[Settings] Error reading encryption from config: {e}")
+                    encryption_enabled = True  # Default to True if error
+            
+            print(f"[Settings] Loaded encryption_enabled from config: {encryption_enabled}")
+            
+            # Set in settings panel
+            if hasattr(self, 'settings_panel'):
+                self.settings_panel.set_encryption_enabled(encryption_enabled)
+            
+        except Exception as e:
+            print(f"[Settings] Error loading encryption setting: {e}")
     
     def center_on_screen(self):
         """Center the main window on the screen (Wayland-aware)"""
@@ -1372,6 +1597,18 @@ class MainWindowBase(QMainWindow):
             self.move(x, y)
         else:
             print("[MainWindow] ⚠️  No screen found, cannot center")
+    
+    def _update_file_lock_manager_password(self):
+        """
+        Update file lock manager with cached password for encryption operations.
+        Call this after successful password verification.
+        """
+        if self.file_lock_manager and self.password_manager:
+            password_bytes = self.password_manager.get_password_bytes()
+            if password_bytes:
+                self.file_lock_manager.set_password(password_bytes)
+                from core.verbose_logger import vlog
+                vlog("[MainWindow] Password set in file lock manager for encryption")
     
     def verify_password_with_recovery(self, title: str, prompt: str) -> bool:
         """
@@ -1444,6 +1681,11 @@ class MainWindowBase(QMainWindow):
             
             # Verify password
             if self.password_manager.verify_password(password):
+                # Update file lock manager with password for encryption operations
+                self._update_file_lock_manager_password()
+                # Mark that password has been verified for encryption this session
+                self._encryption_password_verified = True
+                print("[PasswordManager] ✅ Password verified and cached for encryption operations (will not prompt again this session)")
                 return True
             else:
                 # Invalid password - ask again
@@ -1671,11 +1913,20 @@ class MainWindowBase(QMainWindow):
     
     def on_password_button_click(self):
         """Handle password button click - creates or updates based on current state"""
-        password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
-        if os.path.exists(password_file):
-            self.on_change_password()
-        else:
-            self.on_create_password()
+        try:
+            password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
+            print(f"[PASSWORD] Button clicked, checking file: {password_file}")
+            if os.path.exists(password_file):
+                print("[PASSWORD] Password exists, calling on_change_password")
+                self.on_change_password()
+            else:
+                print("[PASSWORD] Password does not exist, calling on_create_password")
+                self.on_create_password()
+        except Exception as e:
+            print(f"[PASSWORD] ERROR in on_password_button_click: {e}")
+            import traceback
+            traceback.print_exc()
+            self.show_message("Error", f"Failed to handle password button click:\n{e}", "error")
     
     def remove_application(self):
         """Remove selected applications from the list"""
@@ -1725,200 +1976,70 @@ class MainWindowBase(QMainWindow):
         # This method is for backward compatibility but not used in new design
         pass
     
-    # ========================================
-    # FILE/FOLDER LOCKING METHODS
-    # ========================================
-    
-    def add_file(self):
-        """Add file(s) to protected items list - supports multi-selection"""
-        if not self.file_lock_manager:
-            self.show_message("Error", "File locking not available on this platform.", "error")
-            return
-        
-        # Use native dialog for multi-file selection
-        file_paths, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Select File(s) to Protect",
-            os.path.expanduser('~'),
-            "All Files (*.*)"
-        )
-        
-        if not file_paths:
-            return
-        
-        added_count = 0
-        print(f"[Add Files] Processing {len(file_paths)} file(s)...")
-        
-        for file_path in file_paths:
-            if self.file_lock_manager.add_item(file_path, "file"):
-                # Get metadata to display
-                items = self.file_lock_manager.get_locked_items()
-                for item in items:
-                    if item['path'] == file_path:
-                        self.file_grid_widget.add_item(
-                            file_path,
-                            "file",
-                            item.get('unlock_count', 0),
-                            item.get('added_at')
-                        )
-                        break
-                added_count += 1
-                
-                # Process UI events periodically for large batches
-                if added_count % 50 == 0:
-                    QApplication.processEvents()
-        
-        # Force grid refresh after bulk add
-        if added_count > 0:
-            print(f"[Add Files] Refreshing UI with {added_count} new files...")
-            self.file_grid_widget.refresh_grid()
-        
-        if added_count > 0:
-            print(f"[Add Files] Added {added_count} file(s) successfully")
-            
-            # Auto-lock files if monitoring is active
-            if self.monitoring_active and self.file_lock_manager:
-                print(f"🔒 Auto-locking {added_count} newly added file(s)")
-                # Re-lock all files (includes the new ones)
-                success, failed = self.file_lock_manager.lock_all()
-                if success > 0:
-                    print(f"✅ Re-locked {success} items (including new files)")
-                
-                # Update fanotify watches if using fanotify
-                if hasattr(self.file_lock_manager, 'update_monitored_items'):
-                    self.file_lock_manager.update_monitored_items()
-                    print(f"🔄 Updated fanotify watches")
-            
-            # Update config display to show new locked items
-            if hasattr(self, 'update_config_display'):
-                self.update_config_display()
-            
-            self.show_message("Success", f"Added {added_count} file(s) successfully.", "success")
-        else:
-            self.show_message("Error", "Failed to add files. They may already be in the list.", "error")
-    
-    def add_folder(self):
-        """Add folder to protected items list"""
-        if not self.file_lock_manager:
-            self.show_message("Error", "File locking not available on this platform.", "error")
-            return
-        
-        # Use native dialog for folder selection (single selection only)
-        folder_path = QFileDialog.getExistingDirectory(
-            self,
-            "Select Folder to Protect",
-            os.path.expanduser('~')
-        )
-        
-        if not folder_path:
-            return
-        
-        print(f"[Add Folder] Processing folder: {folder_path}")
-        
-        if self.file_lock_manager.add_item(folder_path, "folder"):
-            # Get metadata to display
-            items = self.file_lock_manager.get_locked_items()
-            for item in items:
-                if item['path'] == folder_path:
-                    self.file_grid_widget.add_item(
-                        folder_path,
-                        "folder",
-                        item.get('unlock_count', 0),
-                        item.get('added_at')
-                    )
-                    break
-            
-            print(f"[Add Folder] Added folder successfully")
-            
-            # Auto-lock folder if monitoring is active
-            if self.monitoring_active and self.file_lock_manager:
-                print(f"🔒 Auto-locking newly added folder")
-                # Re-lock all files (includes the new one)
-                success, failed = self.file_lock_manager.lock_all()
-                if success > 0:
-                    print(f"✅ Re-locked {success} items (including new folder)")
-                
-                # Update fanotify watches if using fanotify
-                if hasattr(self.file_lock_manager, 'update_monitored_items'):
-                    self.file_lock_manager.update_monitored_items()
-                    print(f"🔄 Updated fanotify watches")
-            
-            # Update config display to show new locked items
-            if hasattr(self, 'update_config_display'):
-                self.update_config_display()
-            
-            self.show_message("Success", f"Added folder successfully.", "success")
-        else:
-            self.show_message("Error", "Failed to add folder. It may already be in the list.", "error")
-    
-    def remove_file_item(self):
-        """Remove selected file/folder from protected items list"""
-        if not self.file_lock_manager:
-            return
-        
-        # Get all selected paths (supports multi-selection)
-        selected_paths = self.file_grid_widget.get_selected_paths()
-        
-        if not selected_paths:
-            self.show_message("Info", "Please select one or more files/folders to remove.", "info")
-            return
-        
-        # Confirm removal
-        if len(selected_paths) == 1:
-            item_name = os.path.basename(selected_paths[0])
-            message = f"Remove {item_name} from protected items?"
-        else:
-            message = f"Remove {len(selected_paths)} selected items from protected items?"
-        
-        reply = QMessageBox.question(
-            self,
-            "Confirm Removal",
-            message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            removed_count = 0
-            
-            # Bulk remove optimization: defer grid refresh until all items removed
-            for selected_path in selected_paths:
-                if self.file_lock_manager.remove_item(selected_path):
-                    # Skip grid refresh during loop (optimization)
-                    self.file_grid_widget.remove_item(selected_path, defer_refresh=True)
-                    removed_count += 1
-            
-            # Update fanotify watches if monitoring is active
-            if self.monitoring_active and hasattr(self.file_lock_manager, 'update_monitored_items'):
-                self.file_lock_manager.update_monitored_items()
-                print(f"🔄 Updated fanotify watches after removal")
-            
-            # Single refresh at end (O(n) instead of O(n²))
-            if removed_count > 0:
-                print(f"[Remove] Refreshing file grid after removing {removed_count} items...")
-                self.file_grid_widget.refresh_grid()
-            
-            
-            if removed_count > 0:
-                self.show_message("Success", f"Removed {removed_count} item(s) successfully.", "success")
-            else:
-                self.show_message("Error", "Failed to remove items.", "error")
-    
     def load_locked_files(self):
-        """Load locked files/folders from config and display in grid"""
+        """Load locked files/folders from config and display in grid (read-only display)"""
         if not self.file_lock_manager:
+            print("[UI] file_lock_manager is None, skipping load_locked_files")
             return
         
-        self.file_grid_widget.clear()
-        items = self.file_lock_manager.get_locked_items()
+        if not hasattr(self, 'file_grid_widget'):
+            print("[UI] file_grid_widget not initialized yet, skipping load_locked_files")
+            return
         
-        for item in items:
-            self.file_grid_widget.add_item(
-                item['path'],
-                item['type'],
-                item.get('unlock_count', 0),  # Pass unlock_count as 3rd param
-                item.get('added_at')          # Pass added_at as 4th param
-            )
+        try:
+            # CRITICAL: Reload from file first to get fresh data
+            self.file_lock_manager._load_locked_items()
+            
+            items = self.file_lock_manager.get_locked_items()
+            print(f"[UI] Loaded {len(items)} locked items from file_lock_manager")
+            
+            # Display items in read-only grid (CLI-managed, not GUI-managed)
+            self.file_grid_widget.display_items(items)
+            print(f"[UI] Displayed {len(items)} items in file_grid_widget")
+            
+            # Update count label
+            if hasattr(self, 'files_count_label'):
+                count = len(items)
+                self.files_count_label.setText(f"Protected Files: {count}")
+        except Exception as e:
+            print(f"[UI] ERROR in load_locked_files: {e}")
+            import traceback
+            traceback.print_exc()
+
     
+    def save_locked_files_config(self):
+        """Save locked files/folders config while preserving applications - DO NOT reload from file"""
+        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
+        
+        # Load existing config to preserve applications ONLY
+        existing_config = {"applications": [], "locked_files_and_folders": []}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
+        # Use current in-memory locked items (already up-to-date from add/remove operations)
+        locked_items = self.file_lock_manager.get_locked_items() if self.file_lock_manager else []
+        unified_config = {
+            'applications': existing_config.get('applications', []),
+            'locked_files_and_folders': locked_items
+        }
+        
+        try:
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(unified_config, indent=4)
+            success, error = safe_write_to_protected_file(config_file, content)
+            
+            if success:
+                print(f"[Files Config] Saved {len(locked_items)} locked items (preserved {len(existing_config.get('applications', []))} apps)")
+            else:
+                print(f"[Files Config] Error saving: {error}")
+                
+        except Exception as e:
+            print(f"[Files Config] Error: {e}")
     def select_all_apps(self):
         """Select all applications in the list"""
         if not self.app_list_widget.apps_data:
@@ -2216,17 +2337,25 @@ class MainWindowBase(QMainWindow):
         
         if os.path.exists(config_file):
             try:
-                with open(config_file, 'r') as f:
-                    config_data = json.load(f)
+                # Use safe read that handles protected files
+                from core.file_protection import safe_read_from_protected_file
+                success, result = safe_read_from_protected_file(config_file, 'r')
                 
-                # Display raw JSON with proper formatting
-                raw_json = json.dumps(config_data, indent=4)
-                self.config_text.setPlainText(raw_json)
-                
-                # Count items
-                app_count = len(config_data.get('applications', []))
-                locked_count = len(config_data.get('locked_files_and_folders', []))
-                print(f"[Config Display] Updated with {app_count} apps and {locked_count} locked items")
+                if success:
+                    config_data = json.loads(result)
+                    
+                    # Display raw JSON with proper formatting
+                    raw_json = json.dumps(config_data, indent=4)
+                    self.config_text.setPlainText(raw_json)
+                    
+                    # Count items
+                    app_count = len(config_data.get('applications', []))
+                    locked_count = len(config_data.get('locked_files_and_folders', []))
+                    print(f"[Config Display] Updated with {app_count} apps and {locked_count} locked items")
+                else:
+                    error_msg = f"Error loading config: {result}"
+                    self.config_text.setPlainText(error_msg)
+                    print(f"[Config Display] {error_msg}")
             except Exception as e:
                 error_msg = f"Error loading config: {e}"
                 self.config_text.setPlainText(error_msg)
@@ -2244,34 +2373,40 @@ class MainWindowBase(QMainWindow):
             return
         
         try:
-            with open(config_file, 'r') as f:
-                config_data = json.load(f)
+            # Use safe read that handles protected files
+            from core.file_protection import safe_read_from_protected_file
+            success, result = safe_read_from_protected_file(config_file, 'r')
             
-            # Clear current grid
-            self.app_list_widget.apps_data.clear()
-            
-            # Load apps from unified config format with consistent ISO timestamps
-            from datetime import datetime
-            apps_list = config_data.get('applications', [])
-            for app in apps_list:
-                # Always ensure added_at has a value (not null)
-                added_at = app.get('added_at')
-                if not added_at:
-                    added_at = datetime.now().isoformat()
-                    
-                self.app_list_widget.add_app(
-                    app['name'],
-                    app['path'],
-                    unlock_count=app.get('unlock_count', 0),
-                    added_at=added_at
-                )
-            
-            self.update_app_count()
-            print(f"Applications config loaded: {len(apps_list)} apps")
-            
-            # Update config display to show the loaded apps (if config tab has been created)
-            if hasattr(self, 'config_text'):
-                self.update_config_display()
+            if success and result is not None:
+                config_data = json.loads(result)
+                
+                # Clear current grid
+                self.app_list_widget.apps_data.clear()
+                
+                # Load apps from unified config format with consistent ISO timestamps
+                from datetime import datetime
+                apps_list = config_data.get('applications', [])
+                for app in apps_list:
+                    # Always ensure added_at has a value (not null)
+                    added_at = app.get('added_at')
+                    if not added_at:
+                        added_at = datetime.now().isoformat()
+                        
+                    self.app_list_widget.add_app(
+                        app['name'],
+                        app['path'],
+                        unlock_count=app.get('unlock_count', 0),
+                        added_at=added_at
+                    )
+                
+                self.update_app_count()
+                print(f"Applications config loaded: {len(apps_list)} apps")
+                
+                # Update config display to show the loaded apps (if config tab has been created)
+                if hasattr(self, 'config_text'):
+                    self.update_config_display()
+            else:
+                print(f"Error loading applications config: {result}")
         except Exception as e:
             print(f"Error loading applications config: {e}")
         
@@ -2289,7 +2424,8 @@ class MainWindowBase(QMainWindow):
             self.monitoring_button.setText("⏹ Stop Monitoring")
             self.monitoring_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #d32f2f;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #ff3333, stop:1 #cc0000);
                     color: white;
                     font-size: 13px;
                     font-weight: bold;
@@ -2298,14 +2434,20 @@ class MainWindowBase(QMainWindow):
                     border: none;
                 }
                 QPushButton:hover {
-                    background-color: #b71c1c;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #ff5555, stop:1 #dd0000);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #cc0000, stop:1 #990000);
                 }
             """)
         else:
             self.monitoring_button.setText("▶ Start Monitoring")
             self.monitoring_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #2e7d32;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00cc00, stop:1 #008800);
                     color: white;
                     font-size: 13px;
                     font-weight: bold;
@@ -2314,17 +2456,23 @@ class MainWindowBase(QMainWindow):
                     border: none;
                 }
                 QPushButton:hover {
-                    background-color: #388e3c;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #00ff00, stop:1 #00aa00);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #008800, stop:1 #005500);
                 }
                 QPushButton:disabled {
-                    background-color: #2a2a2a;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #555555, stop:1 #333333);
                     color: #666666;
                 }
             """)
     
     def on_start_monitoring(self):
-        """Handle start monitoring button click"""
-        # Check if password is set
+        """Handle start monitoring button click - monitors applications only"""
+        # Check if password is set (overall security requirement)
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         if not os.path.exists(password_file):
             self.show_message(
@@ -2333,217 +2481,82 @@ class MainWindowBase(QMainWindow):
                 "info"
             )
             return
-        
-        # Check if any apps or locked items are added
+
+        # Check if any apps are added (file/folder management is CLI-only, not monitored in UI)
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
-        
-        # Get locked files/folders from config - handle immutable protected config file
-        locked_items = []
-        try:
-            config_file = os.path.join(self.get_fadcrypt_folder(), "apps_config.json")
-            if os.path.exists(config_file):
-                # Temporarily unlock immutable file for reading
-                from core.file_protection import get_file_protection_manager
-                file_protection = get_file_protection_manager()
-                
-                unlock_success, unlock_error = file_protection.temporarily_unlock_file(config_file)
-                if not unlock_success:
-                    print(f"⚠️  Warning: Could not unlock config for reading: {unlock_error}")
-                    locked_items = []
-                else:
-                    try:
-                        with open(config_file, 'r') as f:
-                            import json
-                            config = json.load(f)
-                            locked_items = config.get('locked_files_and_folders', [])
-                    finally:
-                        # Re-lock after reading
-                        relock_success, relock_error = file_protection.relock_file(config_file)
-                        if not relock_success:
-                            print(f"⚠️  Warning: Could not relock config after reading: {relock_error}")
-        except Exception as e:
-            print(f"⚠️  Warning reading locked items at startup: {e}")
-            locked_items = []
-        
-        locked_count = len(locked_items) if locked_items else 0
-        total_items = apps_count + locked_count
-        
-        if total_items == 0:
+
+        if apps_count == 0:
             self.show_message(
-                "No Items to Monitor",
-                "Please add applications or lock files/folders to monitor first.",
+                "No Applications to Monitor",
+                "Please add applications to monitor first.\nFiles and folders are managed via CLI (fadcrypt --lock/unlock).",
                 "info"
             )
             return
-        
+
         # Prepare applications list for monitoring
+        # Always reload applications config to ensure we have the latest data
+        self.load_applications_config()
+
         applications = []
         for app_name, app_data in self.app_list_widget.apps_data.items():
             applications.append({
                 'name': app_name,
                 'path': app_data['path']
             })
-        
+
         print(f"\n🚀 Starting monitoring for {len(applications)} applications...")
         for app in applications:
             print(f"   📦 {app['name']}: {app['path']}")
-        
-        # CRITICAL: Check for crash recovery - unlock any stuck files from previous crash
-        print("🔍 Checking for crash recovery...")
-        if self.file_lock_manager:
-            # Unlock all application/file items (not config files - those are daemon-protected)
-            success, failed = self.file_lock_manager.unlock_all()
-            if success > 0:
-                print(f"♻️  Crash recovery: Restored {success} stuck items from previous session")
-        
+
         # Initialize UnifiedMonitor
         from core.unified_monitor import UnifiedMonitor
         import platform
-        
+
         # Detect platform
         is_linux = platform.system() == "Linux"
+
+        # Get scanning interval from settings
+        scanning_interval = 1.0  # Default
+        try:
+            settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+            if os.path.exists(settings_file):
+                import json
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    scanning_interval = settings.get('scanning_interval', 1.0)
+                    print(f"[Settings] ⚡ Loaded scanning interval: {scanning_interval}s")
+            else:
+                print(f"[Settings] Settings file not found, using default: {scanning_interval}s")
+        except Exception as e:
+            print(f"[Settings] Could not load scanning interval, using default 1.0s: {e}")
+
+        # Only apply boot grace period if this is auto-monitor mode (system boot)
+        # Manual monitoring starts should have no grace period for instant detection
+        boot_grace = scanning_interval * 3 if self.auto_monitor_mode else 0.0
         
         self.unified_monitor = UnifiedMonitor(
             get_state_func=self.get_monitoring_state,
             set_state_func=self.set_monitoring_state,
             show_dialog_func=self.show_password_prompt_for_app,
             is_linux=is_linux,
-            sleep_interval=1.0,
+            sleep_interval=scanning_interval,
             enable_profiling=True,
-            log_activity_func=self.log_activity
+            log_activity_func=self.log_activity,
+            boot_grace_period=boot_grace
         )
-        
-        # Start monitoring
+
+        # Start monitoring immediately (core functionality)
         self.unified_monitor.start_monitoring(applications)
         self.monitoring_active = True
-        
-        # Update button state to reflect monitoring is active
-        self.update_monitoring_button_state(True)
-        
-        # Protect critical files from deletion/tampering (if enabled in settings)
-        settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
-        file_protection_enabled = True  # Default: enabled
-        
-        try:
-            if os.path.exists(settings_file):
-                import json
-                with open(settings_file, 'r') as f:
-                    settings = json.load(f)
-                    file_protection_enabled = settings.get('file_protection_enabled', True)
-        except Exception as e:
-            print(f"[FileProtection] Could not read settings, using default: {e}")
-        
-        # DAEMON-ONLY: Elevated daemon handles file protection seamlessly (no password prompts)
-        if file_protection_enabled:
-            print("🛡️  Protecting critical files via elevated daemon...")
-            file_protection = get_file_protection_manager()
-            fadcrypt_folder = self.get_fadcrypt_folder()
-            
-            # List of critical files to protect - these need to be writable by FadCrypt
-            # but should be protected from external tampering
-            critical_files = [
-                os.path.join(fadcrypt_folder, "recovery_codes.json"),
-                os.path.join(fadcrypt_folder, "encrypted_password.bin"),
-                os.path.join(fadcrypt_folder, "apps_config.json"),
-                os.path.join(fadcrypt_folder, "monitoring_state.json"),
-            ]
-            
-            # Filter to only existing files
-            existing_files = [f for f in critical_files if os.path.exists(f)]
-            
-            if existing_files:
-                success_count, errors = file_protection.protect_multiple_files(existing_files)
-                if success_count > 0:
-                    print(f"✅ Protected {success_count}/{len(existing_files)} immutable critical files")
-                    print(f"✅ Works seamlessly after reboot (daemon auto-starts with root permissions)")
-                else:
-                    error_msg = "❌ File protection failed - elevated daemon required to start monitoring"
-                    print(f"[ERROR] {error_msg}")
-                    self.show_message(
-                        "Elevation Required",
-                        "FadCrypt requires the elevated daemon service to protect critical files.\n\n"
-                        "The daemon may not be:\n"
-                        "  • Running (check: systemctl status fadcrypt-elevated)\n"
-                        "  • Installed (check: dpkg -l | grep fadcrypt)\n"
-                        "  • Available on your system\n\n"
-                        "Monitoring cannot start without file protection."
-                    )
-                    # Stop monitoring since protection failed
-                    self.unified_monitor.stop_monitoring()
-                    self.monitoring_active = False
-                    self.update_monitoring_button_state(False)
-                    return
-        else:
-            print("⏭️  File protection disabled in settings")
-        
-        # Log monitoring start event (needed for duration calculation)
-        self.log_activity(
-            'start_monitoring',
-            None,
-            None,
-            success=True,
-            details=f"Monitoring started for {len(applications)} apps and {locked_count} files/folders"
-        )
-        
-        # Save monitoring state to disk (for crash recovery)
+
+        # Update monitoring state immediately
+        self.monitoring_state['monitoring_active'] = True
         self.save_monitoring_state_to_disk()
-        
-        # Lock files and folders + start monitoring
-        if self.file_lock_manager:
-            print("🔒 Locking files and starting monitoring...")
-            
-            # Lock all items first
-            success, failed = self.file_lock_manager.lock_all()
-            if success > 0:
-                print(f"✅ Locked {success} items")
-            if failed > 0:
-                print(f"⚠️  Failed to lock {failed} items")
-            
-            # Lock config files
-            self.file_lock_manager.lock_fadcrypt_configs()
-            
-            # Start monitoring (fanotify on Linux, nothing on Windows yet)
-            if hasattr(self.file_lock_manager, 'start_monitoring'):
-                if self.file_lock_manager.start_monitoring():
-                    print("✅ Fanotify monitoring started (kernel-level file access interception)")
-                else:
-                    print("ℹ️  Fanotify monitoring skipped - no files/folders to monitor")
-            
-            # Log lock event
-            self.log_activity(
-                'lock',
-                'all_items',
-                success=True,
-                details=f"Locked {success} items"
-                )
-                
-            # Config files are now protected by daemon - no permission locking needed
-        
-        # Update UI button state
+
+        # Update button state to reflect monitoring is active (instant UI feedback)
         self.update_monitoring_button_state(True)
-        print("🔘 Button updated: Changed to Stop mode")
-        
-        # CRITICAL: Disable system tools if lock_tools setting is enabled
-        # This prevents users from terminating FadCrypt via terminal/task manager
-        if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
-            print("🔒 Disabling system tools (terminals, task manager, etc.)...")
-            if hasattr(self, 'disable_system_tools'):
-                self.disable_system_tools()
-                print("✅ System tools disabled successfully")
-            else:
-                print("⚠️  Warning: disable_system_tools method not found")
-        
-        # CRITICAL: Enable autostart when monitoring starts (same as legacy code)
-        # This ensures FadCrypt starts automatically on system boot
-        print("🔧 Enabling autostart for FadCrypt...")
-        if hasattr(self, 'handle_autostart_setting'):
-            # Call platform-specific autostart method
-            self.handle_autostart_setting(enable=True)
-            print("✅ Autostart enabled successfully")
-        else:
-            print("⚠️  Warning: handle_autostart_setting method not found")
-        
-        # Update UI
+
+        # Update system tray immediately
         if self.system_tray:
             self.system_tray.set_monitoring_active(True)
             self.system_tray.show_message(
@@ -2551,14 +2564,107 @@ class MainWindowBase(QMainWindow):
                 f"FadCrypt is now monitoring {len(applications)} application(s).",
                 QSystemTrayIcon.MessageIcon.Information
             )
-        
-        # Hide to tray
+
+        # Hide to tray immediately (instant user feedback)
         self.hide_to_tray()
-        
-        print(f"✅ Monitoring started successfully for {len(applications)} apps")
+
+        # Log monitoring start event (needed for duration calculation)
+        self.log_activity(
+            'start_monitoring',
+            None,
+            None,
+            success=True,
+            details=f"Monitoring started for {len(applications)} apps"
+        )
+
+        # Move heavy operations to background thread for instant startup
+        from PyQt6.QtCore import QThread, pyqtSignal
+        import threading
+
+        def background_monitoring_setup():
+            """Run heavy monitoring setup operations in background thread"""
+            try:
+                # Protect critical files from deletion/tampering (if enabled in settings)
+                settings_file = os.path.join(self.get_fadcrypt_folder(), 'settings.json')
+                file_protection_enabled = True  # Default: enabled
+
+                try:
+                    if os.path.exists(settings_file):
+                        import json
+                        with open(settings_file, 'r') as f:
+                            settings = json.load(f)
+                            file_protection_enabled = settings.get('file_protection_enabled', True)
+                except Exception as e:
+                    print(f"[FileProtection] Could not read settings, using default: {e}")
+
+                # DAEMON-ONLY: Elevated daemon handles file protection seamlessly (no password prompts)
+                if file_protection_enabled:
+                    print("🛡️  Protecting critical files via elevated daemon...")
+                    file_protection = get_file_protection_manager()
+                    fadcrypt_folder = self.get_fadcrypt_folder()
+
+                    # List of critical files to protect - these need to be writable by FadCrypt
+                    # but should be protected from external tampering
+                    # NOTE: Only protect truly immutable files (password, recovery codes)
+                    # Config files (apps_config.json, monitoring_state.json) need UI access
+                    critical_files = [
+                        os.path.join(fadcrypt_folder, "recovery_codes.json"),
+                        os.path.join(fadcrypt_folder, "encrypted_password.bin"),
+                        # apps_config.json and monitoring_state.json are NOT protected
+                        # They need to be readable/writable by the UI
+                    ]
+
+                    # Filter to only existing files
+                    existing_files = [f for f in critical_files if os.path.exists(f)]
+
+                    if existing_files:
+                        success_count, errors = file_protection.protect_multiple_files(existing_files)
+                        if success_count > 0:
+                            print(f"✅ Protected {success_count}/{len(existing_files)} immutable critical files")
+                            print(f"✅ Works seamlessly after reboot (daemon auto-starts with root permissions)")
+                        else:
+                            error_msg = "❌ File protection failed - elevated daemon required to start monitoring"
+                            print(f"[ERROR] {error_msg}")
+                            # Note: We don't stop monitoring here since core monitoring already started
+                    else:
+                        print("⏭️  File protection disabled in settings")
+
+                # CRITICAL: Disable system tools if lock_tools setting is enabled
+                # This prevents users from terminating FadCrypt via terminal/task manager
+                if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
+                    print("🔒 Disabling system tools (task manager, control panel, registry editor)...")
+                    if hasattr(self, 'disable_system_tools'):
+                        result = self.disable_system_tools()
+                        if result:
+                            print("✅ System tools disabled successfully")
+                        else:
+                            print("❌ Failed to disable system tools")
+                    else:
+                        print("⚠️  Warning: disable_system_tools method not found")
+
+                # CRITICAL: Enable autostart when monitoring starts (same as legacy code)
+                # This ensures FadCrypt starts automatically on system boot
+                print("🔧 Enabling autostart for FadCrypt...")
+                if hasattr(self, 'handle_autostart_setting'):
+                    # Call platform-specific autostart method
+                    self.handle_autostart_setting(enable=True)
+                    print("✅ Autostart enabled successfully")
+                else:
+                    print("⚠️  Warning: handle_autostart_setting method not found")
+
+                print("✅ Background monitoring setup completed")
+
+            except Exception as e:
+                print(f"⚠️  Background monitoring setup error: {e}")
+
+        # Start background thread for heavy operations
+        background_thread = threading.Thread(target=background_monitoring_setup, daemon=True)
+        background_thread.start()
+
+        print(f"✅ Monitoring started successfully for {len(applications)} apps (background setup in progress)")
         
     def on_stop_monitoring(self):
-        """Handle stop monitoring button click"""
+        """Handle stop monitoring button click - stops application monitoring only"""
         if not self.monitoring_active:
             self.show_message("Info", "Monitoring is not running.", "info")
             return
@@ -2591,34 +2697,20 @@ class MainWindowBase(QMainWindow):
             
             self.monitoring_active = False
             
-            # Save monitoring state to disk (for crash recovery)
+            # Save monitoring state to disk immediately (for crash recovery)
             self.save_monitoring_state_to_disk()
             
-            # Unlock files and folders (config files are daemon-protected)
-            if self.file_lock_manager:
-                print("🔓 Unlocking files and folders...")
-                success, failed = self.file_lock_manager.unlock_all()
-                if success > 0:
-                    print(f"✅ Unlocked {success} items")
-                if failed > 0:
-                    print(f"⚠️  Failed to unlock {failed} items")
-                
-                # Log unlock event
-                self.log_activity(
-                    'unlock',
-                    'all_items',
-                    success=True,
-                    details=f"Unlocked {success} items"
-                )
+            # Also update in-memory state
+            self.monitoring_state['monitoring_active'] = False
             
             # Update UI button state
             self.update_monitoring_button_state(False)
             print("🔘 Button updated: Changed to Start mode")
             
             # CRITICAL: Re-enable system tools if they were disabled
-            # This restores access to terminals/task manager
+            # This restores access to task manager/control panel/registry editor
             if hasattr(self, 'settings_panel') and self.settings_panel.lock_tools_checkbox.isChecked():
-                print("🔓 Re-enabling system tools (terminals, task manager, etc.)...")
+                print("🔓 Re-enabling system tools (task manager, control panel, registry editor)...")
                 if hasattr(self, 'enable_system_tools'):
                     self.enable_system_tools()
                     print("✅ System tools re-enabled successfully")
@@ -2667,12 +2759,20 @@ class MainWindowBase(QMainWindow):
     def save_monitoring_state(self):
         """Save monitoring state to JSON file"""
         import json
+        
         state_file = os.path.join(self.get_fadcrypt_folder(), 'monitoring_state.json')
         
-        # monitoring_state.json is now daemon-protected, no need for permission unlocking
         try:
-            with open(state_file, 'w') as f:
-                json.dump(self.monitoring_state, f, indent=4)
+            # Include monitoring_active flag
+            self.monitoring_state['monitoring_active'] = self.monitoring_active
+            
+            # Use safe write that handles immutable protection
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(self.monitoring_state, indent=2)
+            success, error = safe_write_to_protected_file(state_file, content)
+            
+            if not success:
+                print(f"Error saving monitoring state: {error}")
         except Exception as e:
             print(f"Error saving monitoring state: {e}")
     
@@ -2768,11 +2868,6 @@ class MainWindowBase(QMainWindow):
                     self.set_monitoring_state('unlocked_files', unlocked_files)
                     print(f"📝 Added {filename} to unlocked files state")
                 
-                # Increment unlock count for tracking
-                if self.file_lock_manager:
-                    self.file_lock_manager.increment_unlock_count(abs_path)
-                    print(f"📊 Incremented unlock count for {filename}")
-                
                 # Log successful unlock activity
                 item_type = 'folder' if is_dir else 'file'
                 self.log_activity(
@@ -2860,10 +2955,6 @@ class MainWindowBase(QMainWindow):
                 if abs_path not in unlocked_files:
                     unlocked_files.append(abs_path)
                     self.set_monitoring_state('unlocked_files', unlocked_files)
-                
-                # Increment unlock count
-                if self.file_lock_manager:
-                    self.file_lock_manager.increment_unlock_count(abs_path)
                 
                 # Log activity
                 item_type = 'folder' if os.path.isdir(file_path) else 'file'
@@ -2970,27 +3061,15 @@ class MainWindowBase(QMainWindow):
                         "Protected files and folders are still locked.\n\n"
                         "Would you like to unlock them now?",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        None  # No parent so it's truly independent
+                        self  # Use self as parent for proper modality
                     )
-                    # Set window flags to keep on top and make it modal
-                    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Dialog)
-                    msg_box.setModal(True)
+                    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
                     reply = msg_box.exec()
                     
                     if reply == QMessageBox.StandardButton.Yes:
-                        # Ask for password
-                        from ui.dialogs.password_dialog import ask_password
-                        password = ask_password(
-                            "Unlock Files",
-                            "Enter your password to unlock files:",
-                            self.resource_path,
-                            style=self.password_dialog_style,
-                            wallpaper=self.wallpaper_choice,
-                            parent=self
-                        )
-                        
-                        if password and self.password_manager.verify_password(password):
-                            # Unlock files
+                        try:
+                            # Automatically unlock using existing connection
+                            # (user already logged in to start the app)
                             if self.file_lock_manager:
                                 print("🔓 Unlocking files and folders...")
                                 success, failed = self.file_lock_manager.unlock_all()
@@ -3004,18 +3083,22 @@ class MainWindowBase(QMainWindow):
                             
                             # Clear monitoring state
                             state['monitoring_active'] = False
-                            with open(state_file, 'w') as f:
-                                json.dump(state, f, indent=2)
+                            from core.file_protection import safe_write_to_protected_file
+                            content = json.dumps(state, indent=2)
+                            success, error = safe_write_to_protected_file(state_file, content)
+                            if not success:
+                                print(f"⚠️  Warning writing monitoring state: {error}")
                             
                             self.show_message(
                                 "Success",
                                 "Files unlocked successfully. Monitoring state cleared.",
                                 "success"
                             )
-                        else:
+                        except Exception as e:
+                            print(f"❌ Error during unlock: {e}")
                             self.show_message(
-                                "Failed",
-                                "Incorrect password. Files remain locked.",
+                                "Error",
+                                f"Failed to unlock files: {e}",
                                 "error"
                             )
                     else:
@@ -3183,14 +3266,14 @@ class MainWindowBase(QMainWindow):
         """
         Cleanup function to restore all system settings before uninstallation.
         This ensures users don't have disabled settings after uninstalling FadCrypt.
-        Platform-agnostic - works on both Windows and Linux.
+        Simply calls the same --cleanup flag used by the installer for consistency.
         """
         try:
             print("\n" + "="*60, flush=True)
             print("🧹 RUNNING UNINSTALL CLEANUP...", flush=True)
             print("="*60, flush=True)
-            
-            # Stop monitoring if active
+
+            # Stop monitoring if active first (UI-specific, not in installer cleanup)
             if hasattr(self, 'unified_monitor') and self.unified_monitor:
                 try:
                     print("⏹ Stopping monitoring system...", flush=True)
@@ -3204,47 +3287,71 @@ class MainWindowBase(QMainWindow):
                     print(f"❌ Error stopping monitor: {e}", flush=True)
             else:
                 print("ℹ️  No active monitoring to stop", flush=True)
-            
-            # Re-enable system tools (platform-specific)
-            # These methods are implemented in platform-specific subclasses
-            if hasattr(self, 'enable_system_tools'):
-                try:
-                    print("🔓 Re-enabling system tools...", flush=True)
-                    self.enable_system_tools()
-                    print("✅ System tools re-enabled", flush=True)
-                except Exception as e:
-                    print(f"❌ Error re-enabling tools: {e}", flush=True)
+
+            # Now run the same cleanup as the installer using --cleanup flag
+            print("� Running system cleanup (same as installer)...", flush=True)
+            import subprocess
+
+            # Get the path to this executable
+            if getattr(sys, 'frozen', False):
+                # Running as PyInstaller bundle
+                exec_path = sys.executable
             else:
-                print("ℹ️  No system tools to re-enable", flush=True)
-            
-            # Remove autostart entry using autostart manager
-            if hasattr(self, 'config_manager') and hasattr(self.config_manager, 'autostart_manager'):
-                try:
-                    print("🗑️  Removing from autostart...", flush=True)
-                    from core.autostart_manager import AutostartManager
-                    autostart_mgr = AutostartManager(self.get_fadcrypt_folder())
-                    autostart_mgr.disable_autostart()
-                    print("✅ Removed from autostart", flush=True)
-                except Exception as e:
-                    print(f"❌ Error removing from autostart: {e}", flush=True)
+                # Running as script - use the same Python executable that launched this process
+                exec_path = sys.executable
+                script_path = os.path.abspath(sys.argv[0])
+
+            # Run cleanup with same logic as installer
+            if getattr(sys, 'frozen', False):
+                # PyInstaller bundle
+                result = subprocess.run([exec_path, '--cleanup', '--internal-auth'],
+                                      capture_output=True,
+                                      text=True,
+                                      timeout=60)
             else:
-                print("ℹ️  No autostart entry to remove", flush=True)
-            
-            print("="*60, flush=True)
-            print("✅ CLEANUP COMPLETED SUCCESSFULLY!", flush=True)
-            print("="*60 + "\n", flush=True)
-            
-            # Show confirmation
+                # Script mode - run python script --cleanup
+                result = subprocess.run([exec_path, script_path, '--cleanup', '--internal-auth'],
+                                      capture_output=True,
+                                      text=True,
+                                      timeout=60)
+
+            # Print the cleanup output
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(f"⚠️  Cleanup warnings: {result.stderr}")
+
+            if result.returncode == 0:
+                print("✅ System cleanup completed successfully", flush=True)
+                print("="*60, flush=True)
+
+                # Show confirmation
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Cleanup Complete",
+                    "All system settings have been restored.\n"
+                    "You can now safely uninstall FadCrypt.",
+                    QMessageBox.StandardButton.Ok
+                )
+                return True
+            else:
+                print(f"❌ System cleanup failed with exit code: {result.returncode}", flush=True)
+                raise Exception(f"Cleanup process failed: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            print(f"\n❌ ERROR: Cleanup timed out after 60 seconds\n", flush=True)
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
+            QMessageBox.warning(
                 self,
-                "Cleanup Complete",
-                "All system settings have been restored.\n"
-                "You can now safely uninstall FadCrypt.",
+                "Cleanup Timeout",
+                "Cleanup process timed out.\n\n"
+                "Some settings may not have been fully restored.\n"
+                "Please try again or check system permissions.",
                 QMessageBox.StandardButton.Ok
             )
-            return True
-            
+            return False
+
         except Exception as e:
             print(f"\n❌ ERROR DURING UNINSTALL CLEANUP: {e}\n", flush=True)
             from PyQt6.QtWidgets import QMessageBox
@@ -3257,53 +3364,368 @@ class MainWindowBase(QMainWindow):
             )
             return False
         
+    def _run_cleanup_logic(self):
+        """
+        Run the same cleanup logic as the --cleanup flag.
+        This ensures UI cleanup and installer cleanup are identical.
+        """
+        import subprocess
+        import platform
+        
+        try:
+            system = platform.system()
+            
+            if system == "Linux":
+                # Get user's home directory (handle sudo context)
+                if 'SUDO_USER' in os.environ:
+                    import pwd
+                    user_home = pwd.getpwnam(os.environ['SUDO_USER']).pw_dir
+                    print(f"[CLEANUP] Running as sudo, user home: {user_home}", flush=True)
+                else:
+                    user_home = os.path.expanduser('~')
+                    print(f"[CLEANUP] User home: {user_home}", flush=True)
+                
+                fadcrypt_folder = os.path.join(user_home, '.config', 'FadCrypt')
+                fadcrypt_backup_folder = os.path.join(user_home, '.local', 'share', 'FadCrypt', 'Backup')
+                
+                # CRITICAL: Remove immutable flags before deletion (files may have chattr +i from file protection)
+                folders_to_clean = [
+                    fadcrypt_folder,
+                    fadcrypt_backup_folder
+                ]
+                
+                for folder in folders_to_clean:
+                    if os.path.exists(folder):
+                        try:
+                            # Find all files and remove immutable flag
+                            print(f"[CLEANUP] Removing immutable flags from {folder}...", flush=True)
+                            result = subprocess.run(
+                                ['find', folder, '-type', 'f', '-exec', 'chattr', '-i', '{}', '+'],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                                timeout=10
+                            )
+                            if result.returncode == 0:
+                                print(f"[CLEANUP] ✅ Removed immutable flags", flush=True)
+                            else:
+                                print(f"[CLEANUP] ⚠️  Could not remove immutable flags via chattr", flush=True)
+                                print(f"[CLEANUP]     Note: Daemon will handle cleanup when service stops", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove immutable flags: {e}", flush=True)
+                
+                # Remove all FadCrypt config and backup folders
+                folders_to_remove = [
+                    fadcrypt_folder,
+                    fadcrypt_backup_folder
+                ]
+                
+                for folder in folders_to_remove:
+                    if os.path.exists(folder):
+                        try:
+                            import shutil
+                            shutil.rmtree(folder)
+                            print(f"[CLEANUP] ✅ Removed: {folder}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove {folder}: {e}", flush=True)
+                
+                # List of common system tools that might have been disabled
+                all_tools = [
+                    '/usr/bin/gnome-terminal',
+                    '/usr/bin/konsole',
+                    '/usr/bin/xterm',
+                    '/usr/bin/gnome-system-monitor',
+                    '/usr/bin/htop',
+                    '/usr/bin/top',
+                    '/usr/bin/gnome-control-center'
+                ]
+                
+                print(f"[CLEANUP] Checking {len(all_tools)} common system tools...", flush=True)
+                
+                # Find tools that need restoring
+                tools_to_restore = []
+                for tool in all_tools:
+                    if os.path.exists(tool):
+                        try:
+                            stat_info = os.stat(tool)
+                            # Check if execute permission is missing (was disabled)
+                            if not (stat_info.st_mode & 0o111):
+                                tools_to_restore.append(tool)
+                                print(f"[CLEANUP] Will restore: {tool}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] Error checking {tool}: {e}", flush=True)
+                
+                # Restore permissions for disabled tools
+                if tools_to_restore:
+                    print(f"[CLEANUP] Restoring {len(tools_to_restore)} disabled tools...", flush=True)
+                    chmod_commands = [f'chmod 755 "{tool}"' for tool in tools_to_restore]
+                    full_command = ' && '.join(chmod_commands)
+                    
+                    # Direct chmod (prerm script runs with root)
+                    result = subprocess.run(['bash', '-c', full_command], 
+                                          capture_output=True, 
+                                          text=True,
+                                          check=False)
+                    
+                    if result.returncode == 0:
+                        print(f"[CLEANUP] ✅ Restored {len(tools_to_restore)} tools", flush=True)
+                    else:
+                        print(f"[CLEANUP] ⚠️ Warning: {result.stderr}", flush=True)
+                else:
+                    print("[CLEANUP] No disabled tools found", flush=True)
+                
+                # Remove lock file if it exists
+                lock_file = '/tmp/fadcrypt.lock'
+                if os.path.exists(lock_file):
+                    try:
+                        os.remove(lock_file)
+                        print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                    except PermissionError:
+                        # Lock file might be owned by different user - cleanup script runs as root
+                        try:
+                            subprocess.run(['rm', '-f', lock_file], check=True)
+                            print(f"[CLEANUP] ✅ Removed lock file: {lock_file}", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+                    except Exception as e:
+                        print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+            
+            elif system == "Windows":
+                print("[CLEANUP] Windows cleanup - restoring system tools and cleaning registry...", flush=True)
+                import winreg
+                
+                # Remove FadCrypt from PATH
+                print("[CLEANUP] Removing FadCrypt from PATH...", flush=True)
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ | winreg.KEY_SET_VALUE)
+                    try:
+                        current_path, _ = winreg.QueryValueEx(key, "Path")
+                        if not current_path:
+                            print("[CLEANUP] ℹ️  PATH is empty", flush=True)
+                        else:
+                            # Get the installation directory (where this executable should be)
+                            # During uninstall, we should be running from the installed location
+                            exe_path = sys.executable
+                            if hasattr(sys, '_MEIPASS'):
+                                # Running from PyInstaller bundle - get the directory containing the exe
+                                exe_dir = os.path.dirname(exe_path)
+                            else:
+                                # Running from source - don't modify PATH
+                                exe_dir = None
+                            
+                            if exe_dir:
+                                print(f"[CLEANUP] Removing directory from PATH: {exe_dir}", flush=True)
+                                # Split PATH and filter out the exe directory
+                                path_parts = current_path.split(';')
+                                original_count = len(path_parts)
+                                # Remove empty strings and the exe directory
+                                filtered_parts = [p for p in path_parts if p and p.strip() and p.strip() != exe_dir]
+                                
+                                if len(filtered_parts) != original_count:
+                                    new_path = ';'.join(filtered_parts)
+                                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, new_path)
+                                    print("[CLEANUP] ✅ Removed FadCrypt from PATH", flush=True)
+                                else:
+                                    print("[CLEANUP] ℹ️  FadCrypt directory not found in PATH", flush=True)
+                            else:
+                                print("[CLEANUP] ℹ️  Not running from PyInstaller bundle, skipping PATH removal", flush=True)
+                    except FileNotFoundError:
+                        print("[CLEANUP] ℹ️  PATH environment variable not found", flush=True)
+                    finally:
+                        winreg.CloseKey(key)
+                        
+                    # Notify system of environment change
+                    try:
+                        import ctypes
+                        HWND_BROADCAST = 0xFFFF
+                        WM_SETTINGCHANGE = 0x001A
+                        SMTO_ABORTIFHUNG = 0x0002
+                        result = ctypes.windll.user32.SendMessageTimeoutW(
+                            HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+                            SMTO_ABORTIFHUNG, 5000, None
+                        )
+                        if result:
+                            print("[CLEANUP] ✅ Notified system of PATH change", flush=True)
+                    except Exception as e:
+                        print(f"[CLEANUP] ℹ️  Could not notify system of PATH change: {e}", flush=True)
+                        
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove from PATH: {e}", flush=True)
+                
+                # Registry keys that FadCrypt may have disabled
+                keys_to_restore = [
+                    # Note: CMD is not managed by system tools anymore to avoid boot loops
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableTaskMgr'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer', 'NoControlPanel'),
+                    (r'Software\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableRegistryTools')
+                ]
+                
+                restored_count = 0
+                for reg_path, value_name in keys_to_restore:
+                    try:
+                        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                        winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, 0)  # 0 = enabled
+                        winreg.CloseKey(key)
+                        restored_count += 1
+                        print(f"[CLEANUP] Restored: {value_name}", flush=True)
+                    except FileNotFoundError:
+                        pass  # Key doesn't exist
+                    except Exception as e:
+                        print(f"[CLEANUP] Warning: Could not restore {value_name}: {e}", flush=True)
+                
+                # Remove FadCrypt context menu entries
+                print("[CLEANUP] Removing FadCrypt context menu entries...", flush=True)
+                try:
+                    from core.windows.shell_extension import ContextMenuManager
+                    manager = ContextMenuManager()
+                    if manager.unregister_context_menu():
+                        print("[CLEANUP] ✅ Removed context menu entries", flush=True)
+                        # Restart File Explorer to clear context menu cache
+                        print("[CLEANUP] Restarting File Explorer to clear context menu cache...", flush=True)
+                        try:
+                            # Kill explorer and restart it properly
+                            subprocess.run(['taskkill.exe', '/f', '/im', 'explorer.exe'], 
+                                         capture_output=True, timeout=5)
+                            # Give it a moment to fully terminate
+                            import time
+                            time.sleep(1)
+                            # Start explorer again (don't wait for it since it's long-running)
+                            subprocess.Popen(['explorer.exe'])
+                            print("[CLEANUP] ✅ File Explorer restarted (context menu cache cleared)", flush=True)
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️  Could not restart File Explorer: {e}", flush=True)
+                            print("[CLEANUP] ℹ️  Context menu changes will take effect on next login", flush=True)
+                    else:
+                        print("[CLEANUP] ⚠️  No context menu entries found to remove", flush=True)
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove context menu entries: {e}", flush=True)
+                
+                # Remove from Windows startup
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                       r"Software\Microsoft\Windows\CurrentVersion\Run",
+                                       0, winreg.KEY_SET_VALUE)
+                    winreg.DeleteValue(key, "FadCrypt")
+                    winreg.CloseKey(key)
+                    print("[CLEANUP] Removed from Windows startup", flush=True)
+                except FileNotFoundError:
+                    pass  # Not in startup
+                except Exception as e:
+                    print(f"[CLEANUP] Warning: Could not remove startup entry: {e}", flush=True)
+                
+                print(f"[CLEANUP] ✅ Restored {restored_count} Windows settings", flush=True)
+                
+                # Remove FadCrypt data directories
+                print("[CLEANUP] Removing FadCrypt data directories...", flush=True)
+                import shutil
+                
+                # Get standard Windows directories
+                appdata = os.environ.get('APPDATA', '')
+                programdata = os.environ.get('PROGRAMDATA', '')
+                
+                # Main unified FadCrypt directory (contains config, logs, backup, temp)
+                data_dirs_to_remove = []
+                if appdata:
+                    main_fadcrypt_dir = os.path.join(appdata, 'FadCrypt')
+                    data_dirs_to_remove.append(main_fadcrypt_dir)
+                
+                # Legacy service logs directory (if it exists)
+                if programdata:
+                    legacy_service_dir = os.path.join(programdata, 'FadCrypt')
+                    data_dirs_to_remove.append(legacy_service_dir)
+                
+                removed_count = 0
+                total_files_removed = 0
+                for data_dir in data_dirs_to_remove:
+                    if os.path.exists(data_dir):
+                        try:
+                            # Count files before removal for logging
+                            file_count = sum(len(files) for _, _, files in os.walk(data_dir))
+                            shutil.rmtree(data_dir)
+                            print(f"[CLEANUP] ✅ Removed directory: {data_dir} ({file_count} files)", flush=True)
+                            removed_count += 1
+                            total_files_removed += file_count
+                        except Exception as e:
+                            print(f"[CLEANUP] ⚠️ Warning: Could not remove {data_dir}: {e}", flush=True)
+                
+                if removed_count > 0:
+                    print(f"[CLEANUP] ✅ Removed {removed_count} directories with {total_files_removed} total files", flush=True)
+                else:
+                    print("[CLEANUP] ℹ️  No FadCrypt directories found to remove", flush=True)
+                
+                # Note: File Explorer restart not needed for context menu changes to take effect
+                print("[CLEANUP] ℹ️  Context menu changes will take effect on next File Explorer restart", flush=True)
+            
+            print("[CLEANUP] ✅ Cleanup completed successfully", flush=True)
+            return True
+            
+        except Exception as e:
+            print(f"[CLEANUP] ❌ Error during cleanup: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def on_create_password(self):
         """Handle create password button click"""
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         
-        print(f"\n🔐 Create Password Request")
+        print(f"\n[PASSWORD] Create Password Request")
         print(f"   Checking password file: {password_file}")
         print(f"   File exists: {os.path.exists(password_file)}")
         
         if os.path.exists(password_file):
-            print(f"   ⚠️  Password file already exists, cannot create")
+            print(f"   WARN Password file already exists, cannot create")
             self.show_message("Info", "Password already exists. Use 'Change Password' to modify.", "info")
         else:
             # First password entry
-            password = ask_password(
-                "Create Password",
-                "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:",
-                self.resource_path,
-                style=self.password_dialog_style,
-                wallpaper=self.wallpaper_choice,
-                parent=self,
-                show_forgot_password=False  # Hide forgot password during creation
-            )
-            if password:
-                # Confirm password entry
-                confirm_password = ask_password(
-                    "Confirm New Password",  # Changed to include "New Password" for "Create" button
-                    "Please re-enter your password to confirm:",
+            try:
+                password = ask_password(
+                    "Create Password",
+                    "Make sure to securely note down your password.\nIf forgotten, the tool cannot be stopped,\nand recovery will be difficult!\nEnter a new password:",
                     self.resource_path,
                     style=self.password_dialog_style,
                     wallpaper=self.wallpaper_choice,
                     parent=self,
                     show_forgot_password=False  # Hide forgot password during creation
                 )
+            except Exception as e:
+                print(f"   ERROR Exception in ask_password (first): {e}")
+                import traceback
+                traceback.print_exc()
+                self.show_message("Error", f"Failed to show password dialog:\n{e}", "error")
+                return
+            if password:
+                # Confirm password entry
+                try:
+                    confirm_password = ask_password(
+                        "Confirm New Password",  # Changed to include "New Password" for "Create" button
+                        "Please re-enter your password to confirm:",
+                        self.resource_path,
+                        style=self.password_dialog_style,
+                        wallpaper=self.wallpaper_choice,
+                        parent=self,
+                        show_forgot_password=False  # Hide forgot password during creation
+                    )
+                except Exception as e:
+                    print(f"   ERROR Exception in ask_password (confirm): {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.show_message("Error", f"Failed to show password confirmation dialog:\n{e}", "error")
+                    return
                 
                 if not confirm_password:
-                    print(f"   ⚠️  Password confirmation cancelled")
+                    print(f"   WARN Password confirmation cancelled")
                     return
                 
                 if password != confirm_password:
-                    print(f"   ❌ Passwords don't match")
+                    print(f"   ERROR Passwords don't match")
                     self.show_message("Error", "Passwords don't match. Please try again.", "error")
                     return
                 
                 try:
                     print(f"   Creating password file at: {password_file}")
                     self.password_manager.create_password(password)
-                    print(f"   ✅ Password created successfully")
+                    print(f"   OK Password created successfully")
                     
                     # Update password button visibility
                     self.update_password_buttons_visibility()
@@ -3313,7 +3735,7 @@ class MainWindowBase(QMainWindow):
                     
                     self.show_message("Success", "Password created successfully.", "success")
                 except Exception as e:
-                    print(f"   ❌ Error creating password: {e}")
+                    print(f"   ERROR Error creating password: {e}")
                     self.show_message("Error", f"Failed to create password:\n{e}", "error")
         
     def on_change_password(self):
@@ -3553,91 +3975,6 @@ class MainWindowBase(QMainWindow):
             except Exception as e:
                 self.show_message("Error", f"Failed to import configuration:\n{e}", "error")
 
-    def remove_file_item(self):
-        """Remove selected file or folder from protected items"""
-        selected_items = self.file_grid_widget.get_selected_paths()
-        
-        if not selected_items:
-            self.show_message("Info", "Please select at least one item to remove.", "info")
-            return
-        
-        # Confirm removal
-        items_str = ", ".join([os.path.basename(p) for p in selected_items])
-        reply = QMessageBox.question(
-            self,
-            "Confirm Removal",
-            f"Are you sure you want to remove:\n{items_str}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            for item_path in selected_items:
-                self.file_grid_widget.remove_item(item_path)
-                
-                # Log activity
-                self.log_activity(
-                    'remove_item',
-                    item_path,
-                    'file_or_folder',
-                    success=True,
-                    details=f"Removed from protection list"
-                )
-            
-            self.save_locked_files_config()
-            self.show_message("Success", f"Removed {len(selected_items)} item(s) successfully.", "success")
-    
-    def save_locked_files_config(self):
-        """Save locked files to unified config file"""
-        from datetime import datetime
-        
-        config_file = os.path.join(self.get_fadcrypt_folder(), 'apps_config.json')
-        
-        # Temporarily unlock config file for writing
-        should_relock = False
-        if self.file_lock_manager and hasattr(self.file_lock_manager, 'temporarily_unlock_config'):
-            self.file_lock_manager.temporarily_unlock_config('apps_config.json')
-            should_relock = True
-        
-        try:
-            # Load existing config to preserve applications
-            existing_config = {"applications": [], "locked_files_and_folders": []}
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, 'r') as f:
-                        existing_config = json.load(f)
-                except:
-                    pass
-            
-            # Build locked items array from file grid
-            items_dict = self.file_grid_widget.cards
-            locked_items = [
-                {
-                    'path': card.item_path,
-                    'type': card.item_type,
-                    'added_at': card.date_added or datetime.now().isoformat()
-                }
-                for card in items_dict.values()
-            ]
-            
-            # Create unified config - preserve applications
-            unified_config = {
-                'applications': existing_config.get('applications', []),
-                'locked_files_and_folders': locked_items
-            }
-            
-            with open(config_file, 'w') as f:
-                json.dump(unified_config, f, indent=4)
-            print(f"Protected files config saved: {len(locked_items)} items (preserved {len(unified_config.get('applications', []))} apps)")
-            
-            # Update config tab display
-            self.update_config_display()
-        except Exception as e:
-            print(f"Error saving locked files config: {e}")
-        finally:
-            # Always re-lock after writing
-            if should_relock and self.file_lock_manager and hasattr(self.file_lock_manager, 'relock_config'):
-                self.file_lock_manager.relock_config('apps_config.json')
-    
     def open_stats_window(self):
         """Open the enhanced statistics dashboard window - requires password if monitoring active"""
         
@@ -3694,6 +4031,720 @@ class MainWindowBase(QMainWindow):
             print(f"Error opening enhanced stats window: {e}")
             import traceback
             traceback.print_exc()
+    
+    def open_fadguide(self):
+        """Open FadGuide help window with CLI command instructions (password-protected)"""
+        # Require password to open FadGuide
+        if not self.verify_password_with_recovery(
+            "FadGuide Access",
+            "Enter your password to access FadGuide:"
+        ):
+            print("[FadGuide] Access denied - password verification failed")
+            return
+        
+        print("[FadGuide] Password verified - opening FadGuide window")
+        
+        try:
+            import platform
+            import os
+            from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                                         QLabel, QTextEdit, QPushButton, QScrollArea, QTabWidget)
+            from PyQt6.QtCore import Qt
+            from PyQt6.QtGui import QFont, QIcon
+            
+            # Close existing window if open
+            if hasattr(self, 'fadguide_window') and self.fadguide_window is not None:
+                self.fadguide_window.close()
+            
+            guide_window = QMainWindow()
+            self.fadguide_window = guide_window
+            guide_window.setWindowTitle("FadGuide — Command Line Reference [CLI]")
+            guide_window.resize(900, 750)
+            
+            # Make close button minimize to tray instead of closing
+            def handle_close_event(event):
+                guide_window.hide()
+                event.ignore()
+            
+            guide_window.closeEvent = handle_close_event
+            
+            # Set window icon
+            icon_path = self.resource_path('img/icon.png')
+            if os.path.exists(icon_path):
+                guide_window.setWindowIcon(QIcon(icon_path))
+            
+            # Main central widget
+            central_widget = QWidget()
+            guide_window.setCentralWidget(central_widget)
+            main_layout = QVBoxLayout(central_widget)
+            main_layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Tab widget
+            tabs = QTabWidget()
+            is_windows = platform.system() == "Windows"
+            is_linux = platform.system() == "Linux"
+            
+            # ============ TAB 1: ENCRYPTION COMMANDS ============
+            tab1 = self._create_encryption_tab(is_windows, is_linux)
+            tabs.addTab(tab1, "Encryption")
+            
+            # ============ TAB 2: PROTECTION TOGGLES ============
+            tab2 = self._create_protection_tab(is_windows, is_linux)
+            tabs.addTab(tab2, "Protection Toggles")
+            
+            main_layout.addWidget(tabs)
+            
+            # Apply dark theme
+            guide_window.setStyleSheet("""
+                QMainWindow {
+                    background-color: #0f0f0f;
+                }
+                QTabWidget::pane {
+                    border: none;
+                }
+                QTabBar::tab {
+                    background-color: #1a1a1a;
+                    color: #b0b0b0;
+                    padding: 8px 20px;
+                    margin-right: 2px;
+                    border: none;
+                }
+                QTabBar::tab:selected {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                    border-bottom: 3px solid #c41e3a;
+                }
+                QTabBar::tab:hover {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                }
+                QScrollArea {
+                    background-color: #0f0f0f;
+                    border: none;
+                }
+                QScrollBar:vertical {
+                    background-color: #1a1a1a;
+                    width: 10px;
+                    border: none;
+                }
+                QScrollBar::handle:vertical {
+                    background-color: #444444;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background-color: #555555;
+                }
+            """)
+            
+            guide_window.show()
+        except Exception as e:
+            print(f"Error opening FadGuide: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _create_encryption_tab(self, is_windows, is_linux):
+        """Create encryption commands tab"""
+        try:
+            from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QScrollArea
+            from PyQt6.QtGui import QFont
+            from PyQt6.QtCore import Qt as QtEnum
+            
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setStyleSheet("background-color: #0f0f0f;")
+            
+            scroll_widget = QWidget()
+            scroll_widget.setStyleSheet("background-color: #0f0f0f;")
+            layout = QVBoxLayout(scroll_widget)
+            layout.setContentsMargins(15, 15, 15, 15)
+            layout.setSpacing(12)
+            
+            # Header
+            header = QLabel("Encryption & Decryption")
+            header_font = QFont()
+            header_font.setPointSize(14)
+            header_font.setBold(True)
+            header.setFont(header_font)
+            header.setStyleSheet("color: #c41e3a; margin-bottom: 5px;")
+            layout.addWidget(header)
+            
+            # Description
+            desc = QLabel("Encrypt sensitive files & folders with military-grade AES-256-GCM encryption. Files are secured in tamper-proof format (can toggle this behavior with Protection Toggles tab). Choose either GUI context menu or CLI commands below.")
+            desc_font = QFont()
+            desc_font.setPointSize(9)
+            desc.setFont(desc_font)
+            desc.setStyleSheet("color: #888888; margin-bottom: 12px;")
+            desc.setWordWrap(True)
+            layout.addWidget(desc)
+            
+            # Windows Context Menu Option
+            if is_windows:
+                gui_header = QLabel("Option 1: GUI Context Menu (Windows)")
+                gui_font = QFont()
+                gui_font.setPointSize(11)
+                gui_font.setBold(True)
+                gui_header.setFont(gui_font)
+                gui_header.setStyleSheet("color: #c41e3a; margin-top: 5px; margin-bottom: 5px;")
+                layout.addWidget(gui_header)
+                
+                gui_steps = QLabel(
+                    "1. Right-click on any file or folder\n"
+                    "    1.1. Click on 'Show More Options' (Windows 11)\n"
+                    "2. Select 'Lock with FadCrypt' to encrypt\n"
+                    "3. Select 'Unlock with FadCrypt' to decrypt"
+                )
+                gui_font_steps = QFont()
+                gui_font_steps.setPointSize(9)
+                gui_steps.setFont(gui_font_steps)
+                gui_steps.setStyleSheet("color: #a0a0a0; margin-left: 8px; margin-bottom: 15px; line-height: 1.6;")
+                gui_steps.setWordWrap(True)
+                layout.addWidget(gui_steps)
+            
+            # CLI Option header
+            cli_header_text = "Option 2: Command Line (CLI)" if is_windows else "Command Line (CLI)"
+            cli_header = QLabel(cli_header_text)
+            cli_font = QFont()
+            cli_font.setPointSize(11)
+            cli_font.setBold(True)
+            cli_header.setFont(cli_font)
+            cli_header.setStyleSheet("color: #c41e3a; margin-top: 10px; margin-bottom: 5px;")
+            layout.addWidget(cli_header)
+            
+            # Opening Terminal Instructions
+            term_header = QLabel("Open Terminal in Your Folder:")
+            term_font = QFont()
+            term_font.setPointSize(11)
+            term_font.setBold(True)
+            term_header.setFont(term_font)
+            term_header.setStyleSheet("color: #c41e3a; margin-top: 5px; margin-bottom: 5px;")
+            layout.addWidget(term_header)
+            
+            if is_windows:
+                term_steps = QLabel(
+                    "1. Open File Explorer\n"
+                    "2. Navigate to your folder\n"
+                    "3. Right-click in the folder → 'Open Terminal Here'\n"
+                    "4. Terminal opens in that directory"
+                )
+            else:  # Linux
+                term_steps = QLabel(
+                    "1. Open File Manager\n"
+                    "2. Navigate to your folder\n"
+                    "3. Right-click → 'Open Terminal Here' (or use Ctrl+Alt+T)\n"
+                    "4. Terminal opens in that directory"
+                )
+            
+            term_steps_font = QFont()
+            term_steps_font.setPointSize(9)
+            term_steps.setFont(term_steps_font)
+            term_steps.setStyleSheet("color: #a0a0a0; margin-left: 8px; margin-bottom: 15px; line-height: 1.6;")
+            term_steps.setWordWrap(True)
+            layout.addWidget(term_steps)
+            
+            # Command sections
+            def add_cmd_section(title, description, command, example):
+                """Add a command section"""
+                title_label = QLabel(title)
+                title_font = QFont()
+                title_font.setPointSize(11)
+                title_font.setBold(True)
+                title_label.setFont(title_font)
+                title_label.setStyleSheet("color: #c41e3a; margin-top: 15px; margin-bottom: 4px;")
+                layout.addWidget(title_label)
+                
+                if description:
+                    desc_label = QLabel(description)
+                    desc_font = QFont()
+                    desc_font.setPointSize(9)
+                    desc_label.setFont(desc_font)
+                    desc_label.setStyleSheet("color: #888888; margin-left: 8px; margin-bottom: 8px; font-style: italic;")
+                    desc_label.setWordWrap(True)
+                    layout.addWidget(desc_label)
+                
+                # Command container
+                cmd_container = QWidget()
+                cmd_layout = QHBoxLayout(cmd_container)
+                cmd_layout.setContentsMargins(0, 0, 0, 0)
+                cmd_layout.setSpacing(8)
+                
+                # Use QLabel instead of QTextEdit - simpler, cleaner code block appearance
+                import html
+                import re
+                
+                def colorize_command(text):
+                    escaped = html.escape(text)
+                    # Flags (blue)
+                    escaped = re.sub(r'(--lock|--unlock|--0|--1|--on|--off)', r'<span style="color: #5ea8ff;">\1</span>', escaped)
+                    # Filenames (yellow)
+                    escaped = re.sub(r'([a-zA-Z0-9_\-~][a-zA-Z0-9_.\-~]*\.[a-zA-Z0-9]+)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                    # Quoted paths (yellow)
+                    escaped = re.sub(r'&quot;(.*?)&quot;', r'&quot;<span style="color: #f0d747;">\1</span>&quot;', escaped)
+                    # Placeholders (yellow): &lt;path&gt;, &lt;file&gt;, etc.
+                    escaped = re.sub(r'(&lt;[a-z]+&gt;)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                    # fadcrypt (green) - avoid replacing inside already colored spans
+                    escaped = re.sub(r'(?<!</span>)(\bfadcrypt\b)(?!</span>)', r'<span style="color: #00d700;">\1</span>', escaped)
+                    return escaped
+                
+                formatted_lines = []
+                for line in command.split('\n'):
+                    if line.strip().startswith('#'):
+                        formatted_lines.append(f'<span style="color: #888888;">{html.escape(line)}</span>')
+                    else:
+                        formatted_lines.append(colorize_command(line))
+                
+                formatted_text = '<br>'.join(formatted_lines)
+
+                
+                cmd_label = QLabel(formatted_text)
+                cmd_label.setTextFormat(QtEnum.TextFormat.RichText)
+                cmd_label.setStyleSheet("""
+                    QLabel {
+                        background-color: #1a1a1a;
+                        color: #00d700;
+                        font-family: 'Courier New', monospace;
+                        font-size: 10pt;
+                        border: 1px solid #333333;
+                        border-radius: 3px;
+                        padding: 12px 8px;
+                        margin-left: 8px;
+                    }
+                """)
+                cmd_label.setTextInteractionFlags(QtEnum.TextInteractionFlag.TextSelectableByMouse)
+                cmd_label.setWordWrap(False)
+                cmd_layout.addWidget(cmd_label, stretch=1)
+                
+                copy_btn = QPushButton("Copy")
+                copy_btn.setMaximumWidth(50)
+                copy_btn.setStyleSheet("""
+                    QPushButton {
+                        background: #c41e3a;
+                        color: white;
+                        border: none;
+                        border-radius: 3px;
+                        font-weight: bold;
+                        font-size: 9pt;
+                        padding: 6px 8px;
+                    }
+                    QPushButton:hover {
+                        background: #e73656;
+                    }
+                    QPushButton:pressed {
+                        background: #a01729;
+                    }
+                """)
+                copy_btn.clicked.connect(lambda: self._copy_to_clipboard(command))
+                cmd_layout.addWidget(copy_btn, stretch=0)
+                
+                cmd_container.setStyleSheet("background-color: transparent; margin-bottom: 10px;")
+                layout.addWidget(cmd_container)
+                
+                if example:
+                    ex_label = QLabel(example)
+                    ex_font = QFont()
+                    ex_font.setPointSize(9)
+                    ex_label.setFont(ex_font)
+                    ex_label.setStyleSheet("color: #666666; margin-left: 8px; margin-bottom: 10px; font-style: italic;")
+                    ex_label.setWordWrap(True)
+                    layout.addWidget(ex_label)
+            
+            add_cmd_section(
+                "Lock (Encrypt) Files/Folders",
+                "Encrypt and protect files or folders with password. Wrap paths with spaces in double quotes.",
+                'fadcrypt --lock <path>\nfadcrypt --lock "C:\\path with spaces\\file.txt"',
+                'Example: fadcrypt --lock secret.txt\nExample: fadcrypt --lock "My Documents"' if is_windows else 'Example: fadcrypt --lock secret.txt\nExample: fadcrypt --lock "~/My Files"'
+            )
+            
+            add_cmd_section(
+                "Unlock (Decrypt) Files/Folders",
+                "Decrypt and restore access. Use with or without .fadcrypt extension - both work!",
+                'fadcrypt --unlock <path>\n# Both work:\nfadcrypt --unlock secret.txt\nfadcrypt --unlock secret.txt.fadcrypt',
+                'Example: fadcrypt --unlock secret.txt\nOR: fadcrypt --unlock secret.txt.fadcrypt (same result)' if is_windows else 'Example: fadcrypt --unlock ~/secret.txt\nOR: fadcrypt --unlock ~/secret.txt.fadcrypt'
+            )
+            
+            # Features section
+            features_title = QLabel("Key Features")
+            features_font = QFont()
+            features_font.setPointSize(11)
+            features_font.setBold(True)
+            features_title.setFont(features_font)
+            features_title.setStyleSheet("color: #c41e3a; margin-top: 18px; margin-bottom: 6px;")
+            layout.addWidget(features_title)
+            
+            features_text_font = QFont()
+            features_text_font.setPointSize(9)
+            features_text = QLabel(
+                "• AES-256-GCM encryption with PBKDF2 (100,000 iterations)\n"
+                + ("• File Protection: ACL-based access control (Windows)\n" if is_windows else "• File Protection: chmod + immutability flags (Linux)\n") +
+                "• All files become tamper-proof (cannot move/copy/delete)\n"
+                "• Run 'fadcrypt --help' in terminal for all commands"
+            )
+            features_text.setFont(features_text_font)
+            features_text.setStyleSheet("color: #a0a0a0; margin-left: 8px; line-height: 1.6;")
+            features_text.setWordWrap(True)
+            layout.addWidget(features_text)
+            
+            # Encryption Time Estimates
+            time_title = QLabel("Encryption Time Estimates")
+            time_font = QFont()
+            time_font.setPointSize(11)
+            time_font.setBold(True)
+            time_title.setFont(time_font)
+            time_title.setStyleSheet("color: #c41e3a; margin-top: 18px; margin-bottom: 6px;")
+            layout.addWidget(time_title)
+            
+            time_text_font = QFont()
+            time_text_font.setPointSize(9)
+            time_text = QLabel(
+                "⏱️ Estimated encryption times (approximate):\n"
+                "   • ~2 sec for 10 MB files\n"
+                "   • ~5 sec for 50 MB files\n"
+                "   • ~16 sec for 500 MB files\n"
+                "   • ~3+ minutes for 5 GB files\n\n"
+                "⚠️ TAMPER-PROOF ENCRYPTION:\n"
+                "Once locked, files CANNOT be: Copied • Moved • Edited • Deleted\n"
+                "(See 'Protection Toggles' tab to learn about --0/--1 for temporary protection)\n\n"
+                "💡 Best Practices:\n"
+                "   ✓ Optimal: Lock files ≤500 MB for faster processing\n"
+                "   ✓ Split any files or folders larger than 500 MB at the outer level: this lets you move, lock, and unlock them separately,\n        keeping each folder smaller and operations faster.\n"
+                "   ✓ You can encrypt tons of files in one folder—just expect slower encryption"
+            )
+            time_text.setFont(time_text_font)
+            time_text.setStyleSheet("color: #a0a0a0; margin-left: 8px; line-height: 1.6;")
+            time_text.setWordWrap(True)
+            layout.addWidget(time_text)
+            
+            layout.addStretch()
+            scroll.setWidget(scroll_widget)
+            return scroll
+        except Exception as e:
+            print(f"Error creating encryption tab: {e}")
+            import traceback
+            traceback.print_exc()
+            from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+            error_widget = QWidget()
+            error_layout = QVBoxLayout()
+            error_label = QLabel(f"Error loading tab: {str(e)}")
+            error_layout.addWidget(error_label)
+            error_widget.setLayout(error_layout)
+            return error_widget
+    
+    def _create_protection_tab(self, is_windows, is_linux):
+        """Create protection toggles tab"""
+        try:
+            from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QScrollArea
+            from PyQt6.QtGui import QFont
+            from PyQt6.QtCore import Qt as QtEnum
+            
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setStyleSheet("background-color: #0f0f0f;")
+            
+            scroll_widget = QWidget()
+            scroll_widget.setStyleSheet("background-color: #0f0f0f;")
+            layout = QVBoxLayout(scroll_widget)
+            layout.setContentsMargins(15, 15, 15, 15)
+            layout.setSpacing(12)
+            
+            # Header
+            header = QLabel("Tamper-Proof Protection Toggles")
+            header_font = QFont()
+            header_font.setPointSize(14)
+            header_font.setBold(True)
+            header.setFont(header_font)
+            header.setStyleSheet("color: #c41e3a; margin-bottom: 5px;")
+            layout.addWidget(header)
+            
+            # Description
+            desc = QLabel("Enable or disable tamper-proof protection on files WITHOUT encryption. Works on ANY file type (encrypted or not). Use --0 (or --off) to remove protection and access files again. Identical commands: --0 = --off (both disable) and --1 = --on (both enable). Files become completely locked like a rock until you remove protection.")
+            desc_font = QFont()
+            desc_font.setPointSize(9)
+            desc.setFont(desc_font)
+            desc.setStyleSheet("color: #888888; margin-bottom: 12px;")
+            desc.setWordWrap(True)
+            layout.addWidget(desc)
+            
+            # Command sections
+            def add_cmd_section(title, description, commands_dict, info):
+                """Add a protection command section"""
+                title_label = QLabel(title)
+                title_font = QFont()
+                title_font.setPointSize(11)
+                title_font.setBold(True)
+                title_label.setFont(title_font)
+                title_label.setStyleSheet("color: #c41e3a; margin-top: 15px; margin-bottom: 4px;")
+                layout.addWidget(title_label)
+                
+                if description:
+                    desc_label = QLabel(description)
+                    desc_font = QFont()
+                    desc_font.setPointSize(9)
+                    desc_label.setFont(desc_font)
+                    desc_label.setStyleSheet("color: #888888; margin-left: 8px; margin-bottom: 8px; font-style: italic;")
+                    desc_label.setWordWrap(True)
+                    layout.addWidget(desc_label)
+                
+                # Show both command variants
+                for cmd_name, command in commands_dict.items():
+                    # Command container
+                    cmd_container = QWidget()
+                    cmd_layout = QHBoxLayout(cmd_container)
+                    cmd_layout.setContentsMargins(0, 0, 0, 0)
+                    cmd_layout.setSpacing(8)
+                    
+                    import html
+                    import re
+                    
+                    def colorize_command(text):
+                        escaped = html.escape(text)
+                        # Flags (blue)
+                        escaped = re.sub(r'(--lock|--unlock|--0|--1|--on|--off)', r'<span style="color: #5ea8ff;">\1</span>', escaped)
+                        # Filenames (yellow)
+                        escaped = re.sub(r'([a-zA-Z0-9_\-~][a-zA-Z0-9_.\-~]*\.[a-zA-Z0-9]+)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                        # Quoted paths (yellow)
+                        escaped = re.sub(r'&quot;(.*?)&quot;', r'&quot;<span style="color: #f0d747;">\1</span>&quot;', escaped)
+                        # Placeholders (yellow): &lt;path&gt;, &lt;file&gt;, etc.
+                        escaped = re.sub(r'(&lt;[a-z]+&gt;)', r'<span style="color: #f0d747;">\1</span>', escaped)
+                        # fadcrypt (green) - avoid replacing inside already colored spans
+                        escaped = re.sub(r'(?<!</span>)(\bfadcrypt\b)(?!</span>)', r'<span style="color: #00d700;">\1</span>', escaped)
+                        return escaped
+                    
+                    formatted_lines = []
+                    for line in command.split('\n'):
+                        if line.strip().startswith('#'):
+                            formatted_lines.append(f'<span style="color: #888888;">{html.escape(line)}</span>')
+                        else:
+                            formatted_lines.append(colorize_command(line))
+                    
+                    formatted_text = '<br>'.join(formatted_lines)
+                    
+                    cmd_label = QLabel(formatted_text)
+                    cmd_label.setTextFormat(QtEnum.TextFormat.RichText)
+                    cmd_label.setStyleSheet("""
+                        QLabel {
+                            background-color: #1a1a1a;
+                            color: #00d700;
+                            font-family: 'Courier New', monospace;
+                            font-size: 10pt;
+                            border: 1px solid #333333;
+                            border-radius: 3px;
+                            padding: 12px 8px;
+                            margin-left: 8px;
+                        }
+                    """)
+                    cmd_label.setTextInteractionFlags(QtEnum.TextInteractionFlag.TextSelectableByMouse)
+                    cmd_label.setWordWrap(False)
+                    cmd_layout.addWidget(cmd_label, stretch=1)
+                    
+                    copy_btn = QPushButton("Copy")
+                    copy_btn.setMaximumWidth(50)
+                    copy_btn.setStyleSheet("""
+                        QPushButton {
+                            background: #c41e3a;
+                            color: white;
+                            border: none;
+                            border-radius: 3px;
+                            font-weight: bold;
+                            font-size: 9pt;
+                            padding: 6px 8px;
+                        }
+                        QPushButton:hover {
+                            background: #e73656;
+                        }
+                        QPushButton:pressed {
+                            background: #a01729;
+                        }
+                    """)
+                    copy_btn.clicked.connect(lambda checked=False, cmd=command: self._copy_to_clipboard(cmd))
+                    cmd_layout.addWidget(copy_btn, stretch=0)
+                    
+                    cmd_container.setStyleSheet("background-color: transparent; margin-bottom: 8px;")
+                    layout.addWidget(cmd_container)
+                
+                if info:
+                    info_label = QLabel(info)
+                    info_font = QFont()
+                    info_font.setPointSize(9)
+                    info_label.setFont(info_font)
+                    info_label.setStyleSheet("color: #666666; margin-left: 8px; margin-bottom: 10px; font-style: italic;")
+                    info_label.setWordWrap(True)
+                    layout.addWidget(info_label)
+            
+            add_cmd_section(
+                "Enable Protection (Lock Without Encryption)",
+                "Make files immutable — cannot be moved, copied, edited, or deleted (no encryption applied)",
+                {
+                    "Method 1": "fadcrypt --1 <file>",
+                    "Method 2": "fadcrypt --on <file>"
+                },
+                "Example: fadcrypt --1 important.txt" if is_windows else "Example: fadcrypt --1 ~/Documents/important.txt"
+            )
+            
+            add_cmd_section(
+                "Disable Protection (Unlock Without Decryption)",
+                "Remove immutability — files become moveable and copyable again (no decryption needed)",
+                {
+                    "Method 1": "fadcrypt --0 <file>",
+                    "Method 2": "fadcrypt --off <file>"
+                },
+                "Example: fadcrypt --0 config.ini" if is_windows else "Example: fadcrypt --0 ~/.config/settings.ini"
+            )
+            
+            # Difference section
+            diff_title = QLabel("Key Difference: --0/--1 vs --lock/--unlock")
+            diff_font = QFont()
+            diff_font.setPointSize(11)
+            diff_font.setBold(True)
+            diff_title.setFont(diff_font)
+            diff_title.setStyleSheet("color: #c41e3a; margin-top: 18px; margin-bottom: 6px;")
+            layout.addWidget(diff_title)
+            
+            diff_text_font = QFont()
+            diff_text_font.setPointSize(9)
+            diff_text = QLabel(
+                "Protection Toggles (--0/--1):\n"
+                "   • NO encryption applied\n"
+                "   • Files stay readable\n"
+                "   • Protection can be toggled on/off anytime\n"
+                "   • Lightweight, no performance cost\n\n"
+                "Encryption (--lock/--unlock):\n"
+                "   • Files are ENCRYPTED\n"
+                "   • Files are unreadable until decrypted\n"
+                "   • Always protected, requires password to decrypt\n"
+                "   • Uses AES-256-GCM with PBKDF2"
+            )
+            diff_text.setFont(diff_text_font)
+            diff_text.setStyleSheet("color: #a0a0a0; margin-left: 8px; line-height: 1.6;")
+            diff_text.setWordWrap(True)
+            layout.addWidget(diff_text)
+            
+            # Use Cases section
+            use_title = QLabel("Use Cases")
+            use_font = QFont()
+            use_font.setPointSize(11)
+            use_font.setBold(True)
+            use_title.setFont(use_font)
+            use_title.setStyleSheet("color: #c41e3a; margin-top: 18px; margin-bottom: 6px;")
+            layout.addWidget(use_title)
+            
+            use_text_font = QFont()
+            use_text_font.setPointSize(9)
+            use_text = QLabel(
+                "✓ Protect system files without encryption overhead\n"
+                "✓ Lock config files to prevent accidental edits\n"
+                "✓ Immutable archives and backups\n"
+                "✓ Works on already-encrypted files to manage protection level"
+            )
+            use_text.setFont(use_text_font)
+            use_text.setStyleSheet("color: #a0a0a0; margin-left: 8px; line-height: 1.6;")
+            use_text.setWordWrap(True)
+            layout.addWidget(use_text)
+            
+            # Help section
+            help_title = QLabel("All Commands")
+            help_font = QFont()
+            help_font.setPointSize(11)
+            help_font.setBold(True)
+            help_title.setFont(help_font)
+            help_title.setStyleSheet("color: #c41e3a; margin-top: 18px; margin-bottom: 6px;")
+            layout.addWidget(help_title)
+            
+            help_desc = QLabel("Run this in terminal to see all available commands:")
+            help_desc_font = QFont()
+            help_desc_font.setPointSize(9)
+            help_desc.setFont(help_desc_font)
+            help_desc.setStyleSheet("color: #888888; margin-left: 8px; margin-bottom: 6px; font-style: italic;")
+            layout.addWidget(help_desc)
+            
+            # Help command in code block
+            help_container = QWidget()
+            help_layout = QHBoxLayout(help_container)
+            help_layout.setContentsMargins(0, 0, 0, 0)
+            help_layout.setSpacing(8)
+            
+            # Use QLabel instead of QTextEdit - simpler, cleaner code block appearance
+            # Format command text with syntax highlighting
+            import html
+            import re
+            
+            def colorize_help_command(command_text):
+                """Apply syntax highlighting to command text"""
+                escaped_line = html.escape(command_text)
+                # Pattern: fadcrypt command
+                highlighted = escaped_line.replace(
+                    'fadcrypt',
+                    '<span style="color: #00d700;">fadcrypt</span>'
+                )
+                # Pattern: --help flag
+                highlighted = highlighted.replace(
+                    '--help',
+                    '<span style="color: #5ea8ff;">--help</span>'
+                )
+                return highlighted
+            
+            highlighted_help = colorize_help_command("fadcrypt --help")
+            help_label = QLabel(highlighted_help)
+            help_label.setTextFormat(QtEnum.TextFormat.RichText)
+            help_label.setStyleSheet("""
+                QLabel {
+                    background-color: #1a1a1a;
+                    color: #00d700;
+                    font-family: 'Courier New', monospace;
+                    font-size: 10pt;
+                    border: 1px solid #333333;
+                    border-radius: 3px;
+                    padding: 12px 8px;
+                    margin-left: 8px;
+                }
+            """)
+            help_label.setTextInteractionFlags(QtEnum.TextInteractionFlag.TextSelectableByMouse)
+            help_label.setWordWrap(False)
+            help_layout.addWidget(help_label, stretch=1)
+            
+            help_copy_btn = QPushButton("Copy")
+            help_copy_btn.setMaximumWidth(50)
+            help_copy_btn.setStyleSheet("""
+                QPushButton {
+                    background: #c41e3a;
+                    color: white;
+                    border: none;
+                    border-radius: 3px;
+                    font-weight: bold;
+                    font-size: 9pt;
+                    padding: 6px 8px;
+                }
+                QPushButton:hover {
+                    background: #e73656;
+                }
+                QPushButton:pressed {
+                    background: #a01729;
+                }
+            """)
+            help_copy_btn.clicked.connect(lambda: self._copy_to_clipboard("fadcrypt --help"))
+            help_layout.addWidget(help_copy_btn, stretch=0)
+            
+            help_container.setStyleSheet("background-color: transparent;")
+            layout.addWidget(help_container)
+            
+            layout.addStretch()
+            scroll.setWidget(scroll_widget)
+            return scroll
+        except Exception as e:
+            print(f"Error creating protection tab: {e}")
+            import traceback
+            traceback.print_exc()
+            from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+            error_widget = QWidget()
+            error_layout = QVBoxLayout()
+            error_label = QLabel(f"Error loading tab: {str(e)}")
+            error_layout.addWidget(error_label)
+            error_widget.setLayout(error_layout)
+            return error_widget
+    
+    def _copy_to_clipboard(self, text):
+        """Copy text to clipboard"""
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
     
     def log_activity(self, event_type: str, item_name: str | None = None, 
                     item_type: str | None = None, **kwargs):

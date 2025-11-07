@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "FadCrypt"
-#define MyAppVersion "v0.3.0"
+#define MyAppVersion "v2.0.0"
 #define MyAppPublisher "FadSec Lab"
 #define MyAppURL "https://faded.dev"
 #define MyAppExeName "FadCrypt.exe"
@@ -10,7 +10,7 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{DAE875C2-596C-4888-87E3-8609F0F72E8E}
+AppId={{DAE875C2-596C-4888-87E3-8609F0F72E8E}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -18,7 +18,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\FadCrypt
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
 ArchitecturesAllowed=x64compatible
@@ -28,11 +28,11 @@ ArchitecturesAllowed=x64compatible
 ; the 64-bit view of the registry.
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-; Uncomment the following line to run in non administrative install mode (install for current user only.)
-;PrivilegesRequired=lowest
-OutputDir=C:\Users\faded\Desktop\FadCrypt\setup
+; Admin privileges required for service installation
+PrivilegesRequired=admin
+OutputDir=..\dist
 OutputBaseFilename=FadCryptSetup
-SetupIconFile=C:\Users\faded\Documents\repos\FadCrypt\img\1.ico
+SetupIconFile=..\img\1.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -41,20 +41,49 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; Desktop icons checkbox - CHECKED by default and NOT optional
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "C:\Users\faded\Documents\repos\FadCrypt\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+; Copy GUI build to gui subdirectory with its own _internal
+; FadCrypt.exe in gui\ will find _internal\ in the same directory
+Source: "..\dist\FadCrypt\FadCrypt.exe"; DestDir: "{app}\gui"; Flags: ignoreversion
+Source: "..\dist\FadCrypt\_internal\*"; DestDir: "{app}\gui\_internal"; Flags: recursesubdirs ignoreversion createallsubdirs
+
+; Copy CLI build to cli subdirectory with its own _internal
+; fadcrypt.exe in cli\ will find _internal\ in the same directory
+Source: "..\dist\FadCryptCLI\fadcrypt.exe"; DestDir: "{app}\cli"; Flags: ignoreversion
+Source: "..\dist\FadCryptCLI\_internal\*"; DestDir: "{app}\cli\_internal"; Flags: recursesubdirs ignoreversion createallsubdirs
+
+; Copy image assets for shortcuts
+Source: "..\img\1.ico"; DestDir: "{app}\img"; Flags: ignoreversion
+Source: "..\img\fadcrypt_cli_ico.ico"; DestDir: "{app}\img"; Flags: ignoreversion
+Source: "..\img\fadcrypt_cli.png"; DestDir: "{app}\img"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+; GUI shortcuts - point to FadCrypt.exe in gui subdirectory
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui"; WorkingDir: "{app}"; IconFilename: "{app}\img\1.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui"; Tasks: desktopicon; WorkingDir: "{app}"; IconFilename: "{app}\img\1.ico"
+
+; CLI shortcuts - point to fadcrypt.exe in cli subdirectory
+Name: "{autoprograms}\FadCrypt CLI"; Filename: "{app}\cli\fadcrypt.exe"; Parameters: "--cli"; WorkingDir: "{app}"; IconFilename: "{app}\img\fadcrypt_cli_ico.ico"
+Name: "{autodesktop}\FadCrypt CLI"; Filename: "{app}\cli\fadcrypt.exe"; Parameters: "--cli"; Tasks: desktopicon; WorkingDir: "{app}"; IconFilename: "{app}\img\fadcrypt_cli_ico.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; Register context menu during install - use --gui to ensure no terminal window
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --register-context --internal-auth"; Flags: runhidden skipifsilent waituntilterminated
+
+; Install and start the elevated service for persistent admin rights
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --install-service --internal-auth"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
+; Stop and uninstall the elevated service
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --uninstall-service --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
+
 ; Run cleanup to restore system settings before uninstalling
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup"; Flags: runhidden waituntilterminated
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --cleanup --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
+
+[Registry]
+; Add CLI directory to PATH for command-line access (fadcrypt --cli from anywhere)
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\cli"; Flags: uninsdeletevalue
 

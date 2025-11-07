@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import os
+import sys
 
 
 class AddApplicationDialog(QDialog):
@@ -184,18 +185,22 @@ class AddApplicationDialog(QDialog):
         browse_button = QPushButton("📁 Browse")
         browse_button.setStyleSheet("""
             QPushButton {
-                background-color: #4a5568;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #5a6578;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QPushButton:pressed {
-                background-color: #3a4558;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         browse_button.clicked.connect(self.browse_for_file)
@@ -213,18 +218,22 @@ class AddApplicationDialog(QDialog):
         scan_button.setMinimumWidth(130)
         scan_button.setStyleSheet("""
             QPushButton {
-                background-color: #6366f1;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #7c3aed;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
             }
             QPushButton:pressed {
-                background-color: #5b21b6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
             }
         """)
         scan_button.clicked.connect(self.scan_for_apps)
@@ -235,18 +244,22 @@ class AddApplicationDialog(QDialog):
         save_button.setMinimumWidth(120)
         save_button.setStyleSheet("""
             QPushButton {
-                background-color: #10b981;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 10pt;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #059669;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
             }
             QPushButton:pressed {
-                background-color: #047857;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         save_button.clicked.connect(self.save_application)
@@ -313,6 +326,9 @@ class AddApplicationDialog(QDialog):
         
         # Auto-fill name and path
         app_name = os.path.basename(file_path)
+        # Clean up the name for display (remove .exe on Windows)
+        if sys.platform.startswith('win') and app_name.endswith('.exe'):
+            app_name = app_name[:-4]
         self.name_entry.setText(app_name)
         self.path_entry.setText(file_path)
         
@@ -414,6 +430,9 @@ class AddApplicationDialog(QDialog):
             )
             return
         
+        # Normalize path separators for consistency
+        app_path = os.path.normpath(app_path)
+
         # Check if path exists
         if not os.path.exists(app_path):
             reply = QMessageBox.question(
@@ -447,12 +466,18 @@ class AddApplicationDialog(QDialog):
                 background-color: transparent;
             }
             QMessageBox QPushButton {
-                background-color: #3b82f6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 padding: 8px 20px;
                 border-radius: 5px;
                 font-weight: bold;
                 min-width: 80px;
+                border: none;
+            }
+            QMessageBox QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
             }
             QMessageBox QPushButton:hover {
                 background-color: #2563eb;

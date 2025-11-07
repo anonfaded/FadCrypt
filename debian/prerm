@@ -20,7 +20,7 @@ case "$1" in
             # Export SUDO_USER so cleanup knows the real user's home directory
             # but run with root privileges (don't use su)
             export SUDO_USER="${SUDO_USER:-$USER}"
-            /usr/bin/fadcrypt --cleanup
+            /usr/bin/fadcrypt --cleanup --internal-auth
             
             echo "Cleanup completed."
         else

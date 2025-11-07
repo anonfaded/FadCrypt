@@ -9,11 +9,20 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 
 
+# Signals for export/import actions
+class SettingsPanelSignals(QWidget):
+    """Signals for settings panel actions"""
+    export_config_requested = pyqtSignal()
+    import_config_requested = pyqtSignal()
+
+
 class SettingsPanel(QWidget):
     """Settings panel for FadCrypt configuration with preview sections"""
     
     # Signals for settings changes
     settings_changed = pyqtSignal(dict)
+    export_config_requested = pyqtSignal()
+    import_config_requested = pyqtSignal()
     
     def __init__(self, resource_path_func=None, platform_name="Linux"):
         super().__init__()
@@ -45,7 +54,9 @@ class SettingsPanel(QWidget):
         # Separator
         separator1 = QFrame()
         separator1.setFrameShape(QFrame.Shape.HLine)
-        separator1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator1.setFrameShadow(QFrame.Shadow.Plain)
+        separator1.setLineWidth(1)
+        separator1.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator1)
         
         # Top frame (radio buttons + preview)
@@ -197,7 +208,9 @@ class SettingsPanel(QWidget):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator2)
         
         # Bottom frame for checkboxes and info
@@ -245,7 +258,9 @@ class SettingsPanel(QWidget):
         # File Protection Section
         separator_file_protection = QFrame()
         separator_file_protection.setFrameShape(QFrame.Shape.HLine)
-        separator_file_protection.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_file_protection.setFrameShadow(QFrame.Shadow.Plain)
+        separator_file_protection.setLineWidth(1)
+        separator_file_protection.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         bottom_frame.addWidget(separator_file_protection)
         
         file_protection_title = QLabel("🛡️  Critical File Protection")
@@ -286,11 +301,68 @@ class SettingsPanel(QWidget):
         file_protection_info.setStyleSheet("color: #666666; font-size: 11px; padding-left: 26px;")
         file_protection_info.setWordWrap(True)
         bottom_frame.addWidget(file_protection_info)
-        
+
+        # Process Scanning Interval Section
+        separator_scanning = QFrame()
+        separator_scanning.setFrameShape(QFrame.Shape.HLine)
+        separator_scanning.setFrameShadow(QFrame.Shadow.Plain)
+        separator_scanning.setLineWidth(1)
+        separator_scanning.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
+        bottom_frame.addWidget(separator_scanning)
+
+        scanning_title = QLabel("⚡ Process Scanning Interval")
+        scanning_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+        bottom_frame.addWidget(scanning_title)
+
+        # Scanning interval input
+        from PyQt6.QtWidgets import QDoubleSpinBox
+        scanning_layout = QHBoxLayout()
+
+        scanning_layout.addWidget(QLabel("Scan every"))
+        self.scanning_interval_spinbox = QDoubleSpinBox()
+        self.scanning_interval_spinbox.setRange(0.5, 5.0)  # 0.5 to 5 seconds
+        self.scanning_interval_spinbox.setSingleStep(0.5)
+        self.scanning_interval_spinbox.setValue(1.0)  # Default: 1.0 seconds
+        self.scanning_interval_spinbox.setSuffix(" seconds")
+        self.scanning_interval_spinbox.setStyleSheet("""
+            QDoubleSpinBox {
+                background-color: #2a2a2a;
+                color: #e0e0e0;
+                border: 1px solid #666666;
+                border-radius: 3px;
+                padding: 4px;
+                min-width: 150px;
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                background-color: #444444;
+                border: none;
+                width: 16px;
+            }
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+                background-color: #555555;
+            }
+        """)
+        scanning_layout.addWidget(self.scanning_interval_spinbox)
+        scanning_layout.addStretch()
+        bottom_frame.addLayout(scanning_layout)
+
+        # Info text for scanning interval
+        scanning_info = QLabel(
+            "How often FadCrypt scans for running applications (0.5-5.0 seconds).\n"
+            "⚠️  Lower values = faster detection but higher CPU usage and battery drain.\n"
+            "⚠️  Higher values = slower detection but better performance.\n"
+            "Default: 1.0 seconds (recommended for most users)."
+        )
+        scanning_info.setStyleSheet("color: #666666; font-size: 11px; padding-left: 0px;")
+        scanning_info.setWordWrap(True)
+        bottom_frame.addWidget(scanning_info)
+
         # Uninstall Cleanup
         separator3 = QFrame()
         separator3.setFrameShape(QFrame.Shape.HLine)
-        separator3.setFrameShadow(QFrame.Shadow.Sunken)
+        separator3.setFrameShadow(QFrame.Shadow.Plain)
+        separator3.setLineWidth(1)
+        separator3.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         bottom_frame.addWidget(separator3)
         
         # Recovery Codes Section
@@ -309,14 +381,21 @@ class SettingsPanel(QWidget):
         recovery_button = QPushButton("Generate Recovery Codes")
         recovery_button.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         recovery_button.clicked.connect(lambda: self.on_generate_recovery_codes())
@@ -325,13 +404,126 @@ class SettingsPanel(QWidget):
         
         bottom_frame.addSpacing(20)
         
+        # Context Menu Refresh (Windows only)
+        if self.platform_name == "Windows":
+            context_menu_title = QLabel("🖱️ Context Menu")
+            context_menu_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+            bottom_frame.addWidget(context_menu_title)
+            
+            context_menu_info = QLabel(
+                "Refresh Windows Explorer context menu entries for Lock/Unlock options.\n"
+                "Use this if right-click options are missing or not working."
+            )
+            context_menu_info.setStyleSheet("color: #888888;")
+            context_menu_info.setWordWrap(True)
+            bottom_frame.addWidget(context_menu_info)
+            
+            context_menu_button = QPushButton("Refresh Context Menu")
+            context_menu_button.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
+                    color: white;
+                    font-weight: bold;
+                    padding: 8px 20px;
+                    border-radius: 5px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #0033cc, stop:1 #001a99);
+                }
+            """)
+            context_menu_button.clicked.connect(lambda: self.on_refresh_context_menu())
+            context_menu_button.setMaximumWidth(200)
+            bottom_frame.addWidget(context_menu_button)
+            
+            bottom_frame.addSpacing(20)
+        
+        # Dangerous Operations Section - Encryption
+        separator_dangerous = QFrame()
+        separator_dangerous.setFrameShape(QFrame.Shape.HLine)
+        separator_dangerous.setFrameShadow(QFrame.Shadow.Sunken)
+        bottom_frame.addWidget(separator_dangerous)
+        
+        dangerous_title = QLabel("⚠️  Dangerous Operations")
+        dangerous_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #ff6b6b;")
+        bottom_frame.addWidget(dangerous_title)
+        
+        # Platform-specific checkbox text
+        if self.platform_name == "Windows":
+            checkbox_text = "Enable File/Folder Encryption on Lock (stored as .fadcrypt binary)"
+        else:  # Linux
+            checkbox_text = "Enable File/Folder Encryption on Lock (stored as .fadcrypt binary)"
+        
+        self.encryption_checkbox = QCheckBox(checkbox_text)
+        self.encryption_checkbox.setChecked(False)  # Default: Disabled for safety
+        self.encryption_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #e0e0e0;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #666666;
+                border-radius: 3px;
+                background-color: #2a2a2a;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #d32f2f;
+                background-color: #d32f2f;
+                image: url(none);
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #888888;
+            }
+        """)
+        bottom_frame.addWidget(self.encryption_checkbox)
+        
+        # Warning text below checkbox
+        if self.platform_name == "Windows":
+            encryption_warning_text = (
+                "⚠️  When disabled: Files locked via ACL only, readable when unlocked.\n"
+                "⚠️  When enabled(default): Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  ACL still applied to .fadcrypt file for dual-layer protection.\n"
+                "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
+                "⚠️  Keep recovery codes safe - encryption is irreversible without them."
+            )
+        else:  # Linux
+            encryption_warning_text = (
+                "⚠️  When disabled: Files locked via permissions (000) + immutable flag.\n"
+                "⚠️  When enabled(default): Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  Permissions (000) + immutable still applied to .fadcrypt for dual-layer protection.\n"
+                "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
+                "⚠️  Keep recovery codes safe - encryption is irreversible without them."
+            )
+        
+        encryption_warning = QLabel(encryption_warning_text)
+        encryption_warning.setStyleSheet("color: #ffb74d; font-size: 11px; padding-left: 26px; line-height: 1.6; font-weight: 500;")
+        encryption_warning.setWordWrap(True)
+        bottom_frame.addWidget(encryption_warning)
+        
+        bottom_frame.addSpacing(20)
+        
         cleanup_title = QLabel("🔧 Uninstall Cleanup")
         cleanup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         bottom_frame.addWidget(cleanup_title)
         
         cleanup_info = QLabel(
-            "Before uninstalling FadCrypt, run this cleanup to restore all system settings.\n"
-            "This will re-enable disabled terminals, system monitors, and remove autostart entries."
+            "🧹 Complete system cleanup before uninstalling FadCrypt.\n\n"
+            "This will:\n"
+            "• Stop any active file monitoring\n"
+            "• Re-enable disabled system tools (Command Prompt, Task Manager, etc.)\n"
+            "• Remove FadCrypt from Windows startup\n"
+            "• Remove Windows Explorer context menu entries\n"
+            "• Delete all FadCrypt data directories and files\n"
+            "• Restart File Explorer to apply changes\n\n"
+            "Run this before uninstalling to ensure a clean system state."
         )
         cleanup_info.setStyleSheet("color: #888888;")
         cleanup_info.setWordWrap(True)
@@ -340,20 +532,97 @@ class SettingsPanel(QWidget):
         cleanup_button = QPushButton("Run Uninstall Cleanup")
         cleanup_button.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
                 border-radius: 5px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         cleanup_button.clicked.connect(lambda: self.on_cleanup_clicked())
         cleanup_button.setMaximumWidth(200)
         bottom_frame.addWidget(cleanup_button)
         
+        bottom_frame.addSpacing(20)
+        
+        # Configuration Backup Section
+        backup_title = QLabel("💾 Configuration Backup")
+        backup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
+        bottom_frame.addWidget(backup_title)
+        
+        backup_info = QLabel(
+            "Export your configuration (applications, locked files, settings) to a JSON file.\n"
+            "Import a previously exported configuration to restore your setup.\n"
+            "Useful for backup, migration, or sharing setups across devices."
+        )
+        backup_info.setStyleSheet("color: #888888;")
+        backup_info.setWordWrap(True)
+        bottom_frame.addWidget(backup_info)
+        
+        # Export/Import buttons in horizontal layout
+        backup_buttons = QHBoxLayout()
+        backup_buttons.setSpacing(10)
+        
+        export_button = QPushButton("📥 Export Config")
+        export_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border-radius: 5px;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
+            }
+        """)
+        export_button.clicked.connect(self.on_export_config_clicked)
+        export_button.setMaximumWidth(150)
+        backup_buttons.addWidget(export_button)
+        
+        import_button = QPushButton("📤 Import Config")
+        import_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00cc00, stop:1 #008800);
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border-radius: 5px;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00ff00, stop:1 #00aa00);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #008800, stop:1 #005500);
+            }
+        """)
+        import_button.clicked.connect(self.on_import_config_clicked)
+        import_button.setMaximumWidth(150)
+        backup_buttons.addWidget(import_button)
+        
+        backup_buttons.addStretch()
+        bottom_frame.addLayout(backup_buttons)
         layout.addLayout(bottom_frame)
         layout.addStretch()
         
@@ -368,6 +637,8 @@ class SettingsPanel(QWidget):
         self.wallpaper_group.buttonClicked.connect(self.on_settings_changed)
         self.lock_tools_checkbox.stateChanged.connect(self.on_settings_changed)
         self.file_protection_checkbox.stateChanged.connect(self.on_settings_changed)
+        self.scanning_interval_spinbox.valueChanged.connect(self.on_settings_changed)
+        self.encryption_checkbox.stateChanged.connect(self.on_settings_changed)
         
         # Initial preview update
         self.update_preview()
@@ -412,10 +683,23 @@ class SettingsPanel(QWidget):
         # To be implemented by main window
         pass
     
+    def on_refresh_context_menu(self):
+        """Handle context menu refresh button click"""
+        # To be implemented by main window
+        pass
+    
     def on_cleanup_clicked(self):
         """Handle cleanup button click"""
         # To be implemented by main window
         pass
+        
+    def on_export_config_clicked(self):
+        """Handle export config button click"""
+        self.export_config_requested.emit()
+    
+    def on_import_config_clicked(self):
+        """Handle import config button click"""
+        self.import_config_requested.emit()
         
     def get_settings(self):
         """Get current settings as dictionary"""
@@ -423,7 +707,9 @@ class SettingsPanel(QWidget):
             'dialog_style': 'simple' if self.simple_dialog_radio.isChecked() else 'fullscreen',
             'wallpaper': self.get_wallpaper_choice(),
             'lock_tools': self.lock_tools_checkbox.isChecked(),
-            'file_protection_enabled': self.file_protection_checkbox.isChecked()
+            'file_protection_enabled': self.file_protection_checkbox.isChecked(),
+            'scanning_interval': self.scanning_interval_spinbox.value(),
+            # NOTE: encryption_enabled is now managed separately from settings.json (lives in apps_config.json)
         }
         
     def get_wallpaper_choice(self):
@@ -458,8 +744,16 @@ class SettingsPanel(QWidget):
             
         self.lock_tools_checkbox.setChecked(settings.get('lock_tools', False))  # Default: False for safety
         self.file_protection_checkbox.setChecked(settings.get('file_protection_enabled', True))  # Default: True (enabled)
+        self.scanning_interval_spinbox.setValue(settings.get('scanning_interval', 1.0))  # Default: 1.0 seconds
+        
+        # NOTE: encryption_enabled is now read from apps_config.json, not from settings.json
+        # It will be set separately by the main window via set_encryption_enabled()
         
         self.on_settings_changed()
+    
+    def set_encryption_enabled(self, enabled):
+        """Set encryption checkbox state from apps_config.json"""
+        self.encryption_checkbox.setChecked(enabled)
     
     def apply_settings(self, settings):
         """Alias for set_settings - apply settings from dictionary"""

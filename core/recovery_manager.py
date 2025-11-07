@@ -18,6 +18,7 @@ import string
 import hashlib
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
+from .verbose_logger import vlog
 
 
 class RecoveryCodeManager:
@@ -63,7 +64,8 @@ class RecoveryCodeManager:
             recovery_codes_file_path: Full path to recovery_codes.json file
         """
         self.recovery_codes_file = recovery_codes_file_path
-        print(f"[RecoveryCodeManager] Initialized with codes file: {recovery_codes_file_path}")
+        # Debug log (commented out for cleaner CLI)
+        # print(f"[RecoveryCodeManager] Initialized with codes file: {recovery_codes_file_path}")
     
     @staticmethod
     def generate_code() -> str:
@@ -188,14 +190,18 @@ class RecoveryCodeManager:
                     'created_at': datetime.now().isoformat()
                 })
             
-            # Save to file (plain JSON, no encryption needed)
+            # Save to file using safe write (plain JSON, no encryption needed)
             # The hashes are useless without the actual codes
-            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
-                json.dump(recovery_data, f, indent=2)
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(recovery_data, indent=2)
+            success, error = safe_write_to_protected_file(self.recovery_codes_file, content)
+            if not success:
+                vlog(f"[RecoveryCodeManager] ❌ Failed to write recovery codes: {error}")
+                return False, None
             
-            print(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
-            print(f"[RecoveryCodeManager] Hash algorithm: PBKDF2-HMAC-SHA256 ({self.HASH_ITERATIONS} iterations)")
-            print(f"[RecoveryCodeManager] File now exists: {os.path.exists(self.recovery_codes_file)}")
+            vlog(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
+            vlog(f"[RecoveryCodeManager] Hash algorithm: PBKDF2-HMAC-SHA256 ({self.HASH_ITERATIONS} iterations)")
+            vlog(f"[RecoveryCodeManager] File now exists: {os.path.exists(self.recovery_codes_file)}")
             return True, codes
                 
         except Exception as e:
@@ -253,14 +259,16 @@ class RecoveryCodeManager:
                         return False, "This recovery code has already been used"
                     
                     # Code is valid and unused
-                    print("[RecoveryCodeManager] Recovery code verified")
+                    from core.verbose_logger import vlog
+                    vlog("[RecoveryCodeManager] Recovery code verified")
                     return True, None
             
             # Code not found in any hash
             return False, "Recovery code not found or incorrect"
             
         except Exception as e:
-            print(f"[RecoveryCodeManager] ❌ Error verifying recovery code: {e}")
+            from core.verbose_logger import vlog
+            vlog(f"[RecoveryCodeManager] ❌ Error verifying recovery code: {e}")
             import traceback
             traceback.print_exc()
             return False, f"Error verifying code: {str(e)}"
@@ -315,11 +323,17 @@ class RecoveryCodeManager:
             if not code_found:
                 return False, "Recovery code not found"
             
-            # Save updated data
-            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
-                json.dump(recovery_data, f, indent=2)
+            # Save updated data using safe write to handle file permissions
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(recovery_data, indent=2)
+            success, error = safe_write_to_protected_file(self.recovery_codes_file, content)
+            if not success:
+                from core.verbose_logger import vlog
+                vlog(f"[RecoveryCodeManager] ❌ Failed to write recovery codes: {error}")
+                return False, error
             
-            print("[RecoveryCodeManager] Recovery code marked as used")
+            from core.verbose_logger import vlog
+            vlog("[RecoveryCodeManager] Recovery code marked as used")
             return True, None
             
         except Exception as e:

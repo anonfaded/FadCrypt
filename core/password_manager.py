@@ -7,6 +7,7 @@ import os
 from typing import Optional, Callable, List, Tuple
 from .crypto_manager import CryptoManager
 from .recovery_manager import RecoveryCodeManager
+from .verbose_logger import vlog
 
 
 class PasswordManager:
@@ -41,10 +42,11 @@ class PasswordManager:
         if recovery_codes_file_path:
             self.recovery_manager = RecoveryCodeManager(recovery_codes_file_path)
         
-        print(f"[PasswordManager] Initialized with password file: {password_file_path}")
-        print(f"[PasswordManager] Password file exists: {os.path.exists(password_file_path)}")
-        if self.recovery_manager:
-            print(f"[PasswordManager] Recovery codes available: {self.recovery_manager.has_recovery_codes()}")
+        # Debug logs (commented out for cleaner CLI)
+        # print(f"[PasswordManager] Initialized with password file: {password_file_path}")
+        # print(f"[PasswordManager] Password file exists: {os.path.exists(password_file_path)}")
+        # if self.recovery_manager:
+        #     print(f"[PasswordManager] Recovery codes available: {self.recovery_manager.has_recovery_codes()}")
     
     def create_password(self, password: str) -> bool:
         """
@@ -62,7 +64,7 @@ class PasswordManager:
         try:
             password_bytes = password.encode('utf-8')
             
-            print(f"[PasswordManager] Creating password at: {self.password_file}")
+            vlog(f"[PasswordManager] Creating password at: {self.password_file}")
             
             # Encrypt the password with itself
             success = self.crypto.encrypt_password_hash(
@@ -73,15 +75,15 @@ class PasswordManager:
             
             if success:
                 self.cached_password = password_bytes
-                print(f"[PasswordManager] ✅ Master password created successfully")
-                print(f"[PasswordManager] File now exists: {os.path.exists(self.password_file)}")
+                vlog(f"[PasswordManager] [OK] Master password created successfully")
+                vlog(f"[PasswordManager] File now exists: {os.path.exists(self.password_file)}")
                 return True
             else:
-                print("[PasswordManager] ❌ Failed to create master password")
+                print("[PasswordManager] [ERROR] Failed to create master password")
                 return False
                 
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error creating password: {e}")
+            print(f"[PasswordManager] [ERROR] Error creating password: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -98,12 +100,13 @@ class PasswordManager:
         """
         try:
             if not os.path.exists(self.password_file):
-                print(f"[PasswordManager] ⚠️  Password file not found: {self.password_file}")
+                print(f"[PasswordManager] [WARN] Password file not found: {self.password_file}")
                 return False
             
             password_bytes = password.encode('utf-8')
             
-            print(f"[PasswordManager] Verifying password from: {self.password_file}")
+            # Debug log (commented out for cleaner CLI)
+            # print(f"[PasswordManager] Verifying password from: {self.password_file}")
             
             # Try to decrypt the password hash
             decrypted_hash = self.crypto.decrypt_password_hash(
@@ -112,7 +115,8 @@ class PasswordManager:
             )
             
             if decrypted_hash is None:
-                print("[PasswordManager] ❌ Decryption returned None")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [ERROR] Decryption returned None")
                 return False
             
             # Compare with original password
@@ -120,14 +124,17 @@ class PasswordManager:
             
             if is_valid:
                 self.cached_password = password_bytes
-                print("[PasswordManager] ✅ Password verified successfully")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [OK] Password verified successfully")
             else:
-                print("[PasswordManager] ❌ Password verification failed (mismatch)")
+                # Debug log (commented out for cleaner CLI)
+                # print("[PasswordManager] [ERROR] Password verification failed (mismatch)")
+                pass
             
             return is_valid
             
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error verifying password: {e}")
+            print(f"[PasswordManager] [ERROR] Error verifying password: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -168,7 +175,8 @@ class PasswordManager:
                     print("[PasswordManager] Warning: Failed to re-encrypt some configs")
                     # Don't revert password change - user can manually re-encrypt
             
-            print("[PasswordManager] Password changed successfully")
+            from core.verbose_logger import vlog
+            vlog("[PasswordManager] Password changed successfully")
             return True
             
         except Exception as e:
@@ -287,34 +295,35 @@ class PasswordManager:
             if not self.recovery_manager.has_recovery_codes():
                 return False, "No recovery codes found. Please reset your password differently."
             
-            print("[PasswordManager] Starting password recovery process (hash-based)...")
+            from core.verbose_logger import vlog
+            vlog("[PasswordManager] Starting password recovery process (hash-based)...")
             
             # Step 1: Verify recovery code
-            print("[PasswordManager] Verifying recovery code against stored hashes...")
+            vlog("[PasswordManager] Verifying recovery code against stored hashes...")
             is_valid, error_msg = self.recovery_manager.verify_recovery_code(recovery_code)
             
             if not is_valid:
                 print(f"[PasswordManager] Recovery code verification failed: {error_msg}")
                 return False, f"Invalid recovery code: {error_msg}"
             
-            print("[PasswordManager] Recovery code verified successfully")
+            vlog("[PasswordManager] Recovery code verified successfully")
             
             # Step 2: Consume (mark as used) the recovery code immediately
             print("[PasswordManager] Marking recovery code as used...")
             consumed, consume_error = self.recovery_manager.consume_recovery_code(recovery_code)
             
             if not consumed:
-                print(f"[PasswordManager] Failed to mark code as used: {consume_error}")
+                vlog(f"[PasswordManager] Failed to mark code as used: {consume_error}")
             else:
-                print("[PasswordManager] Recovery code marked as used")
+                vlog("[PasswordManager] Recovery code marked as used")
             
             # Step 3: Delete old password file (cannot be recovered)
             if os.path.exists(self.password_file):
                 try:
                     os.remove(self.password_file)
-                    print("[PasswordManager] ✅ Deleted old password file")
+                    vlog("[PasswordManager] [OK] Deleted old password file")
                 except Exception as e:
-                    print(f"[PasswordManager] ⚠️  Failed to delete old password: {e}")
+                    vlog(f"[PasswordManager] ⚠️  Failed to delete old password: {e}")
             
             # Note: Recovery codes are kept - only the used code is marked as consumed
             # Remaining unused codes can still be used for future password resets
@@ -329,12 +338,12 @@ class PasswordManager:
             if not self.create_password(new_password):
                 return False, "Failed to create new password"
             
-            print("[PasswordManager] Password recovered and reset successfully")
+            vlog("[PasswordManager] Password recovered and reset successfully")
             
             return True, None
             
         except Exception as e:
-            print(f"[PasswordManager] ❌ Error recovering password: {e}")
+            print(f"[PasswordManager] [ERROR] Error recovering password: {e}")
             import traceback
             traceback.print_exc()
             return False, f"Error during recovery: {str(e)}"

@@ -29,10 +29,11 @@ class StatisticsManager:
     def _init_session_metadata(self):
         """Initialize session metadata (called once per app startup)"""
         try:
+            from core.file_protection import safe_write_to_protected_file
             # Create fresh metadata file with current startup time
             startup_data = {'first_startup': datetime.now().isoformat()}
-            with open(self.metadata_file, 'w') as f:
-                json.dump(startup_data, f, indent=2)
+            content = json.dumps(startup_data, indent=2)
+            safe_write_to_protected_file(self.metadata_file, content)
         except:
             pass
     
@@ -227,8 +228,9 @@ class StatisticsManager:
         # Calculate and cache
         stats = self.calculate_stats()
         try:
-            with open(self.stats_cache_file, 'w') as f:
-                json.dump(stats, f, indent=2)
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(stats, indent=2)
+            safe_write_to_protected_file(self.stats_cache_file, content)
         except:
             pass
         

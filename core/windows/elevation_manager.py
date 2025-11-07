@@ -156,7 +156,7 @@ class WindowsElevationManager:
         
         # Escape for XML
         args_json = args_json.replace('"', '&quot;')
-        script_path = script_path.replace('\\', '\\\\')
+        # script_path is already absolute, no need to double-escape
         
         # Task XML with elevated privileges
         xml = f"""<?xml version="1.0" encoding="UTF-16"?>
@@ -165,14 +165,9 @@ class WindowsElevationManager:
     <Description>FadCrypt Elevated Operation</Description>
   </RegistrationInfo>
   <Triggers>
-    <EventTrigger>
-      <Enabled>false</Enabled>
-      <StartBoundary>2024-01-01T00:00:00</StartBoundary>
-    </EventTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
-      <UserId>S-1-5-18</UserId>
       <RunLevel>HighestAvailable</RunLevel>
     </Principal>
   </Principals>
@@ -183,12 +178,6 @@ class WindowsElevationManager:
     <AllowHardTerminate>true</AllowHardTerminate>
     <StartWhenAvailable>false</StartWhenAvailable>
     <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
-    <IdleSettings>
-      <StopOnIdleEnd>true</StopOnIdleEnd>
-      <RestartOnIdle>false</RestartOnIdle>
-      <IdleDuration>PT10M</IdleDuration>
-      <WaitTimeout>PT1H</WaitTimeout>
-    </IdleSettings>
     <AllowStartOnDemand>true</AllowStartOnDemand>
     <Enabled>true</Enabled>
     <Hidden>false</Hidden>

@@ -20,9 +20,12 @@ class AppScannerThread(QThread):
     
     scan_complete = pyqtSignal(list)  # List of found apps
     scan_progress = pyqtSignal(str)  # Progress message
+    app_found = pyqtSignal(dict)     # Individual app found
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.emitted_count = 0
+        self.max_emit = 200
         
     def run(self):
         """Scan system for installed applications."""
@@ -71,6 +74,7 @@ class AppScannerThread(QThread):
                         if not any(app['name'] == app_info['name'] for app in apps):
                             apps.append(app_info)
                             self.scan_progress.emit(f"Found: {app_info['name']}")
+                            self.app_found.emit(app_info)
             except (PermissionError, OSError) as e:
                 print(f"[Scanner] Error scanning {desktop_dir}: {e}")
         
@@ -167,45 +171,537 @@ class AppScannerThread(QThread):
     def _scan_windows_applications(self) -> List[Dict[str, str]]:
         """Scan Windows system for applications."""
         apps = []
-        program_dirs = [
-            r"C:\Program Files",
-            r"C:\Program Files (x86)",
-            os.path.expanduser(r"~\AppData\Local\Programs")
+
+        # Method 1: Scan Start Menu shortcuts (most reliable and fast)
+        self.scan_progress.emit("Scanning Start Menu shortcuts...")
+        start_menu_apps = self._scan_windows_start_menu()
+        apps.extend(start_menu_apps)
+        self.scan_progress.emit(f"Found {len(start_menu_apps)} apps in Start Menu")
+
+        # Method 2: Scan Desktop shortcuts
+        self.scan_progress.emit("Scanning Desktop shortcuts...")
+        desktop_apps = self._scan_windows_desktop()
+        new_desktop_apps = []
+        for app in desktop_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                new_desktop_apps.append(app)
+        apps.extend(new_desktop_apps)
+        self.scan_progress.emit(f"Found {len(new_desktop_apps)} additional apps on Desktop")
+
+        # Method 3: Quick scan of common program directories (much faster)
+        self.scan_progress.emit("Scanning Program Files directories...")
+        program_apps = self._scan_windows_program_dirs_fast()
+        new_program_apps = []
+        for app in program_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                new_program_apps.append(app)
+        apps.extend(new_program_apps)
+        self.scan_progress.emit(f"Found {len(new_program_apps)} additional apps in Program Files")
+
+        # Method 4: Registry scan (can be slow, but important for installed apps)
+        self.scan_progress.emit("Scanning Windows Registry...")
+        registry_apps = self._scan_windows_registry_uninstall()
+        new_registry_apps = []
+        for app in registry_apps:
+            if not any(existing['name'] == app['name'] for existing in apps):
+                new_registry_apps.append(app)
+        apps.extend(new_registry_apps)
+        self.scan_progress.emit(f"Found {len(new_registry_apps)} additional apps in Registry")
+
+        # Filter out system utilities and junk apps
+        filtered_apps = []
+        for app in apps:
+            if self._should_include_app(app):
+                filtered_apps.append(app)
+
+        self.scan_progress.emit(f"Filtered to {len(filtered_apps)} valid applications")
+
+        return sorted(filtered_apps, key=lambda x: x['name'].lower())
+
+    def _scan_windows_registry_uninstall(self) -> List[Dict[str, str]]:
+        """Scan Windows registry uninstall keys for installed applications."""
+        apps = []
+        
+        try:
+            import winreg
+        except ImportError:
+            return apps
+
+        # Registry keys to scan
+        registry_keys = [
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
         ]
         
-        self.scan_progress.emit(f"Scanning {len(program_dirs)} directories...")
+        processed_keys = 0
         
-        for prog_dir in program_dirs:
-            if not os.path.exists(prog_dir):
-                continue
-            
-            self.scan_progress.emit(f"Scanning {prog_dir}...")
-            
+        for hkey, subkey_path in registry_keys:
             try:
-                for root, dirs, files in os.walk(prog_dir):
-                    for file in files:
-                        if file.endswith('.exe'):
-                            filepath = os.path.join(root, file)
-                            name = os.path.splitext(file)[0]
-                            
-                            # Skip system files and installers
-                            if any(skip in name.lower() for skip in ['unins', 'uninst', 'setup', 'install']):
-                                continue
-                            
+                key = winreg.OpenKey(hkey, subkey_path)
+                i = 0
+                while True:
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        app_info = self._parse_registry_uninstall_key(hkey, f"{subkey_path}\\{subkey_name}")
+                        if app_info:
                             # Avoid duplicates
-                            if not any(app['name'] == name for app in apps):
-                                apps.append({
-                                    'name': name,
-                                    'path': filepath,
-                                    'icon': filepath,  # Windows can extract icon from .exe
-                                    'category': self._categorize_windows_app(filepath),
-                                    'desktop_file': ''
-                                })
-                                self.scan_progress.emit(f"Found: {name}")
-            except (PermissionError, OSError) as e:
-                print(f"[Scanner] Error scanning {prog_dir}: {e}")
+                            if not any(existing['name'] == app_info['name'] for existing in apps):
+                                apps.append(app_info)
+                                try:
+                                    self.app_found.emit(app_info)
+                                except Exception:
+                                    pass
+                        
+                        processed_keys += 1
+                        # Update progress every 20 keys
+                        if processed_keys % 20 == 0:
+                            self.scan_progress.emit(f"Scanning Registry... {len(apps)} apps found")
+                        
+                        i += 1
+                    except OSError:
+                        # No more subkeys
+                        break
+                        
+                winreg.CloseKey(key)
+            except (FileNotFoundError, OSError):
+                # Registry key doesn't exist
+                continue
         
-        return sorted(apps, key=lambda x: x['name'].lower())
+        return apps
+
+    def _scan_windows_program_dirs_fast(self) -> List[Dict[str, str]]:
+        """Fast scan of common Windows installation directories."""
+        apps = []
+        
+        # Common installation directories - scan top-level only for speed
+        common_dirs = [
+            r"C:\Program Files",
+            r"C:\Program Files (x86)",
+        ]
+        
+        # Known popular applications and their typical exe names
+        known_apps = {
+            'Google Chrome': ['chrome.exe'],
+            'Mozilla Firefox': ['firefox.exe'],
+            'Microsoft Edge': ['msedge.exe'],
+            'Brave': ['brave.exe'],
+            'Opera': ['opera.exe'],
+            'Vivaldi': ['vivaldi.exe'],
+            'Notepad++': ['notepad++.exe'],
+            'Visual Studio Code': ['Code.exe'],
+            'Sublime Text': ['sublime_text.exe'],
+            'Atom': ['atom.exe'],
+            'Git': ['git.exe', 'git-bash.exe'],
+            'Python': ['python.exe', 'pythonw.exe'],
+            'Node.js': ['node.exe'],
+            'Java': ['java.exe', 'javaw.exe'],
+            'VLC Media Player': ['vlc.exe'],
+            'Steam': ['Steam.exe'],
+            'Discord': ['Discord.exe'],
+            'Slack': ['slack.exe'],
+            'Zoom': ['zoom.exe'],
+            'Microsoft Teams': ['Teams.exe'],
+            'Skype': ['Skype.exe'],
+            'WhatsApp': ['WhatsApp.exe'],
+            'Telegram': ['Telegram.exe'],
+            'Adobe Acrobat': ['Acrobat.exe', 'AcroRd32.exe'],
+            'WinRAR': ['WinRAR.exe'],
+            '7-Zip': ['7zFM.exe'],
+            'Paint.NET': ['PaintDotNet.exe'],
+            'GIMP': ['gimp-2.10.exe'],
+            'Blender': ['blender.exe'],
+            'Audacity': ['audacity.exe'],
+            'OBS Studio': ['obs64.exe', 'obs32.exe'],
+            'VirtualBox': ['VirtualBox.exe'],
+            'VMware': ['vmware.exe'],
+        }
+        
+        for base_dir in common_dirs:
+            if not os.path.exists(base_dir):
+                continue
+                
+            try:
+                # Only scan top-level directories for speed
+                for item in os.listdir(base_dir):
+                    item_path = os.path.join(base_dir, item)
+                    if not os.path.isdir(item_path):
+                        continue
+                        
+                    # Check if this directory contains known applications
+                    for app_name, exe_names in known_apps.items():
+                        for exe_name in exe_names:
+                            exe_path = os.path.join(item_path, exe_name)
+                            if os.path.exists(exe_path):
+                                app_info = {
+                                    'name': app_name,
+                                    'path': exe_path,
+                                    'icon': exe_path,
+                                    'category': self._categorize_windows_app(exe_path),
+                                    'desktop_file': exe_path
+                                }
+                                
+                                # Avoid duplicates
+                                if not any(app['name'] == app_info['name'] for app in apps):
+                                    apps.append(app_info)
+                                    try:
+                                        self.app_found.emit(app_info)
+                                    except Exception:
+                                        pass
+                                break  # Found this app, move to next
+                                
+            except (PermissionError, OSError) as e:
+                print(f"[Scanner] Error scanning {base_dir}: {e}")
+        
+        return apps
+
+    def _scan_windows_start_menu(self) -> List[Dict[str, str]]:
+        """Scan Windows Start Menu for application shortcuts."""
+        apps = []
+        start_menu_paths = [
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+            os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs")
+        ]
+
+        total_shortcuts = 0
+        processed_shortcuts = 0
+
+        # First pass: count total shortcuts for progress
+        for start_path in start_menu_paths:
+            if os.path.exists(start_path):
+                for root, dirs, files in os.walk(start_path):
+                    total_shortcuts += len([f for f in files if f.endswith('.lnk')])
+
+        for start_path in start_menu_paths:
+            if not os.path.exists(start_path):
+                continue
+
+            try:
+                for root, dirs, files in os.walk(start_path):
+                    for file in files:
+                        if file.endswith('.lnk'):
+                            lnk_path = os.path.join(root, file)
+                            app_info = self._parse_windows_shortcut(lnk_path)
+                            if app_info and app_info['name'] and app_info['path']:
+                                # Avoid duplicates
+                                if not any(app['name'] == app_info['name'] for app in apps):
+                                    apps.append(app_info)
+                                    try:
+                                        self.app_found.emit(app_info)
+                                    except Exception:
+                                        pass
+                            
+                            processed_shortcuts += 1
+                            
+                            # Update progress every 10 shortcuts to avoid spam
+                            if processed_shortcuts % 10 == 0 and total_shortcuts > 0:
+                                progress_pct = int((processed_shortcuts / total_shortcuts) * 100)
+                                self.scan_progress.emit(f"Scanning Start Menu... {progress_pct}% ({len(apps)} apps found)")
+                                
+            except (PermissionError, OSError) as e:
+                print(f"[Scanner] Error scanning Start Menu {start_path}: {e}")
+
+        return apps
+
+    def _scan_windows_desktop(self) -> List[Dict[str, str]]:
+        """Scan Windows Desktop for application shortcuts."""
+        apps = []
+        desktop_path = os.path.expanduser(r"~\Desktop")
+
+        if not os.path.exists(desktop_path):
+            return apps
+
+        self.scan_progress.emit("Scanning Desktop...")
+
+        try:
+            for file in os.listdir(desktop_path):
+                if file.endswith('.lnk'):
+                    lnk_path = os.path.join(desktop_path, file)
+                    app_info = self._parse_windows_shortcut(lnk_path)
+                    if app_info and app_info['name'] and app_info['path']:
+                        # Only include if it's an actual application (not just a shortcut to a folder/file)
+                        if app_info['path'].endswith('.exe'):
+                            apps.append(app_info)
+                            self.scan_progress.emit(f"Found: {app_info['name']}")
+                            self.app_found.emit(app_info)
+        except (PermissionError, OSError) as e:
+            print(f"[Scanner] Error scanning Desktop: {e}")
+
+        return apps
+
+    def _scan_windows_registry_uninstall(self) -> List[Dict[str, str]]:
+        """Scan Windows registry uninstall keys for installed applications."""
+        apps = []
+
+        try:
+            import winreg
+        except ImportError:
+            print("[Scanner] winreg not available, skipping registry scan")
+            return apps
+
+        self.scan_progress.emit("Scanning registry...")
+
+        # Registry paths to check
+        reg_paths = [
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        ]
+
+        for reg_path in reg_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path)
+                i = 0
+                while True:
+                    try:
+                        subkey = winreg.EnumKey(key, i)
+                        subkey_path = f"{reg_path}\\{subkey}"
+                        app_info = self._parse_registry_uninstall_key(winreg.HKEY_LOCAL_MACHINE, subkey_path)
+                        if app_info and app_info['name'] and app_info['path']:
+                            # Avoid duplicates and system entries
+                            if (not any(app['name'] == app_info['name'] for app in apps) and
+                                not self._is_system_app(app_info['name'])):
+                                apps.append(app_info)
+                                self.scan_progress.emit(f"Found: {app_info['name']}")
+                                self.app_found.emit(app_info)
+                        i += 1
+                    except OSError:
+                        break
+                winreg.CloseKey(key)
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                print(f"[Scanner] Error scanning registry {reg_path}: {e}")
+
+        return apps
+
+    def _parse_windows_shortcut(self, lnk_path: str) -> Optional[Dict[str, str]]:
+        """Parse a Windows .lnk shortcut file."""
+        # Try to use win32com for proper shortcut parsing
+        try:
+            import pythoncom
+            from win32com.shell import shell
+
+            shortcut = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink,
+                None,
+                pythoncom.CLSCTX_INPROC_SERVER,
+                shell.IID_IShellLink
+            )
+
+            # Load the shortcut
+            persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+            persist_file.Load(lnk_path)
+
+            # Get target path
+            target_path = shortcut.GetPath(0)[0]
+
+            if not target_path or not target_path.endswith('.exe'):
+                return None
+
+            # Get description/name
+            name = shortcut.GetDescription()
+            if not name:
+                name = os.path.splitext(os.path.basename(target_path))[0]
+
+            return {
+                'name': name,
+                'path': target_path,
+                'icon': target_path,  # Use exe for icon extraction
+                'category': self._categorize_windows_app(target_path),
+                'desktop_file': lnk_path  # Store shortcut path
+            }
+
+        except ImportError:
+            # win32com not available, use fallback method
+            return self._parse_windows_shortcut_fallback(lnk_path)
+        except Exception as e:
+            # Any other error, use fallback
+            return self._parse_windows_shortcut_fallback(lnk_path)
+
+    def _parse_windows_shortcut_fallback(self, lnk_path: str) -> Optional[Dict[str, str]]:
+        """Fallback method to parse Windows shortcuts without win32com."""
+        try:
+            # Read the .lnk file as binary and extract target path
+            # This is a simplified approach - .lnk files have a complex structure
+            with open(lnk_path, 'rb') as f:
+                data = f.read()
+
+            # Look for common executable extensions in the binary data
+            # This is a very basic heuristic
+            data_str = data.decode('latin-1', errors='ignore')
+
+            # Common executable paths to look for
+            common_paths = [
+                'C:\\Program Files',
+                'C:\\Program Files (x86)',
+                'C:\\Users',
+                'C:\\Windows'
+            ]
+
+            target_path = None
+            for path_start in common_paths:
+                if path_start in data_str:
+                    # Find the start of the path
+                    start_idx = data_str.find(path_start)
+                    if start_idx != -1:
+                        # Look for .exe extension after the path start
+                        exe_idx = data_str.find('.exe', start_idx)
+                        if exe_idx != -1:
+                            # Extract path up to and including .exe
+                            potential_path = data_str[start_idx:exe_idx + 4]
+                            if os.path.exists(potential_path):
+                                target_path = potential_path
+                                break
+
+            if target_path:
+                name = os.path.splitext(os.path.basename(target_path))[0]
+                return {
+                    'name': name,
+                    'path': target_path,
+                    'icon': target_path,
+                    'category': self._categorize_windows_app(target_path),
+                    'desktop_file': lnk_path
+                }
+
+        except Exception as e:
+            pass
+
+        # Final fallback: just use the shortcut filename
+        name = os.path.splitext(os.path.basename(lnk_path))[0]
+        return {
+            'name': name,
+            'path': lnk_path,  # Use shortcut itself as path
+            'icon': '',
+            'category': 'Other',
+            'desktop_file': lnk_path
+        }
+
+    def _parse_registry_uninstall_key(self, hkey, subkey_path: str) -> Optional[Dict[str, str]]:
+        """Parse a Windows registry uninstall key."""
+        try:
+            import winreg
+        except ImportError:
+            return None
+
+        try:
+            key = winreg.OpenKey(hkey, subkey_path)
+            display_name = None
+            install_location = None
+            uninstall_string = None
+
+            try:
+                display_name, _ = winreg.QueryValueEx(key, "DisplayName")
+            except FileNotFoundError:
+                pass
+
+            try:
+                install_location, _ = winreg.QueryValueEx(key, "InstallLocation")
+            except FileNotFoundError:
+                pass
+
+            try:
+                uninstall_string, _ = winreg.QueryValueEx(key, "UninstallString")
+            except FileNotFoundError:
+                pass
+
+            winreg.CloseKey(key)
+
+            if not display_name:
+                return None
+
+            # Try to find the executable path
+            exe_path = None
+            if install_location and os.path.exists(install_location):
+                # Look for exe files in install location (recursive search)
+                for root, dirs, files in os.walk(install_location):
+                    for file in files:
+                        if file.endswith('.exe') and not file.lower().endswith('uninstall.exe'):
+                            exe_path = os.path.join(root, file)
+                            break
+                    if exe_path:
+                        break
+
+            # If no exe found, try to extract from uninstall string
+            if not exe_path and uninstall_string:
+                # Uninstall strings often contain the exe path
+                if '.exe' in uninstall_string.lower():
+                    # Extract path from quotes or before parameters
+                    import re
+                    match = re.search(r'["\']([^"\']*\.exe)["\']', uninstall_string)
+                    if match:
+                        exe_path = match.group(1)
+                    else:
+                        # Try to find exe path without quotes
+                        exe_match = re.search(r'([A-Za-z]:[^\s]*\.exe)', uninstall_string)
+                        if exe_match:
+                            exe_path = exe_match.group(1)
+
+            # For system apps like Notepad, use known paths
+            if not exe_path and display_name:
+                display_lower = display_name.lower()
+                if 'notepad' in display_lower:
+                    exe_path = r'C:\Windows\System32\notepad.exe'
+                elif 'wordpad' in display_lower:
+                    exe_path = r'C:\Program Files\Windows NT\Accessories\wordpad.exe'
+                elif 'paint' in display_lower:
+                    exe_path = r'C:\Windows\System32\mspaint.exe'
+                elif 'calculator' in display_lower:
+                    exe_path = r'C:\Windows\System32\calc.exe'
+
+            if exe_path and os.path.exists(exe_path):
+                return {
+                    'name': display_name,
+                    'path': exe_path,
+                    'icon': exe_path,
+                    'category': self._categorize_windows_app(exe_path),
+                    'desktop_file': ''
+                }
+
+        except Exception as e:
+            pass
+
+        return None
+
+    def _is_system_app(self, app_name: str) -> bool:
+        """Check if an application is a system component that shouldn't be locked."""
+        system_apps = [
+            'microsoft', 'windows', 'system', 'update', 'driver', 'hotfix',
+            'security', 'defender', 'malware', 'antivirus', 'firewall',
+            'service pack', 'kb', 'patch', 'redistributable', 'runtime',
+            'visual c++', 'directx', '.net framework', 'silverlight'
+        ]
+
+        app_lower = app_name.lower()
+        return any(sys_app in app_lower for sys_app in system_apps)
+    
+    def _should_include_app(self, app: Dict[str, str]) -> bool:
+        """Check if an app should be included in the results."""
+        name = app.get('name', '').lower()
+        path = app.get('path', '').lower()
+        
+        # Exclude system utilities
+        if self._is_system_app(app.get('name', '')):
+            return False
+        
+        # Exclude if path is a directory (not an exe)
+        if path and not path.endswith('.exe'):
+            return False
+        
+        # Exclude common junk/shortcut names
+        exclude_names = [
+            'uninstall', 'setup', 'installer', 'update', 'patch', 'hotfix',
+            'readme', 'help', 'support', 'website', 'license', 'eula',
+            'shortcut', 'link', 'url', 'internet', 'default', 'unknown'
+        ]
+        
+        if any(excl in name for excl in exclude_names):
+            return False
+        
+        # Exclude if exe doesn't exist
+        if not os.path.exists(app.get('path', '')):
+            return False
+        
+        return True
     
     def _categorize_windows_app(self, filepath: str) -> str:
         """Categorize Windows app based on install location"""
@@ -221,7 +717,26 @@ class AppScannerThread(QThread):
             return 'Development'
         elif any(x in filepath_lower for x in ['photoshop', 'gimp', 'paint', 'illustrator']):
             return 'Graphics'
-        elif any(x in filepath_lower for x in ['vlc', 'media', 'spotify', 'itunes', 'winamp']):
+        elif any(x in filepath_lower for x in ['vlc', 'media', 'itunes', 'winamp']):
+            return 'Multimedia'
+        elif 'system32' in filepath_lower or 'windows' in filepath_lower:
+            return 'System'
+        else:
+            return 'Other'
+        """Categorize Windows app based on install location"""
+        filepath_lower = filepath.lower()
+        
+        if 'steam' in filepath_lower or 'games' in filepath_lower:
+            return 'Games'
+        elif 'microsoft office' in filepath_lower or 'libreoffice' in filepath_lower:
+            return 'Office'
+        elif any(x in filepath_lower for x in ['chrome', 'firefox', 'edge', 'browser']):
+            return 'Internet'
+        elif any(x in filepath_lower for x in ['vscode', 'visual studio', 'pycharm', 'intellij', 'eclipse']):
+            return 'Development'
+        elif any(x in filepath_lower for x in ['photoshop', 'gimp', 'paint', 'illustrator']):
+            return 'Graphics'
+        elif any(x in filepath_lower for x in ['vlc', 'media', 'itunes', 'winamp']):
             return 'Multimedia'
         elif 'system32' in filepath_lower or 'windows' in filepath_lower:
             return 'System'
@@ -379,25 +894,186 @@ class AppCard(QFrame):
     def load_app_icon(self) -> Optional[QPixmap]:
         """Load application icon from system."""
         icon_name = self.app_data.get('icon', '')
+        app_name = self.app_data.get('name', 'Unknown')
+        
         if not icon_name:
+            print(f"[IconLoader] No icon name for app: {app_name}")
             return None
         
-        # Try common icon paths
-        icon_paths = [
-            f"/usr/share/pixmaps/{icon_name}.png",
-            f"/usr/share/pixmaps/{icon_name}.svg",
-            f"/usr/share/pixmaps/{icon_name}.xpm",
-            f"/usr/share/icons/hicolor/48x48/apps/{icon_name}.png",
-            f"/usr/share/icons/hicolor/scalable/apps/{icon_name}.svg",
-            icon_name if icon_name.startswith('/') else None
-        ]
+        print(f"[IconLoader] Loading icon for {app_name} from: {icon_name}")
         
-        for path in icon_paths:
-            if path and os.path.exists(path):
-                pixmap = QPixmap(path)
-                if not pixmap.isNull():
-                    return pixmap
+        # Windows: Try to extract icon from exe file
+        if sys.platform.startswith('win') and icon_name.endswith('.exe'):
+            try:
+                print(f"[IconLoader] Attempting to load Windows exe icon: {icon_name}")
+                
+                # Method 1: Try to find associated icon file first (fastest)
+                exe_dir = os.path.dirname(icon_name)
+                exe_basename = os.path.splitext(os.path.basename(icon_name))[0]
+                
+                # Common icon file patterns
+                icon_candidates = [
+                    os.path.join(exe_dir, f"{exe_basename}.ico"),
+                    os.path.join(exe_dir, "icon.ico"),
+                    os.path.join(exe_dir, f"{exe_basename}.png"),
+                    os.path.join(exe_dir, "icon.png")
+                ]
+                
+                for icon_path in icon_candidates:
+                    if os.path.exists(icon_path):
+                        pixmap = QPixmap(icon_path)
+                        if not pixmap.isNull():
+                            print(f"[IconLoader] ✅ Found associated icon file: {icon_path} for {app_name}")
+                            return pixmap
+                
+                # Method 2: Extract icon from exe using Windows API
+                try:
+                    import ctypes
+                    from ctypes import wintypes
+                    
+                    # Load required DLLs
+                    user32 = ctypes.windll.user32
+                    shell32 = ctypes.windll.shell32
+                    
+                    # SHGetFileInfo function (more reliable than ExtractIconEx)
+                    SHGetFileInfoW = shell32.SHGetFileInfoW
+                    SHGetFileInfoW.argtypes = [
+                        wintypes.LPCWSTR,  # pszPath
+                        wintypes.DWORD,    # dwFileAttributes
+                        ctypes.c_void_p,   # psfi
+                        ctypes.c_uint,     # cbFileInfo
+                        ctypes.c_uint      # uFlags
+                    ]
+                    SHGetFileInfoW.restype = wintypes.DWORD
+                    
+                    # SHFILEINFO structure
+                    class SHFILEINFO(ctypes.Structure):
+                        _fields_ = [
+                            ('hIcon', wintypes.HICON),
+                            ('iIcon', ctypes.c_int),
+                            ('dwAttributes', wintypes.DWORD),
+                            ('szDisplayName', wintypes.WCHAR * 260),
+                            ('szTypeName', wintypes.WCHAR * 80),
+                        ]
+                    
+                    # Flags for SHGetFileInfo
+                    SHGFI_ICON = 0x000000100
+                    SHGFI_LARGEICON = 0x000000000
+                    
+                    # Get the file info with icon
+                    shfi = SHFILEINFO()
+                    flags = SHGFI_ICON | SHGFI_LARGEICON
+                    
+                    result = SHGetFileInfoW(icon_name, 0, ctypes.byref(shfi), ctypes.sizeof(SHFILEINFO), flags)
+                    
+                    if result and shfi.hIcon:
+                        print(f"[IconLoader] SHGetFileInfo succeeded for: {app_name}")
+                        
+                        # Convert HICON to QPixmap
+                        try:
+                            # Create QImage from HICON
+                            # Get icon dimensions
+                            class ICONINFO(ctypes.Structure):
+                                _fields_ = [
+                                    ('fIcon', wintypes.BOOL),
+                                    ('xHotspot', wintypes.DWORD),
+                                    ('yHotspot', wintypes.DWORD),
+                                    ('hbmMask', wintypes.HBITMAP),
+                                    ('hbmColor', wintypes.HBITMAP),
+                                ]
+                            
+                            GetIconInfo = user32.GetIconInfo
+                            GetIconInfo.argtypes = [wintypes.HICON, ctypes.POINTER(ICONINFO)]
+                            GetIconInfo.restype = wintypes.BOOL
+                            
+                            icon_info = ICONINFO()
+                            if GetIconInfo(shfi.hIcon, ctypes.byref(icon_info)):
+                                # Get bitmap info for color bitmap
+                                class BITMAP(ctypes.Structure):
+                                    _fields_ = [
+                                        ('bmType', wintypes.LONG),
+                                        ('bmWidth', wintypes.LONG),
+                                        ('bmHeight', wintypes.LONG),
+                                        ('bmWidthBytes', wintypes.LONG),
+                                        ('bmPlanes', wintypes.WORD),
+                                        ('bmBitsPixel', wintypes.WORD),
+                                        ('bmBits', wintypes.LPVOID),
+                                    ]
+                                
+                                GetObjectW = ctypes.windll.gdi32.GetObjectW
+                                GetObjectW.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.POINTER(BITMAP)]
+                                GetObjectW.restype = ctypes.c_int
+                                
+                                bitmap = BITMAP()
+                                if GetObjectW(icon_info.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)):
+                                    # Create QImage from bitmap data
+                                    width = bitmap.bmWidth
+                                    height = bitmap.bmHeight
+                                    
+                                    # Get bitmap bits
+                                    GetBitmapBits = ctypes.windll.gdi32.GetBitmapBits
+                                    GetBitmapBits.argtypes = [wintypes.HBITMAP, wintypes.LONG, wintypes.LPVOID]
+                                    GetBitmapBits.restype = wintypes.LONG
+                                    
+                                    # Allocate buffer for bitmap data
+                                    buffer_size = bitmap.bmWidthBytes * bitmap.bmHeight
+                                    bitmap_data = ctypes.create_string_buffer(buffer_size)
+                                    
+                                    if GetBitmapBits(icon_info.hbmColor, buffer_size, bitmap_data):
+                                        # Create QImage from BGRA data (Windows bitmaps are often BGRA)
+                                        from PyQt6.QtGui import QImage
+                                        image = QImage(bitmap_data.raw, width, height, bitmap.bmWidthBytes, QImage.Format.Format_ARGB32)
+                                        
+                                        # Convert to pixmap
+                                        pixmap = QPixmap.fromImage(image)
+                                        if not pixmap.isNull():
+                                            print(f"[IconLoader] ✅ Successfully converted HICON to QPixmap for: {app_name}")
+                                            # Clean up
+                                            user32.DestroyIcon(shfi.hIcon)
+                                            return pixmap
+                            
+                        except Exception as e:
+                            print(f"[IconLoader] Error converting HICON for {app_name}: {e}")
+                            
+                        # Clean up
+                        user32.DestroyIcon(shfi.hIcon)
+                        
+                except Exception as e:
+                    print(f"[IconLoader] Windows API method failed for {app_name}: {e}")
+                    
+                # Method 3: Try QIcon as fallback (sometimes works)
+                try:
+                    qicon = QIcon(icon_name)
+                    if not qicon.isNull():
+                        pixmap = qicon.pixmap(48, 48)
+                        if not pixmap.isNull():
+                            print(f"[IconLoader] ✅ QIcon fallback succeeded for: {app_name}")
+                            return pixmap
+                except Exception as e:
+                    print(f"[IconLoader] QIcon fallback failed for {app_name}: {e}")
+                    
+            except Exception as e:
+                print(f"[IconLoader] Error loading Windows icon for {app_name}: {e}")
         
+        # Linux: Try common icon paths
+        elif sys.platform.startswith('linux'):
+            icon_paths = [
+                f"/usr/share/pixmaps/{icon_name}.png",
+                f"/usr/share/pixmaps/{icon_name}.svg",
+                f"/usr/share/pixmaps/{icon_name}.xpm",
+                f"/usr/share/icons/hicolor/48x48/apps/{icon_name}.png",
+                f"/usr/share/icons/hicolor/scalable/apps/{icon_name}.svg",
+                icon_name if icon_name.startswith('/') else None
+            ]
+            
+            for path in icon_paths:
+                if path and os.path.exists(path):
+                    pixmap = QPixmap(path)
+                    if not pixmap.isNull():
+                        print(f"[IconLoader] ✅ Loaded Linux icon from: {path} for {app_name}")
+                        return pixmap
+        
+        print(f"[IconLoader] ❌ No icon found for app: {app_name} (tried: {icon_name})")
         return None
     
     def _on_checkbox_changed(self, state):
@@ -449,6 +1125,13 @@ class AppCard(QFrame):
     def is_checked(self) -> bool:
         """Check if this app is selected."""
         return self._is_checked
+    
+    def set_checked(self, checked: bool):
+        """Set the checked state of this card."""
+        if self._is_checked != checked:
+            self._is_checked = checked
+            self.update_style()
+            self.toggled.emit(self._is_checked)
 
 
 class AppScannerDialog(QDialog):
@@ -467,6 +1150,13 @@ class AppScannerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Scan for Applications")
+        
+        # Set window icon
+        if parent and hasattr(parent, 'resource_path'):
+            icon_path = parent.resource_path('img/icon.png')
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        
         self.setModal(True)
         # Use a reasonable default minimum size (restore original)
         self.setMinimumSize(800, 600)
@@ -507,6 +1197,13 @@ class AppScannerDialog(QDialog):
         self.category_filter = None
         # Track if we've centered on first show (for Wayland compatibility)
         self._first_show = True
+        # Loading overlay
+        self.loading_overlay = None
+        # Pagination
+        self.current_page = 0
+        self.apps_per_page = 50
+        self.filtered_apps = []  # Apps after filtering
+        self.selected_apps = set()  # Store selected app names across pages
 
         self.init_ui()
         # Don't center here - will center on showEvent after dialog has proper size
@@ -529,9 +1226,18 @@ class AppScannerDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
         
-        # Status label
-        self.status_label = QLabel("Scanning system...")
-        self.status_label.setStyleSheet("color: #888888;")
+        # Status label - make it more prominent for live updates
+        self.status_label = QLabel("🔍 Starting scan...")
+        self.status_label.setStyleSheet("""
+            color: #3b82f6;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 8px;
+            background-color: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        """)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
         
         # Search bar
@@ -570,19 +1276,23 @@ class AppScannerDialog(QDialog):
         self.clear_search_btn.clicked.connect(self.clear_search)
         self.clear_search_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #64748b, stop:1 #334155);
                 color: #e5e7eb;
-                border: 1px solid #44464f;
+                border: none;
                 padding: 8px 12px;
                 border-radius: 6px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 80px;
             }
             QPushButton:hover {
-                background-color: #3b3f46;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #94a3b8, stop:1 #475569);
             }
             QPushButton:pressed {
-                background-color: #32353a;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #334155, stop:1 #1e293b);
             }
         """)
         search_layout.addWidget(self.clear_search_btn)
@@ -637,6 +1347,69 @@ class AppScannerDialog(QDialog):
                 pass
         
         scroll.setWidget(self.scroll_widget)
+        
+        # Create loading overlay that covers the scroll area
+        self.loading_overlay = QWidget(scroll)
+        overlay_layout = QVBoxLayout(self.loading_overlay)
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        loading_container = QWidget()
+        loading_container.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border: none;
+                padding: 10px;
+            }
+        """)
+        loading_inner_layout = QVBoxLayout(loading_container)
+        loading_inner_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        loading_inner_layout.setSpacing(8)
+        
+        # Loading spinner animation (simple text-based for now)
+        loading_spinner = QLabel("🔄")
+        loading_spinner.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                color: #3b82f6;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_spinner)
+        
+        # Add progress indicator
+        self.loading_progress = QLabel("0 applications found")
+        self.loading_progress.setStyleSheet("""
+            QLabel {
+                color: #9ca3af;
+                font-size: 12px;
+                margin-top: 5px;
+            }
+        """)
+        loading_inner_layout.addWidget(self.loading_progress)
+        
+        loading_label = QLabel("🔍 Scanning for applications...")
+        loading_label.setStyleSheet("""
+            QLabel {
+                color: #e5e7eb;
+                font-size: 14px;
+                font-weight: bold;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_label)
+        
+        loading_subtitle = QLabel("This may take a few moments...")
+        loading_subtitle.setStyleSheet("""
+            QLabel {
+                color: #9ca3af;
+                font-size: 12px;
+            }
+        """)
+        loading_inner_layout.addWidget(loading_subtitle)
+        
+        overlay_layout.addWidget(loading_container, alignment=Qt.AlignmentFlag.AlignCenter)
+        overlay_layout.setContentsMargins(0, 0, 0, 0)
+        self.loading_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.3);")
+        self.loading_overlay.setVisible(True)  # Show initially
+        
         layout.addWidget(scroll, stretch=1)
         # keep a reference to the scroll area so we can use its viewport width for responsive math
         self.scroll_area = scroll
@@ -658,6 +1431,68 @@ class AppScannerDialog(QDialog):
         self.selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.selection_label)
         
+        # Pagination controls
+        pagination_layout = QHBoxLayout()
+        pagination_layout.setSpacing(10)
+        
+        self.page_label = QLabel("Page 1 of 1")
+        self.page_label.setStyleSheet("""
+            color: #e5e7eb;
+            font-size: 12px;
+            background-color: transparent;
+        """)
+        pagination_layout.addWidget(self.page_label)
+        
+        pagination_layout.addStretch()
+        
+        self.prev_btn = QPushButton("◀ Previous")
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4b5563;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #374151;
+            }
+            QPushButton:disabled {
+                background-color: #6b7280;
+                color: #9ca3af;
+            }
+        """)
+        pagination_layout.addWidget(self.prev_btn)
+        
+        self.next_btn = QPushButton("Next ▶")
+        self.next_btn.clicked.connect(self.next_page)
+        self.next_btn.setEnabled(False)
+        self.next_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4b5563;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #374151;
+            }
+            QPushButton:disabled {
+                background-color: #6b7280;
+                color: #9ca3af;
+            }
+        """)
+        pagination_layout.addWidget(self.next_btn)
+        
+        layout.addLayout(pagination_layout)
+        
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
@@ -672,20 +1507,24 @@ class AppScannerDialog(QDialog):
         self.select_all_btn.clicked.connect(self.select_all)
         self.select_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #3b82f6;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3b82f6, stop:1 #1d4ed8);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 90px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #2563eb;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #60a5fa, stop:1 #2563eb);
             }
             QPushButton:pressed {
-                background-color: #1d4ed8;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1d4ed8, stop:1 #1e40af);
             }
         """)
         button_layout.addWidget(self.select_all_btn)
@@ -694,20 +1533,24 @@ class AppScannerDialog(QDialog):
         self.deselect_all_btn.clicked.connect(self.deselect_all)
         self.deselect_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #6b7280;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6b7280, stop:1 #374151);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 100px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #4b5563;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9ca3af, stop:1 #4b5563);
             }
             QPushButton:pressed {
-                background-color: #374151;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #374151, stop:1 #1f2937);
             }
         """)
         button_layout.addWidget(self.deselect_all_btn)
@@ -719,20 +1562,24 @@ class AppScannerDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc2626;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #dc2626, stop:1 #991b1b);
                 color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 14px;
                 font-size: 13px;
+                font-weight: 600;
                 min-width: 90px;
                 min-height: 32px;
             }
             QPushButton:hover {
-                background-color: #b91c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ef4444, stop:1 #b91c1c);
             }
             QPushButton:pressed {
-                background-color: #991b1b;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #991b1b, stop:1 #7f1d1d);
             }
         """)
         button_layout.addWidget(cancel_btn)
@@ -744,7 +1591,8 @@ class AppScannerDialog(QDialog):
         self.add_btn.setDefault(True)
         self.add_btn.setStyleSheet("""
             QPushButton {
-                background-color: #009E60;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #009E60, stop:1 #005c3d);
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -754,14 +1602,17 @@ class AppScannerDialog(QDialog):
                 min-width: 120px;
                 min-height: 32px;
             }
-            QPushButton:hover {
-                background-color: #00b56f;
+            QPushButton:hover:enabled {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00b56f, stop:1 #008852);
             }
-            QPushButton:pressed {
-                background-color: #008852;
+            QPushButton:pressed:enabled {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #005c3d, stop:1 #003d28);
             }
             QPushButton:disabled {
-                background-color: #d1d5db;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #d1d5db, stop:1 #9ca3af);
                 color: #9ca3af;
             }
         """)
@@ -909,188 +1760,131 @@ class AppScannerDialog(QDialog):
             self.category_filter = category
         # refresh tags and filter
         self._populate_category_tags()
-        self.filter_apps(self.search_input.text())
+        self.filter_apps()
 
     def clear_category_filter(self):
         self.category_filter = None
         self._populate_category_tags()
-        self.filter_apps(self.search_input.text())
+        self.filter_apps()
     
     def start_scan(self):
         """Start scanning for applications in background thread."""
         self.scanner_thread = AppScannerThread(self)
         self.scanner_thread.scan_progress.connect(self.update_progress)
+        self.scanner_thread.app_found.connect(self.add_app_to_display)
         self.scanner_thread.scan_complete.connect(self.display_results)
         self.scanner_thread.start()
     
     def update_progress(self, message: str):
         """Update progress label."""
         self.status_label.setText(message)
+        # Force UI update to prevent freezing
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+    
+    def add_app_to_display(self, app_info: Dict[str, str]):
+        """Add a single app to the display as it's found."""
+        # Ensure scanned_apps exists
+        if not hasattr(self, 'scanned_apps'):
+            self.scanned_apps = []
+
+        # Hide loading overlay on first found app so the UI feels responsive
+        try:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay and self.loading_overlay.isVisible():
+                self.loading_overlay.setVisible(False)
+        except Exception:
+            pass
+
+        # Check for duplicates
+        if not any(app['name'] == app_info['name'] for app in self.scanned_apps):
+            # Add normalized category key
+            app_info['category_lc'] = (app_info.get('category', 'Other') or 'Other').strip().lower()
+            self.scanned_apps.append(app_info)
+
+            # Update loading progress if overlay is still visible
+            try:
+                if hasattr(self, 'loading_overlay') and self.loading_overlay and self.loading_overlay.isVisible():
+                    if hasattr(self, 'loading_progress'):
+                        count = len(self.scanned_apps)
+                        self.loading_progress.setText(f"{count} application{'s' if count != 1 else ''} found")
+            except Exception:
+                pass
+
+            # Update status label to reflect live count and enable add button
+            try:
+                self.status_label.setText(f"🔍 Found {len(self.scanned_apps)} applications (scanning…)")
+                self.add_btn.setEnabled(True)
+            except Exception:
+                pass
+
+            # Force UI update
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
     
     def display_results(self, apps: List[Dict[str, str]]):
-        """Display scanned applications in grid."""
-        # Store scanned apps and add a normalized lowercase category key for reliable filtering
-        self.scanned_apps = apps
-        for a in self.scanned_apps:
-            a['category_lc'] = (a.get('category', 'Other') or 'Other').strip().lower()
+        """Display scanned applications with pagination."""
+        # Hide loading overlay
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.setVisible(False)
         
-        if not apps:
+        # Store all scanned apps
+        if hasattr(self, 'scanned_apps') and self.scanned_apps:
+            # Apps were added incrementally during scan
+            pass
+        else:
+            # Fallback: Store scanned apps
+            self.scanned_apps = apps
+            for a in self.scanned_apps:
+                a['category_lc'] = (a.get('category', 'Other') or 'Other').strip().lower()
+        
+        if not self.scanned_apps:
             self.status_label.setText("❌ No applications found")
             return
         
-        self.status_label.setText(f"✅ Found {len(apps)} applications - Select apps to add:")
+        # Apply current filter
+        self.filtered_apps = self._apply_filter(self.scanned_apps)
         
-        # Clear previous cards
-        for card in self.app_cards:
-            card.deleteLater()
-        self.app_cards.clear()
+        # Reset to first page
+        self.current_page = 0
         
-        # Create cards in grid (N columns)
-        row = 0
-        col = 0
-        card_max_w = 320  # keep cards readable and prevent full-row stretching
-        card_fixed_h = 140
-        for app in apps:
-            card = AppCard(app, self)
-            # enforce fixed size so cards are uniform
-            card.setFixedSize(card_max_w, card_fixed_h)
-
-            card.toggled.connect(lambda checked: self.update_selection_count())
-            # Align top+center so cards don't expand horizontally and allow multiple columns
-            self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
-            self.app_cards.append(card)
-
-            col += 1
-            if col >= self.columns:
-                col = 0
-                row += 1
+        # Display first page
+        self._display_page()
+        
+        # Update pagination controls
+        self._update_pagination()
         
         # Enable add button
         self.add_btn.setEnabled(True)
+        
         # Populate category tags for filtering
         try:
             self._populate_category_tags()
         except Exception:
             pass
-        # Ensure layout recalculation now that cards exist (fix initial single-column issue)
-        try:
-            QTimer.singleShot(0, self._ensure_layout)
         except Exception:
             pass
     
-    def filter_apps(self, search_text: str):
-        """Filter displayed apps based on search text."""
-        search_text = search_text.lower().strip()
-        
-        visible_count = 0
-        row = 0
-        col = 0
-        # Clear existing layout placements so we can re-add visible cards
-        while self.scroll_layout.count():
-            item = self.scroll_layout.takeAt(0)
-            widget = item.widget() if item else None
-            if widget:
-                try:
-                    self.scroll_layout.removeWidget(widget)
-                except Exception:
-                    pass
 
-        for card in self.app_cards:
-            app_name = card.app_data.get('name', '').lower()
-            app_path = card.app_data.get('path', '').lower()
-            # prefer the normalized lowercase category key when available
-            app_category = card.app_data.get('category_lc', card.app_data.get('category', '')).lower()
-
-            # Text match
-            matches_text = (not search_text) or (search_text in app_name) or (search_text in app_path) or (search_text in app_category)
-            # Category match
-            matches_category = (not self.category_filter) or (app_category == (self.category_filter or '').lower())
-
-            matches = matches_text and matches_category
-
-            if matches:
-                card.setVisible(True)
-                # Reposition visible cards
-                try:
-                    self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
-                except Exception:
-                    self.scroll_layout.addWidget(card, row, col)
-                visible_count += 1
-                col += 1
-                if col >= self.columns:
-                    col = 0
-                    row += 1
-            else:
-                card.setVisible(False)
-        
-        # Update status
-        # Update status
-        if self.category_filter:
-            self.status_label.setText(f"🔖 Filter: {self.category_filter} — Showing {visible_count} of {len(self.scanned_apps)} apps")
-        elif search_text:
-            self.status_label.setText(f"🔍 Showing {visible_count} of {len(self.scanned_apps)} applications")
-        else:
-            self.status_label.setText(f"✅ Found {len(self.scanned_apps)} applications - Select apps to add:")
-    
-    def clear_search(self):
-        """Clear search input and show all apps."""
-        self.search_input.clear()
-        # Clear category filter as well and refresh
-        self.category_filter = None
-        try:
-            self._populate_category_tags()
-        except Exception:
-            pass
-        try:
-            self.filter_apps("")
-        except Exception:
-            pass
     
     def update_selection_count(self):
         """Update the selection counter label."""
-        selected_count = sum(1 for card in self.app_cards if card.is_checked())
-        if selected_count == 0:
-            self.selection_label.setText("0 apps selected")
-            self.selection_label.setStyleSheet("""
-                color: #6b7280;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 5px;
-                background-color: transparent;
-            """)
-        else:
-            self.selection_label.setText(f"✓ {selected_count} app{'s' if selected_count != 1 else ''} selected")
-            self.selection_label.setStyleSheet("""
-                color: #009E60;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 5px;
-                background-color: transparent;
-            """)
+        self._update_selection_count()
     
     def select_all(self):
-        """Select all application cards."""
+        """Select all application cards on current page."""
         for card in self.app_cards:
-            if card.checkbox:
-                card.checkbox.setChecked(True)
-        self.update_selection_count()
+            card.set_checked(True)
+        self._update_selection_count()
     
     def deselect_all(self):
-        """Deselect all application cards."""
+        """Deselect all application cards on current page."""
         for card in self.app_cards:
-            if card.checkbox:
-                card.checkbox.setChecked(False)
-        self.update_selection_count()
+            card.set_checked(False)
+        self._update_selection_count()
     
     def add_selected_apps(self):
         """Emit signal with selected apps and close dialog."""
-        selected_apps = []
-        
-        for card in self.app_cards:
-            if card.is_checked():
-                selected_apps.append(card.app_data)
-        
-        if not selected_apps:
+        if not self.selected_apps:
             QMessageBox.warning(
                 self,
                 "No Selection",
@@ -1098,8 +1892,14 @@ class AppScannerDialog(QDialog):
             )
             return
         
-        print(f"[AppScanner] User selected {len(selected_apps)} apps to add")
-        self.apps_selected.emit(selected_apps)
+        # Get app data for selected apps
+        selected_app_data = []
+        for app in self.scanned_apps:
+            if app['name'] in self.selected_apps:
+                selected_app_data.append(app)
+        
+        print(f"[AppScanner] User selected {len(selected_app_data)} apps to add")
+        self.apps_selected.emit(selected_app_data)
         self.accept()
     
     def center_on_screen(self):
@@ -1134,6 +1934,123 @@ class AppScannerDialog(QDialog):
             
             self.move(center_x, center_y)
     
+    def _apply_filter(self, apps):
+        """Apply current search and category filters."""
+        filtered = apps
+        
+        # Apply category filter
+        if self.category_filter:
+            filtered = [app for app in filtered if app.get('category_lc') == self.category_filter]
+        
+        # Apply search filter
+        search_text = self.search_input.text().strip().lower()
+        if search_text:
+            filtered = [app for app in filtered 
+                       if search_text in app.get('name', '').lower() or 
+                          search_text in app.get('path', '').lower()]
+        
+        return filtered
+    
+    def _display_page(self):
+        """Display the current page of apps."""
+        # Clear previous cards
+        for card in self.app_cards:
+            card.deleteLater()
+        self.app_cards.clear()
+        
+        # Calculate page bounds
+        start_idx = self.current_page * self.apps_per_page
+        end_idx = min(start_idx + self.apps_per_page, len(self.filtered_apps))
+        page_apps = self.filtered_apps[start_idx:end_idx]
+        
+        if not page_apps:
+            return
+        
+        # Create cards for this page
+        row = 0
+        col = 0
+        card_max_w = 320
+        card_fixed_h = 140
+        
+        for app in page_apps:
+            card = AppCard(app, self)
+            card.setFixedSize(card_max_w, card_fixed_h)
+            # Set checked state based on stored selections
+            if app['name'] in self.selected_apps:
+                card.set_checked(True)
+            card.toggled.connect(lambda checked, app_name=app['name']: self._on_card_toggled(app_name, checked))
+            self.scroll_layout.addWidget(card, row, col, alignment=(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter))
+            self.app_cards.append(card)
+
+            col += 1
+            if col >= self.columns:
+                col = 0
+                row += 1
+        
+        # Update status
+        total_filtered = len(self.filtered_apps)
+        total_scanned = len(self.scanned_apps)
+        start_num = start_idx + 1
+        end_num = min(end_idx, total_filtered)
+        
+        if total_filtered < total_scanned:
+            self.status_label.setText(f"✅ Found {total_scanned} applications, showing {total_filtered} filtered ({start_num}-{end_num})")
+        else:
+            self.status_label.setText(f"✅ Found {total_scanned} applications ({start_num}-{end_num})")
+        
+        # Update selection count
+        self._update_selection_count()
+    
+    def _update_pagination(self):
+        """Update pagination controls."""
+        total_pages = max(1, (len(self.filtered_apps) + self.apps_per_page - 1) // self.apps_per_page)
+        
+        self.page_label.setText(f"Page {self.current_page + 1} of {total_pages}")
+        
+        self.prev_btn.setEnabled(self.current_page > 0)
+        self.next_btn.setEnabled(self.current_page < total_pages - 1)
+    
+    def prev_page(self):
+        """Go to previous page."""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self._display_page()
+            self._update_pagination()
+    
+    def next_page(self):
+        """Go to next page."""
+        total_pages = max(1, (len(self.filtered_apps) + self.apps_per_page - 1) // self.apps_per_page)
+        if self.current_page < total_pages - 1:
+            self.current_page += 1
+            self._display_page()
+            self._update_pagination()
+    
+    def filter_apps(self):
+        """Apply search filter and refresh display."""
+        self.filtered_apps = self._apply_filter(self.scanned_apps)
+        self.current_page = 0
+        self._display_page()
+        self._update_pagination()
+    
+    def clear_search(self):
+        """Clear search input."""
+        self.search_input.clear()
+        self.filter_apps()
+
+    def _on_card_toggled(self, app_name: str, checked: bool):
+        """Handle card toggle events."""
+        if checked:
+            if app_name not in self.selected_apps:
+                self.selected_apps.add(app_name)
+        else:
+            self.selected_apps.discard(app_name)
+        self._update_selection_count()
+
+    def _update_selection_count(self):
+        """Update the selection count display."""
+        count = len(self.selected_apps)
+        self.selection_label.setText(f"Selected: {count} app{'s' if count != 1 else ''}")
+
     def showEvent(self, event):
         """Override showEvent to center dialog after it has proper size (Wayland-compatible)."""
         super().showEvent(event)

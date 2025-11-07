@@ -58,7 +58,9 @@ class EditApplicationDialog(QDialog):
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setFrameShadow(QFrame.Shadow.Plain)
+        separator.setLineWidth(1)
+        separator.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator)
         
         layout.addSpacing(10)
@@ -97,14 +99,20 @@ class EditApplicationDialog(QDialog):
         browse_btn.clicked.connect(self.browse_for_file)
         browse_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4C516D;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3366ff, stop:1 #0033cc);
                 color: white;
                 border: none;
                 border-radius: 4px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #5C6180;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5588ff, stop:1 #0055ff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0033cc, stop:1 #001a99);
             }
         """)
         path_layout.addWidget(browse_btn)
@@ -122,7 +130,9 @@ class EditApplicationDialog(QDialog):
         # Separator
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setFrameShadow(QFrame.Shadow.Plain)
+        separator2.setLineWidth(1)
+        separator2.setStyleSheet("background-color: #2a2a2a; border: none; border-radius: 1px; margin: 5px 0px; max-height: 1px; min-height: 1px;")
         layout.addWidget(separator2)
         
         # Buttons
@@ -135,14 +145,20 @@ class EditApplicationDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #666666, stop:1 #444444);
                 color: white;
                 border: none;
                 border-radius: 4px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #555555, stop:1 #333333);
             }
         """)
         button_layout.addWidget(cancel_btn)
@@ -154,14 +170,20 @@ class EditApplicationDialog(QDialog):
         save_btn.setDefault(True)
         save_btn.setStyleSheet("""
             QPushButton {
-                background-color: #009E60;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 border-radius: 4px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #00b56f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         button_layout.addWidget(save_btn)

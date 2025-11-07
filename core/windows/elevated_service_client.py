@@ -1,159 +1,152 @@
 """
-Windows Elevated Service Client
+FadCrypt Windows Elevated Service Client
 
-Communicates with FadCrypt Windows Service via named pipes.
-Service runs as SYSTEM - no UAC/password prompts needed.
-
-The service is registered as a Windows Service and auto-starts with the system.
-All file operations execute with system privileges silently.
+Client for communicating with the FadCrypt Elevated Service.
+Provides the same interface as the Linux elevated daemon client.
 """
 
 import json
-import logging
-from typing import Tuple, List
 import os
+import sys
+import logging
+from typing import Tuple, Optional, List
 
-logger = logging.getLogger(__name__)
+# Add current directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
-# Named pipe configuration (must match service)
-PIPE_NAME = r'\\.\pipe\FadCryptElevated'
+try:
+    import win32pipe
+    import win32file
+    import win32api
+    import win32con
+    import win32security
+    WINDOWS_AVAILABLE = True
+except ImportError:
+    WINDOWS_AVAILABLE = False
+
+# Service configuration
+SERVICE_NAME = "FadCryptElevated"
+PIPE_NAME = r"\\.\pipe\fadcrypt-elevated"
 
 
-class ElevatedServiceError(Exception):
-    """Raised when service communication fails."""
-    pass
+class ElevatedServiceClient:
+    """Client for FadCrypt Windows Elevated Service"""
 
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.is_available_checked = False
+        self._service_available = False
 
-class WindowsElevatedClient:
-    """Client for communicating with Windows Elevated Service."""
-    
-    def __init__(self, pipe_name: str = PIPE_NAME):
-        """
-        Initialize client.
-        
-        Args:
-            pipe_name: Named pipe name for service communication
-        """
-        self.pipe_name = pipe_name
-    
     def is_available(self) -> bool:
-        """
-        Check if service is running.
-        
-        Returns:
-            True if service responds to ping, False otherwise
-        """
-        try:
-            response = self._send_request({'command': 'ping'})
-            return response.get('success', False)
-        except Exception as e:
-            logger.debug(f"Service not available: {e}")
+        """Check if the elevated service is available"""
+        if self.is_available_checked:
+            return self._service_available
+
+        self.is_available_checked = True
+
+        if not WINDOWS_AVAILABLE:
+            self.logger.warning("Windows API not available")
             return False
-    
-    def protect_files(self, files: List[str]) -> Tuple[bool, str]:
-        """
-        Protect files by setting attributes (Hidden + System + ReadOnly).
-        
-        Requires service running as SYSTEM - no password prompt needed.
-        Works across reboots - service auto-starts at boot.
-        
-        Args:
-            files: List of file paths to protect
-            
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
-        request = {
-            'command': 'protect',
-            'files': files
-        }
-        
+
         try:
-            response = self._send_request(request)
-            
-            if response.get('success'):
-                count = response.get('files_protected', 0)
-                logger.info(f"Service: Protected {count} files")
-                return True, response.get('message', 'Files protected')
-            else:
-                error = response.get('error', 'Unknown error')
-                logger.error(f"Service protect failed: {error}")
-                return False, error
-        
-        except Exception as e:
-            logger.error(f"Service communication failed: {e}")
-            return False, f"Service error: {e}"
-    
-    def unprotect_files(self, files: List[str]) -> Tuple[bool, str]:
-        """
-        Remove protection from files (remove attributes).
-        
-        Args:
-            files: List of file paths to unprotect
-            
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
-        request = {
-            'command': 'unprotect',
-            'files': files
-        }
-        
-        try:
-            response = self._send_request(request)
-            
-            if response.get('success'):
-                count = response.get('files_unprotected', 0)
-                logger.info(f"Service: Unprotected {count} files")
-                return True, response.get('message', 'Files unprotected')
-            else:
-                error = response.get('error', 'Unknown error')
-                logger.error(f"Service unprotect failed: {error}")
-                return False, error
-        
-        except Exception as e:
-            logger.error(f"Service communication failed: {e}")
-            return False, f"Service error: {e}"
-    
-    def _send_request(self, request: dict) -> dict:
-        """
-        Send request to service via named pipe.
-        
-        Args:
-            request: Request dictionary
-            
-        Returns:
-            Response dictionary from service
-            
-        Raises:
-            ElevatedServiceError: If communication fails
-        """
-        try:
-            # Try to open named pipe
-            # This requires the Windows API - pywin32 or manual implementation
-            
-            # For now, return error (actual implementation needs pywin32)
-            raise ElevatedServiceError(
-                "Named pipe communication not implemented. "
-                "Install pywin32 and use win32pipe.CreateFile() / ReadFile() / WriteFile()"
+            # Try to connect to the named pipe
+            handle = win32file.CreateFile(
+                PIPE_NAME,
+                win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                0, None,
+                win32file.OPEN_EXISTING,
+                0, None
             )
-        
+            win32file.CloseHandle(handle)
+            self._service_available = True
+            self.logger.info("Elevated service is available")
+            return True
         except Exception as e:
-            raise ElevatedServiceError(f"Pipe error: {e}")
+            self.logger.warning(f"Elevated service not available: {e}")
+            return False
+
+    def _send_request(self, operation: str, args: Optional[List] = None) -> Tuple[bool, Optional[str]]:
+        """Send a request to the elevated service"""
+        if not self.is_available():
+            return False, "Elevated service not available"
+
+        try:
+            # Get user SID
+            if WINDOWS_AVAILABLE:
+                token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+                user_sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+                user_sid_str = win32security.ConvertSidToStringSid(user_sid)
+                win32api.CloseHandle(token)
+            else:
+                user_sid_str = None
+            
+            # Create request
+            request = {
+                "operation": operation,
+                "args": args or [],
+                "user_sid": user_sid_str
+            }
+            request_json = json.dumps(request)
+
+            # Connect to named pipe
+            handle = win32file.CreateFile(
+                PIPE_NAME,
+                win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                0, None,
+                win32file.OPEN_EXISTING,
+                0, None
+            )
+
+            try:
+                # Send request
+                win32file.WriteFile(handle, request_json.encode('utf-8'))
+
+                # Read response
+                result, data = win32file.ReadFile(handle, 65536)
+                if result == 0:  # Success
+                    response_json = data.decode('utf-8', errors='ignore')
+                    response = json.loads(response_json)
+
+                    success = response.get('success', False)
+                    error = response.get('error')
+
+                    return success, error
+                else:
+                    return False, "Failed to read response"
+
+            finally:
+                win32file.CloseHandle(handle)
+
+        except Exception as e:
+            self.logger.error(f"Request failed: {e}")
+            return False, str(e)
+
+    def disable_system_tools(self) -> Tuple[bool, Optional[str]]:
+        """Disable system tools via elevated service"""
+        return self._send_request("disable-tools")
+
+    def enable_system_tools(self) -> Tuple[bool, Optional[str]]:
+        """Enable system tools via elevated service"""
+        return self._send_request("enable-tools")
+
+    def protect_files(self, file_paths: List[str]) -> Tuple[bool, Optional[str]]:
+        """Protect files via elevated service"""
+        return self._send_request("protect-files", file_paths)
+
+    def unprotect_files(self, file_paths: List[str]) -> Tuple[bool, Optional[str]]:
+        """Unprotect files via elevated service"""
+        return self._send_request("unprotect-files", file_paths)
 
 
-# Global client instance
-_client = None
+# Global instance
+_elevated_client = None
 
 
-def get_windows_elevated_client() -> WindowsElevatedClient:
-    """
-    Get or create global Windows elevated client instance.
-    
-    Returns:
-        WindowsElevatedClient instance
-    """
-    global _client
-    if _client is None:
-        _client = WindowsElevatedClient()
-    return _client
+def get_elevated_client() -> ElevatedServiceClient:
+    """Get or create the global elevated service client"""
+    global _elevated_client
+    if _elevated_client is None:
+        _elevated_client = ElevatedServiceClient()
+    return _elevated_client

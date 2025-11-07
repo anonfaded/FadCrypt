@@ -123,7 +123,8 @@ class StatsWindow(QWidget):
         refresh_btn = QPushButton("🔄 Refresh")
         refresh_btn.setStyleSheet("""
             QPushButton {
-                background-color: #d32f2f;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff3333, stop:1 #cc0000);
                 color: white;
                 border: none;
                 padding: 8px 20px;
@@ -131,7 +132,12 @@ class StatsWindow(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #b71c1c;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #ff5555, stop:1 #dd0000);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #cc0000, stop:1 #990000);
             }
         """)
         refresh_btn.clicked.connect(self.refresh_stats)

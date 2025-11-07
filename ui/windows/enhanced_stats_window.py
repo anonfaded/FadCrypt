@@ -1,11 +1,12 @@
 """Enhanced Statistics Window - Beautiful dashboard with pie/line charts and duration metrics"""
 
+import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QScrollArea, QGridLayout, QFrame, QTabWidget
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QRect, QPoint
-from PyQt6.QtGui import QFont, QColor, QPainter, QBrush, QPen
+from PyQt6.QtGui import QFont, QColor, QPainter, QBrush, QPen, QIcon
 from PyQt6.QtCore import QSize
 import pyqtgraph as pg
 import json
@@ -301,6 +302,11 @@ class EnhancedStatsWindow(QWidget):
         
         self.init_ui()
         
+        # Set window icon
+        icon_path = self.resource_path('img/icon.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         # Auto-refresh timer - only when window is visible
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_stats)
@@ -312,6 +318,10 @@ class EnhancedStatsWindow(QWidget):
     def init_ui(self):
         """Initialize UI"""
         self.setWindowTitle("FadCrypt Statistics & Analytics")
+        
+        # Set window flags to appear in taskbar on Windows
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
+        
         self.setGeometry(100, 100, 1200, 800)
         
         # Dark theme
@@ -907,7 +917,8 @@ class EnhancedStatsWindow(QWidget):
                     background-color: transparent;
                 }
                 QMessageBox QPushButton {
-                    background-color: #9C27B0;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
                     color: white;
                     border: none;
                     border-radius: 4px;
@@ -915,7 +926,8 @@ class EnhancedStatsWindow(QWidget):
                     min-width: 80px;
                 }
                 QMessageBox QPushButton:hover {
-                    background-color: #7B1FA2;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
                 }
             """)
             msg.exec()
@@ -972,7 +984,8 @@ class EnhancedStatsWindow(QWidget):
                     background-color: transparent;
                 }
                 QMessageBox QPushButton {
-                    background-color: #9C27B0;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #3366ff, stop:1 #0033cc);
                     color: white;
                     border: none;
                     border-radius: 4px;
@@ -980,7 +993,8 @@ class EnhancedStatsWindow(QWidget):
                     min-width: 80px;
                 }
                 QMessageBox QPushButton:hover {
-                    background-color: #7B1FA2;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5588ff, stop:1 #0055ff);
                 }
             """)
             msg.exec()

@@ -151,7 +151,9 @@ class CryptoManager:
             return None
         except Exception as e:
             if not suppress_errors:
-                print(f"[CryptoManager] Error decrypting data: {e}")
+                # Debug log (commented out for cleaner CLI)
+                # print(f"[CryptoManager] Error decrypting data: {e}")
+                pass
             return None
     
     def encrypt_password_hash(
@@ -191,9 +193,16 @@ class CryptoManager:
             # Encrypt the password hash
             encrypted_hash = encryptor.update(password_hash) + encryptor.finalize()
             
-            # Write to file: salt + tag + encrypted_hash
-            with open(file_path, 'wb') as f:
-                f.write(salt + encryptor.tag + encrypted_hash)
+            # Write to file: salt + tag + encrypted_hash using safe write
+            from core.file_protection import safe_write_to_protected_file
+            content_bytes = salt + encryptor.tag + encrypted_hash
+            # Convert bytes to a serializable format for safe_write
+            import base64
+            content = base64.b64encode(content_bytes).decode('utf-8')
+            success, error = safe_write_to_protected_file(file_path, content, mode='w')
+            if not success:
+                print(f"[CryptoManager] Error writing encrypted password hash: {error}")
+                return False
             
             return True
             
@@ -218,10 +227,16 @@ class CryptoManager:
         """
         try:
             # Read encrypted file
-            with open(file_path, 'rb') as f:
-                salt = f.read(self.SALT_SIZE)
-                tag = f.read(self.TAG_SIZE)
-                encrypted_hash = f.read()
+            import base64
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Decode base64
+            encrypted_data = base64.b64decode(content.encode('utf-8'))
+            
+            salt = encrypted_data[:self.SALT_SIZE]
+            tag = encrypted_data[self.SALT_SIZE:self.SALT_SIZE + self.TAG_SIZE]
+            encrypted_hash = encrypted_data[self.SALT_SIZE + self.TAG_SIZE:]
             
             # Validate file format
             if len(salt) != self.SALT_SIZE or len(tag) != self.TAG_SIZE:
@@ -245,5 +260,6 @@ class CryptoManager:
             print(f"[CryptoManager] Password file not found: {file_path}")
             return None
         except Exception as e:
-            print(f"[CryptoManager] Error decrypting password hash: {e}")
+            # Debug log (commented out for cleaner CLI)
+            # print(f"[CryptoManager] Error decrypting password hash: {e}")
             return None
