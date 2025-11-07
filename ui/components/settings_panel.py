@@ -488,16 +488,16 @@ class SettingsPanel(QWidget):
         # Warning text below checkbox
         if self.platform_name == "Windows":
             encryption_warning_text = (
-                "⚠️  When disabled (default): Files locked via ACL only, readable when unlocked.\n"
-                "⚠️  When enabled: Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  When disabled: Files locked via ACL only, readable when unlocked.\n"
+                "⚠️  When enabled(default): Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
                 "⚠️  ACL still applied to .fadcrypt file for dual-layer protection.\n"
                 "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
                 "⚠️  Keep recovery codes safe - encryption is irreversible without them."
             )
         else:  # Linux
             encryption_warning_text = (
-                "⚠️  When disabled (default): Files locked via permissions (000) + immutable flag.\n"
-                "⚠️  When enabled: Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
+                "⚠️  When disabled: Files locked via permissions (000) + immutable flag.\n"
+                "⚠️  When enabled(default): Files encrypted to .fadcrypt (AES-256), stored as binary blob.\n"
                 "⚠️  Permissions (000) + immutable still applied to .fadcrypt for dual-layer protection.\n"
                 "⚠️  If password forgotten: Use recovery codes to reset password and unlock encrypted files.\n"
                 "⚠️  Keep recovery codes safe - encryption is irreversible without them."

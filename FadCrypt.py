@@ -12,18 +12,51 @@ import sys
 import os
 import platform
 import tempfile
+import io
 
 # CRITICAL: Force unbuffered output for live progress display in PowerShell/CMD
 os.environ['PYTHONUNBUFFERED'] = '1'
 
-# CRITICAL: Set console encoding to UTF-8 FIRST to prevent Unicode errors
+# CRITICAL: Force UTF-8 encoding everywhere - MUST be first thing
+# This handles all cases: console=True, console=False, packaged app, development
 try:
     import codecs
+    
+    # Try method 1: reconfigure() - works with console=True
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+        try:
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+    
+    # Method 2: Wrap with TextIOWrapper - works when stdout exists but can't reconfigure
+    if sys.stdout is not None and not hasattr(sys.stdout, 'reconfigure'):
+        try:
+            if hasattr(sys.stdout, 'buffer'):
+                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+                sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+    
+    # Method 3: If stdout is None (console=False), create UTF-8 capable streams
+    if sys.stdout is None:
+        try:
+            sys.stdout = open(os.devnull, 'w', encoding='utf-8', errors='replace')
+            sys.stderr = open(os.devnull, 'w', encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+            
+    # Set console code page to UTF-8 on Windows
+    if platform.system() == 'Windows':
+        try:
+            import subprocess
+            subprocess.run(['chcp', '65001'], capture_output=True)
+        except Exception:
+            pass
+            
 except Exception:
-    pass
+    pass  # If all else fails, continue anyway
 
 def get_fadcrypt_logs_folder():
     """Get the unified FadCrypt logs folder for the current platform."""
@@ -104,6 +137,30 @@ if hasattr(sys, '_MEIPASS'):
         except (OSError, FileNotFoundError):
             # If original directory no longer exists, stay in current directory
             pass
+
+
+# CRITICAL: Define safe_print and safe_flush BEFORE they're used in CLI handling
+def safe_print(*args, **kwargs):
+    """Safely print to stdout, handling None or closed streams"""
+    try:
+        if sys.stdout is not None and hasattr(sys.stdout, 'write'):
+            # Try to print normally
+            print(*args, **kwargs)
+    except (AttributeError, ValueError, OSError, BrokenPipeError):
+        # If stdout is broken or None, silently fail - we can't do much else
+        pass
+
+
+def safe_flush(stream=None):
+    """Safely flush stdout/stderr even if None or doesn't have flush method"""
+    if stream is None:
+        stream = sys.stdout
+    if stream is not None and hasattr(stream, 'flush'):
+        try:
+            stream.flush()
+        except (AttributeError, ValueError, OSError):
+            pass
+
 
 # NOTE: Installer will perform context menu registration and PATH changes
 # Use --register-context to register context menu (this is invoked by installer)
@@ -400,7 +457,7 @@ if '--test-context-lock' in sys.argv or '--test-context-unlock' in sys.argv:
 
 # Handle --context-lock and --context-unlock from context menu
 if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
-    print(f"[CONTEXT MENU] Processing context menu arguments: {sys.argv}", flush=True)
+    safe_print(f"[CONTEXT MENU] Processing context menu arguments: {sys.argv}")
     try:
         if '--context-lock' in sys.argv:
             idx = sys.argv.index('--context-lock')
@@ -408,13 +465,13 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
                 # Get all paths after --context-lock (support batch operations)
                 paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
                 if not paths:
-                    print(f"[CONTEXT MENU] No paths provided", flush=True)
+                    safe_print(f"[CONTEXT MENU] No paths provided")
                     sys.exit(1)
                 
-                print(f"[CONTEXT MENU] Locking {len(paths)} item(s): {paths}", flush=True)
-                from core.windows.cli_lock_handler import lock_files_with_password_batch
-                success, info = lock_files_with_password_batch(paths)
-                print(f"[CONTEXT MENU] Lock result: {success}", flush=True)
+                safe_print(f"[CONTEXT MENU] Locking {len(paths)} item(s): {paths}")
+                from core.windows.cli_lock_handler import lock_multiple_with_password
+                success, info = lock_multiple_with_password(paths)
+                safe_print(f"[CONTEXT MENU] Lock result: {success}")
                 sys.exit(0 if success else 1)
         
         elif '--context-unlock' in sys.argv:
@@ -423,18 +480,18 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
                 # Get all paths after --context-unlock (support batch operations)
                 paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
                 if not paths:
-                    print(f"[CONTEXT MENU] No paths provided", flush=True)
+                    safe_print(f"[CONTEXT MENU] No paths provided")
                     sys.exit(1)
                 
-                print(f"[CONTEXT MENU] Unlocking {len(paths)} item(s): {paths}", flush=True)
-                from core.windows.cli_lock_handler import unlock_files_with_password_batch
-                success, info = unlock_files_with_password_batch(paths)
-                print(f"[CONTEXT MENU] Unlock result: {success}", flush=True)
+                safe_print(f"[CONTEXT MENU] Unlocking {len(paths)} item(s): {paths}")
+                from core.windows.cli_lock_handler import unlock_multiple_with_password
+                success, info = unlock_multiple_with_password(paths)
+                safe_print(f"[CONTEXT MENU] Unlock result: {success}")
                 sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"[CLI] Error: {e}", flush=True)
+        safe_print(f"[CLI] Error: {e}")
         import traceback
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr if sys.stderr is not None else None)
         sys.exit(1)
 
 if '--cleanup' in sys.argv:
@@ -1094,6 +1151,13 @@ def launch_tui():
         from colorama import just_fix_windows_console
         just_fix_windows_console()
         
+        # Debug: Print launch info
+        if VERBOSE_MODE:
+            safe_print("[TUI] Launching TUI mode...")
+            safe_print(f"[TUI] stdout is None: {sys.stdout is None}")
+            safe_print(f"[TUI] stdin is None: {sys.stdin is None}")
+            safe_print(f"[TUI] stderr is None: {sys.stderr is None}")
+        
         # Get platform-specific paths
         system = platform.system()
         
@@ -1115,6 +1179,13 @@ def launch_tui():
         crypto_manager = CryptoManager()
         password_manager = PasswordManager(password_file, crypto_manager, recovery_codes_file)
         
+        # Inform user that CLI/TUI is starting (helps when launched from explorer/context menu)
+        try:
+            print("🔐 FadCrypt CLI starting...")
+            sys.stdout.flush()
+        except Exception:
+            pass
+
         # Verify password before launching TUI
         from core.cli.password_prompt import PasswordPrompt
         password_prompt = PasswordPrompt(password_manager)
@@ -1209,15 +1280,52 @@ def requires_password_protection():
     return True
 
 
-def handle_direct_cli_commands():
-    """Handle direct CLI commands like --lock, --unlock, --list with password protection"""
-    # Set UTF-8 encoding for stdout/stderr to support emojis
+def setup_console_encoding():
+    """Setup UTF-8 encoding for console output, handling None stdout/stderr gracefully"""
     import io
     import sys
-    if sys.stdout.encoding != 'utf-8':
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    if sys.stderr.encoding != 'utf-8':
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    
+    # Only set UTF-8 if stdout/stderr exist and buffer is available
+    if sys.stdout is not None and hasattr(sys.stdout, 'buffer') and sys.stdout.buffer is not None:
+        if getattr(sys.stdout, 'encoding', None) != 'utf-8':
+            try:
+                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            except (AttributeError, ValueError):
+                pass  # Fallback if wrapping fails
+    
+    if sys.stderr is not None and hasattr(sys.stderr, 'buffer') and sys.stderr.buffer is not None:
+        if getattr(sys.stderr, 'encoding', None) != 'utf-8':
+            try:
+                sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+            except (AttributeError, ValueError):
+                pass  # Fallback if wrapping fails
+
+def handle_direct_cli_commands():
+    """Handle direct CLI commands like --lock, --unlock, --list with password protection"""
+    import sys
+    import os
+    
+    # CRITICAL: Restore stdin/stdout/stderr if console=False in spec
+    # Without these, print() and other I/O operations will fail
+    if sys.stdout is None or sys.stdin is None or sys.stderr is None:
+        # Reopen standard streams for console I/O (for when running with console=False)
+        sys.stdin = open(os.devnull, 'r')
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        # On Windows, try to use a real console if available
+        if os.name == 'nt':
+            try:
+                import ctypes
+                ctypes.windll.kernel32.AllocConsole()
+                # Redirect to the new console
+                sys.stdout = open('CON:', 'w')
+                sys.stdin = open('CON:', 'r')
+                sys.stderr = open('CON:', 'w')
+            except:
+                pass  # Fall back to os.devnull
+    
+    # Setup console encoding safely
+    setup_console_encoding()
     
     from colorama import just_fix_windows_console
     just_fix_windows_console()
@@ -1326,7 +1434,7 @@ def handle_direct_cli_commands():
                 # If there are invalid paths or no locked paths, handle without calling CLI handler
                 if invalid_paths or suggested_paths or unlocked_paths or not locked_paths:
                     print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
-                    sys.stdout.flush()
+                    safe_flush()
                     
                     # Build error messages
                     error_messages = []
@@ -1351,7 +1459,7 @@ def handle_direct_cli_commands():
                         print_error(f"Failed to unlock {len(error_messages)} item(s):")
                         for error_msg in error_messages:
                             print_error(f"   {error_msg}")
-                        sys.stdout.flush()
+                        safe_flush()
                     
                     return True
                 else:
@@ -1377,8 +1485,8 @@ def handle_direct_cli_commands():
         
         # Clear screen after successful authentication
         os.system('cls' if os.name == 'nt' else 'clear')
-        sys.stdout.flush()
-        sys.stderr.flush()
+        safe_flush()
+        safe_flush(sys.stderr)
     
     # Handle --lock
     if '--lock' in sys.argv:
@@ -1391,13 +1499,11 @@ def handle_direct_cli_commands():
                 print_error("Usage: fadcrypt --lock <path1> [path2] ...")
                 return False
             
-            # Ensure UTF-8 encoding is active for emoji display
-            import io
-            if sys.stdout.encoding != 'utf-8':
-                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            # Setup UTF-8 encoding for emoji display
+            setup_console_encoding()
             
             print_colored(f"🔒 Locking {len(paths)} item(s)...\n", Colors.INFO)
-            sys.stdout.flush()
+            safe_flush()
             
             success, failed, successful_paths, error_messages = cli_handler.lock_multiple(paths)
             
@@ -1409,7 +1515,7 @@ def handle_direct_cli_commands():
                     item_name = os.path.basename(path)
                     print_colored(f"   fadcrypt --unlock {item_name}", Colors.SUCCESS)
                 print()
-                sys.stdout.flush()
+                safe_flush()
             
             if failed > 0:
                 print_error(f"Failed to lock {failed} item(s).")
@@ -1417,7 +1523,7 @@ def handle_direct_cli_commands():
                     print_colored("Error details:", Colors.ERROR)
                     for error_msg in error_messages:
                         print_colored(f"   {error_msg}", Colors.ERROR)
-                sys.stdout.flush()
+                safe_flush()
             
             return True
         else:
@@ -1436,13 +1542,11 @@ def handle_direct_cli_commands():
                 print_error("Usage: fadcrypt --unlock <path1> [path2] ...")
                 return False
             
-            # Ensure UTF-8 encoding is active for emoji display
-            import io
-            if sys.stdout.encoding != 'utf-8':
-                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+            # Setup UTF-8 encoding for emoji display
+            setup_console_encoding()
             
             print_colored(f"🔐 Unlocking {len(paths)} item(s)...\n", Colors.INFO)
-            sys.stdout.flush()
+            safe_flush()
             
             success, failed, successful_paths, error_messages = cli_handler.unlock_multiple(paths)
             
@@ -1465,12 +1569,12 @@ def handle_direct_cli_commands():
                         item_name = item_name[:-10]  # Remove '.fadcrypt' (10 characters)
                     print_colored(f"   fadcrypt --lock {item_name}", Colors.SUCCESS)
                 print()
-                sys.stdout.flush()
+                safe_flush()
             if failed > 0:
                 print_error(f"Failed to unlock {failed} item(s):")
                 for error_msg in error_messages:
                     print_error(f"   {error_msg}")
-                sys.stdout.flush()
+                safe_flush()
             
             return True
         else:
@@ -1690,6 +1794,20 @@ def handle_direct_cli_commands():
 
 def main():
     """Main entry point for FadCrypt - TUI or GUI."""
+    import sys
+    import os
+    
+    # CRITICAL: If console=False in spec file, stdout/stderr are None
+    # Setup minimal stdout for print() to work before GUI window is created
+    # This is especially important for help/version output and splash screen messages
+    if sys.stdout is None or sys.stderr is None:
+        # Redirect to devnull so print() doesn't crash (output won't be visible but no error)
+        if sys.stdout is None:
+            sys.stdout = open(os.devnull, 'w')
+        if sys.stderr is None:
+            sys.stderr = open(os.devnull, 'w')
+        if sys.stdin is None:
+            sys.stdin = open(os.devnull, 'r')
     
     # Handle --help first (before any other processing)
     if '--help' in sys.argv or '-h' in sys.argv:
@@ -1745,13 +1863,23 @@ def main():
     non_functional_flags = {'--verbose', '--windows'}
     functional_args = [arg for arg in sys.argv[1:] if arg not in non_functional_flags]
     
+    if VERBOSE_MODE:
+        safe_print(f"[MAIN] sys.argv: {sys.argv}")
+        safe_print(f"[MAIN] gui_mode: {gui_mode}")
+        safe_print(f"[MAIN] functional_args: {functional_args}")
+    
     # CLI mode if: explicitly requested, no arguments (except non-functional flags), or not GUI mode
     cli_mode = '--cli' in sys.argv or (len(functional_args) == 0) or not gui_mode
     
     # If CLI mode or no arguments, launch TUI
     if cli_mode and not gui_mode:
+        if VERBOSE_MODE:
+            safe_print(f"[MAIN] cli_mode={cli_mode}, gui_mode={gui_mode} - Launching TUI...")
         launch_tui()
         return
+    
+    if VERBOSE_MODE:
+        safe_print(f"[MAIN] cli_mode={cli_mode}, gui_mode={gui_mode} - Launching GUI...")
     
     # Otherwise, launch GUI
     # Step 1: Single Instance Check - Prevent multiple instances

@@ -10,6 +10,7 @@ from typing import Optional
 
 from .colors import Colors, print_colored, print_error, print_success, print_warning, print_info
 from .curses_password import prompt_password_curses
+import getpass
 
 
 class PasswordPrompt:
@@ -35,9 +36,33 @@ class PasswordPrompt:
         Returns:
             Password string or None if cancelled
         """
-        # Remove trailing colon and "Enter" prefix for cleaner curses display
+        # Remove trailing colon and "Enter" prefix for cleaner display
         clean_prompt = prompt.replace("Enter ", "").replace(":", "").strip()
-        return prompt_password_curses(clean_prompt, confirm)
+
+        # First try the curses-based prompt (animated/masked). If it fails
+        # (missing curses support, no proper TTY, or other runtime error),
+        # fall back to getpass.getpass which works in basic terminals.
+        try:
+            return prompt_password_curses(clean_prompt, confirm)
+        except Exception:
+            # Fallback: use getpass (non-animated, reliable)
+            try:
+                if confirm:
+                    a = getpass.getpass(f"{clean_prompt}: ")
+                    b = getpass.getpass("Confirm password: ")
+                    if a != b:
+                        print_warning("Passwords do not match.")
+                        return None
+                    return a
+                else:
+                    pw = getpass.getpass(f"{clean_prompt}: ")
+                    # Support special "FORGOT_PASSWORD" token when user presses F1
+                    # This isn't available via getpass, so we keep the existing behavior
+                    # and the caller can handle None as cancellation.
+                    return pw if pw else None
+            except Exception:
+                # If even getpass fails, return None to indicate cancel/error
+                return None
     
     def verify_password(self, prompt: str = "Enter your FadCrypt password: ") -> bool:
         """

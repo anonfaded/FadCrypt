@@ -9,18 +9,19 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('img', 'img'),                # Image assets
-        ('core', 'core'),              # Core modules
-        ('ui', 'ui'),                  # UI modules
-        ('core/fonts', 'core/fonts'),  # Fonts for snake game
-        ('core/version.py', '.'),      # Version info
-        ('core/win_mock.py', '.'),     # Mock Windows on Linux for testing
+        ('img', 'img'),  # All image assets
+        ('core', 'core'),  # Include all core modules
+        ('ui', 'ui'),  # Include all UI modules
+        ('core/fonts', 'core/fonts'),  # Include fonts for snake game
+        ('core/version.py', '.'),  # Version info
+        ('core/win_mock.py', '.'),  # Mock Windows on Linux for testing
     ],
     hiddenimports=[
         # Version module
         'core.version',
         # Core modules
         'core',
+        'core.application_manager',
         'core.autostart_manager',
         'core.config_manager',
         'core.crypto_manager',
@@ -38,17 +39,12 @@ a = Analysis(
         'core.statistics_manager',
         'core.verbose_logger',
         'core.file_encryption_manager',
-        # Windows-specific core modules
-        'core.windows',
-        'core.windows.acl_locker',
-        'core.windows.cli_lock_handler',
-        'core.windows.elevation_manager',
-        'core.windows.fadcrypt-elevated-helper',
-        'core.windows.file_lock_manager_windows',
-        'core.windows.file_encryption_manager_windows',
-        'core.windows.elevated_service_client',
-        'core.windows.fadcrypt_elevated_service',
-        'core.windows.shell_extension',
+        'core.linux',
+        'core.linux.file_lock_manager_linux',
+        'core.linux.file_encryption_manager_linux',
+        'core.linux.elevated_daemon',
+        'core.linux.elevated_daemon_client',
+        'core.linux.fanotify_client',
         # UI modules
         'ui',
         'ui.base',
@@ -74,11 +70,12 @@ a = Analysis(
         'ui.dialogs.password_dialog',
         'ui.dialogs.readme_dialog',
         'ui.dialogs.recovery_dialog',
-        # Windows-specific UI modules
+        'ui.linux',
+        'ui.linux.main_window_linux',
+        # Windows UI modules for cross-platform testing/development
         'ui.windows',
         'ui.windows.main_window_windows',
         'ui.windows.enhanced_stats_window',
-        'ui.windows.stats_window',
         # CLI modules
         'core.cli',
         'core.cli.cli_handler_base',
@@ -92,24 +89,18 @@ a = Analysis(
         'core.cli.curses_password',
         'core.cli.curses_menu',
         'core.cli.curses_file_browser',
-        # Curses library (required for CLI password input)
-        'curses',
-        'curses.ascii',
-        'curses.panel',
-        'curses.textpad',
         # External dependencies - PyQt6
         'PyQt6',
         'PyQt6.QtWidgets',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.sip',
-        'PyQt6.QtNetwork',
-        'PyQt6.QtDBus',
         # External dependencies - Other
         'PIL',
         'PIL.Image',
+        'PIL.ImageTk',
         'pystray',
-        'pystray._win32',
+        'pystray._xorg',
         'pygame',
         'pygame.mixer',
         'cryptography',
@@ -121,7 +112,7 @@ a = Analysis(
         'watchdog',
         'watchdog.observers',
         'watchdog.events',
-        # NumPy and PyQtGraph
+        # NumPy and PyQtGraph for enhanced stats
         'numpy',
         'numpy.core',
         'numpy.core._multiarray_umath',
@@ -130,36 +121,16 @@ a = Analysis(
         'numpy._core.multiarray',
         'pyqtgraph',
         'pyqtgraph.graphicsItems',
-        # Pygame for snake game
+        # Pygame for snake game - avoid circular imports
         'pygame.base',
         'pygame.constants',
         'pygame.color',
         'pygame.colordict',
-        # Windows-specific modules
-        'winreg',
-        'ctypes',
-        'ctypes.wintypes',
-        # Windows compatibility modules
-        'core.win_mock',
-        # Cryptography extensions
-        'cryptography.hazmat.primitives.ciphers',
-        'cryptography.hazmat.primitives.kdf.pbkdf2',
-        'cryptography.hazmat.primitives.padding',
-        # Additional Windows modules
-        'msvcrt',
-        'nt',
-        '_winapi',
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['core/pyi_rth_dllfix.py'],
-    excludes=[
-    'tkinter',
-    'tcl',
-    '_tkinter',
-    'tk',
-    'tcl8',
-    ],
+    runtime_hooks=[],
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -172,13 +143,19 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    name='FadCrypt',
+    name='fadcrypt-cli',  # CLI version with console
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
-    console=False,  # GUI app - NO console window
-    icon='img/1.ico'  # Use .ico file, not .png
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,  # CLI app, needs console for TUI
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )
 
 coll = COLLECT(
@@ -187,6 +164,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=False,
-    name='FadCrypt'
+    upx=True,
+    upx_exclude=[],
+    name='FadCryptCLI'
 )

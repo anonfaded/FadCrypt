@@ -84,8 +84,15 @@ class LogCapture:
             # Only capture if streams are available (not None)
             if sys.stdout is not None:
                 sys.stdout = TeeOutput(sys.stdout, self.buffer)
+            else:
+                # If stdout is None (console=False), create a dummy stream
+                sys.stdout = TeeOutput(None, self.buffer)
+                
             if sys.stderr is not None:
                 sys.stderr = TeeOutput(sys.stderr, self.buffer)
+            else:
+                # If stderr is None, create a dummy stream
+                sys.stderr = TeeOutput(None, self.buffer)
             self.enabled = True
             
     def stop(self):

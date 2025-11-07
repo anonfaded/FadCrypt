@@ -54,19 +54,33 @@ Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" -ErrorAction SilentlyContinue }
 if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue }
 
-# Build with PyInstaller
-Write-Host "Building executable with PyInstaller..." -ForegroundColor Yellow
+# Build GUI with PyInstaller
+Write-Host "Building GUI executable with PyInstaller..." -ForegroundColor Yellow
 Write-Host "Command: python -m PyInstaller FadCrypt.spec --clean --noconfirm" -ForegroundColor DarkGray
 python -m PyInstaller FadCrypt.spec --clean --noconfirm
 
-# Check if build succeeded
+# Check if GUI build succeeded
 if (-not (Test-Path "dist\FadCrypt\FadCrypt.exe")) {
     Write-Host "Error: Build failed - FadCrypt.exe not found in dist\FadCrypt\" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "✓ PyInstaller build successful!" -ForegroundColor Green
+Write-Host "✓ GUI build successful!" -ForegroundColor Green
 Write-Host "  Output: dist\FadCrypt\FadCrypt.exe" -ForegroundColor Green
+
+# Build CLI with PyInstaller
+Write-Host "`nBuilding CLI executable with PyInstaller..." -ForegroundColor Yellow
+Write-Host "Command: python -m PyInstaller FadCryptCLI.spec --clean --noconfirm" -ForegroundColor DarkGray
+python -m PyInstaller FadCryptCLI.spec --clean --noconfirm
+
+# Check if CLI build succeeded
+if (-not (Test-Path "dist\FadCryptCLI\fadcrypt.exe")) {
+    Write-Host "Error: Build failed - fadcrypt.exe not found in dist\FadCryptCLI\" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✓ CLI build successful!" -ForegroundColor Green
+Write-Host "  Output: dist\FadCryptCLI\fadcrypt.exe" -ForegroundColor Green
 
 # If Inno Setup is skipped, exit early
 if ($SkipInnoSetup) {

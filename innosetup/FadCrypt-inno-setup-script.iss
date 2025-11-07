@@ -41,39 +41,49 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+; Desktop icons checkbox - CHECKED by default and NOT optional
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Copy entire FadCrypt directory (onedir format) with all subdirectories
-Source: "..\dist\FadCrypt\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+; Copy GUI build to gui subdirectory with its own _internal
+; FadCrypt.exe in gui\ will find _internal\ in the same directory
+Source: "..\dist\FadCrypt\FadCrypt.exe"; DestDir: "{app}\gui"; Flags: ignoreversion
+Source: "..\dist\FadCrypt\_internal\*"; DestDir: "{app}\gui\_internal"; Flags: recursesubdirs ignoreversion createallsubdirs
+
+; Copy CLI build to cli subdirectory with its own _internal
+; fadcrypt.exe in cli\ will find _internal\ in the same directory
+Source: "..\dist\FadCryptCLI\fadcrypt.exe"; DestDir: "{app}\cli"; Flags: ignoreversion
+Source: "..\dist\FadCryptCLI\_internal\*"; DestDir: "{app}\cli\_internal"; Flags: recursesubdirs ignoreversion createallsubdirs
+
+; Copy image assets for shortcuts
+Source: "..\img\1.ico"; DestDir: "{app}\img"; Flags: ignoreversion
+Source: "..\img\fadcrypt_cli_ico.ico"; DestDir: "{app}\img"; Flags: ignoreversion
+Source: "..\img\fadcrypt_cli.png"; DestDir: "{app}\img"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--gui"; WorkingDir: "{app}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--gui"; Tasks: desktopicon; WorkingDir: "{app}"
+; GUI shortcuts - point to FadCrypt.exe in gui subdirectory
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui"; WorkingDir: "{app}"; IconFilename: "{app}\img\1.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui"; Tasks: desktopicon; WorkingDir: "{app}"; IconFilename: "{app}\img\1.ico"
+
+; CLI shortcuts - point to fadcrypt.exe in cli subdirectory
+Name: "{autoprograms}\FadCrypt CLI"; Filename: "{app}\cli\fadcrypt.exe"; Parameters: "--cli"; WorkingDir: "{app}"; IconFilename: "{app}\img\fadcrypt_cli_ico.ico"
+Name: "{autodesktop}\FadCrypt CLI"; Filename: "{app}\cli\fadcrypt.exe"; Parameters: "--cli"; Tasks: desktopicon; WorkingDir: "{app}"; IconFilename: "{app}\img\fadcrypt_cli_ico.ico"
 
 [Run]
-; Register context menu and add CLI PATH entry during install. We call the installed exe with
-; --register-context so the app doesn't need to do first-run registry changes.
-; This MUST run on every install to ensure context menu is registered.
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-context --internal-auth"; Flags: runhidden skipifsilent waituntilterminated
+; Register context menu during install - use --gui to ensure no terminal window
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --register-context --internal-auth"; Flags: runhidden skipifsilent waituntilterminated
 
 ; Install and start the elevated service for persistent admin rights
-; Note: This runs with admin privileges since PrivilegesRequired=admin
-; Service installation logs to user's temp directory automatically
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service --internal-auth"; Flags: runhidden waituntilterminated
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --install-service --internal-auth"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
 ; Stop and uninstall the elevated service
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-service --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --uninstall-service --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptServiceUninstall"
 
 ; Run cleanup to restore system settings before uninstalling
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--cleanup --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
+Filename: "{app}\gui\{#MyAppExeName}"; Parameters: "--gui --cleanup --internal-auth"; Flags: runhidden waituntilterminated; RunOnceId: "FadCryptCleanup"
 
 [Registry]
-; Add FadCrypt to PATH for CLI access
-Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Flags: uninsdeletevalue
-
-; Context menu entries are now handled by the cleanup script, not InnoSetup
-; This prevents conflicts during uninstallation
+; Add CLI directory to PATH for command-line access (fadcrypt --cli from anywhere)
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\cli"; Flags: uninsdeletevalue
 
