@@ -13,11 +13,17 @@
 
 <img src="https://github.com/user-attachments/assets/c730eda3-5887-458d-8df1-971a74807b73" style="width: 100px; height: auto;" >
 
-# FadCrypt
+# `>_` FadCrypt
 
 **Advanced and elegant cross-platform encryption tool – files, folders, and applications all protected with military-grade AES-256-GCM encryption. Open-source, completely free, no telemetry!**
 
-## 🎯 What is FadCrypt?
+[![GitHub all releases](https://img.shields.io/github/downloads/anonfaded/FadCrypt/total?label=Downloads&logo=github)](https://github.com/anonfaded/FadCrypt/releases/)
+[![ko-fi badge](https://img.shields.io/badge/buy_me_a-coffee-red)](https://ko-fi.com/D1D510FNSV)
+[![Discord](https://img.shields.io/discord/1263384048194027520?label=Join%20Us%20on%20Discord&logo=discord)](https://discord.gg/kvAZvdkuuN)
+
+</div>
+
+## `>_` 🎯 What is FadCrypt?
 
 **FadCrypt** is a comprehensive dual-mode security solution that protects both your files and your applications:
 
@@ -39,23 +45,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 - **Cross-Platform:** Windows and Linux desktop platforms with unified CLI and separate optimized GUIs
 - **Military-Grade Encryption:** AES-256-GCM with PBKDF2 key derivation (100,000 iterations)
 - **Fully Encrypted:** Configuration, passwords, and recovery codes are all encrypted
-- **No External Dependencies:** Open-source and completely free with no cloud sync or telemetry
-
-[![GitHub all releases](https://img.shields.io/github/downloads/anonfaded/FadCrypt/total?label=Downloads&logo=github)](https://github.com/anonfaded/FadCrypt/releases/)
-
-[![ko-fi badge](https://img.shields.io/badge/buy_me_a-coffee-red)](https://ko-fi.com/D1D510FNSV)
-[![Discord](https://img.shields.io/discord/1263384048194027520?label=Join%20Us%20on%20Discord&logo=discord)](https://discord.gg/kvAZvdkuuN)
-
-<!-- <img alt="Discord" src="https://img.shields.io/discord/1263384048194027520?style=social&logo=discord&label=Join%20chat&color=red"> -->
-
-<br>
-<br>
-
-</div>
-
-<p align="center">
-        <img src="https://raw.githubusercontent.com/bornmay/bornmay/Update/svg/Bottom.svg" alt="Github Stats" />
-</p>
+- - **No External Dependencies:** Open-source and completely free with no cloud sync or telemetry
 
 ---
 
@@ -82,7 +72,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 
 ---
 
-## 📱 Screenshots
+## `>_` 📱 Screenshots
 
 <div align="center">
 <!--     <img src="https://github.com/anonfaded/FadCam/assets/124708903/4a93c111-fc67-4d75-94b1-fa4e01822998" style="width: 50px; height: auto;" >
@@ -111,7 +101,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
         <img src="/img/5.png" style="width: 700px; height: auto;" >
     </details> -->
     
-## How FadCrypt Works:
+## `>_` How FadCrypt Works:
 
 ### File & Folder Encryption (CLI Mode)
 
@@ -305,7 +295,7 @@ When monitoring (auto-monitor) is enabled:
 
 **Config Protection:** Critical config files are backed up and protected; the daemon manages file immutability and restoration where applicable.
 
-## Password Creation & Setup
+## `>_` Password Creation & Setup
 
 When you first run FadCrypt:
 
@@ -318,13 +308,58 @@ If you forget your password:
 - Use one of the recovery codes to set a new password
 - Each recovery code is single-use; other codes remain valid until used or until you regenerate a fresh set
 
-## ⬇️ Download
+## `>_` ⬇️ Installation & Setup
 
-Download the latest installers from the [releases page](https://github.com/anonfaded/FadCrypt/releases/).
+Download the latest version from the [releases page](https://github.com/anonfaded/FadCrypt/releases/):
 
 [<img src="https://raw.githubusercontent.com/vadret/android/master/assets/get-github.png" alt="Get it on GitHub" height="70">](https://github.com/anonfaded/FadCrypt/releases)
 
-## Features:
+### Windows
+
+1. **Download:** Get the installer from [Releases](https://github.com/anonfaded/FadCrypt/releases)
+2. **Install:** Run `FadCrypt-Setup.exe` and follow the wizard
+3. **Run:** 
+   - Search "FadCrypt" in Start menu and launch, or
+   - Run `fadcrypt` from Command Prompt/PowerShell
+4. **Context Menu:** Right-click files/folders to lock/unlock directly
+
+### Linux
+
+1. **Download & Install:** Get `.deb` from [Releases](https://github.com/anonfaded/FadCrypt/releases), then:
+   ```bash
+   sudo apt install ./fadcrypt_X.Y.Z_amd64.deb
+   ```
+   - The daemon service installs and enables automatically
+   
+2. **Run:** 
+   - Search "FadCrypt" in app menu, or
+   - Run `fadcrypt` from terminal
+
+3. **First Setup:** Set master password and generate recovery codes
+
+<details>
+<summary><strong>ℹ️ Linux-Specific Details</strong></summary>
+
+**Daemon Service:**
+- **Name:** `fadcrypt-elevated.service`
+- **Check status:** `systemctl status fadcrypt-elevated.service`
+- **View logs:** `journalctl -u fadcrypt-elevated.service -f`
+- **Start:** `sudo systemctl start fadcrypt-elevated.service`
+- **Stop:** `sudo systemctl stop fadcrypt-elevated.service`
+
+**File Operations:**
+- Lock: Uses `chmod 000` + `chattr +i` (daemon-managed)
+- Unlock: Restores original permissions
+- Logs: `~/.config/FadCrypt/logs/`
+
+**Socket Communication:**
+- Client-daemon via Unix socket: `/run/fadcrypt/elevated.sock`
+- Auto-retry on connection failure
+- Timeout: 30 seconds per operation
+
+</details>
+
+## `>_` Features:
 
 - **Application Locking:** Secure apps with encrypted password protection; password cannot be recovered if lost and tool cannot be stopped without it.
 - **Real-time File Protection:** Detects and auto-recovers critical files/folders if deleted or modified.
@@ -382,7 +417,7 @@ FadCrypt uses a client-daemon architecture for maximum security:
 ✅ Linux: Root daemon service with Unix socket communication (systemd)
 ✅ Cross-platform (Windows + Linux)
 
-## Command-Line Interface (CLI)
+## `>_` Command-Line Interface (CLI)
 
 FadCrypt provides a complete CLI interface for automation and scripting on both platforms:
 
@@ -487,7 +522,7 @@ The `--1`/`--on` and `--0`/`--off` flags work on **any file or folder**, not jus
 - **Non-Protected (OFF)** - Use when you need flexibility to organize or back up files while keeping them protected.
 - **Immutable Without Encryption** - Use `--1` on regular files when you want read-only protection without encryption overhead.
 
-## Performance
+## `>_` Performance
 
 FadCrypt uses AES-256-GCM encryption with efficient streaming I/O and optimized cryptographic operations. Files are encrypted with authentication to ensure data integrity.
 
@@ -499,59 +534,24 @@ FadCrypt uses AES-256-GCM encryption with efficient streaming I/O and optimized 
 
 > Performance varies based on CPU speed and storage type (SSD/HDD).
 
-### Installation & Setup
-
-#### Windows
-
-1. **Download:** Get the installer from the [releases page](https://github.com/anonfaded/FadCrypt/releases)
-2. **Install:** Run `FadCrypt-Setup.exe` and follow the wizard
-3. **Run:** After installation you can run `fadcrypt` from Command Prompt or PowerShell, or search for "FadCrypt" in the Start menu and launch the GUI app
-4. **Context Menu:** Right-click files/folders to lock/unlock directly (installed by the installer)
-
-#### Linux
-
-1. **Install Package:** `sudo apt install ./fadcrypt_X.Y.Z_amd64.deb` (or use your distribution's package manager for the release package)
-   - The `.deb` package installs and enables the elevated daemon service automatically; no separate manual enable steps are required
-2. **Command:** Run `fadcrypt` from terminal (also available from your desktop launcher after installation)
-3. **First Run:** Set master password and generate recovery codes
-
-### Linux-Specific Notes
-
-**Daemon Service:**
-- **Name:** `fadcrypt-elevated.service`
-- **Status:** Check with `systemctl status fadcrypt-elevated.service`
-- **Logs:** View with `journalctl -u fadcrypt-elevated.service -f`
-- **Manual Start:** `sudo systemctl start fadcrypt-elevated.service`
-- **Manual Stop:** `sudo systemctl stop fadcrypt-elevated.service`
-
-**File Operations:**
-- Lock operations use `chmod 000` + `chattr +i` (managed by daemon)
-- Unlock operations restore original permissions
-- All operations logged to `~/.config/FadCrypt/logs/`
-
-**Socket Communication:**
-- Client-server via Unix socket: `/run/fadcrypt/elevated.sock`
-- Automatic retry on connection failure
-- Timeout: 30 seconds per operation
-
-## Featured On
+## `>_` Featured On
 
 - [VPN Club on Telegram](https://t.me/s/wbnet?q=fadcrypt)
 - [popMods on Telegram](https://t.me/s/popmods?q=fadcrypt)
 - [blog.csdn.net](https://blog.csdn.net/qq_29607687/article/details/141366524)
 <!-- - [rhkb.cn](http://www.rhkb.cn/news/405585.html) -->
 
-## Join Community
+## `>_` Join Community
 
 Join our [Discord server](https://discord.gg/kvAZvdkuuN) to share ideas, seek help, or connect with other users. Your feedback and contributions are welcome!
 
 [![Discord](https://img.shields.io/discord/1263384048194027520?label=Join%20Us%20on%20Discord&logo=discord)](https://discord.gg/kvAZvdkuuN)
 
-## Support
+## `>_` Support
 
 <a href='https://ko-fi.com/D1D510FNSV' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi3.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
-## Contributions
+## `>_` Contributions
 
 We welcome any contributions to improve this project! Whether it's bug fixes or new features, your help is appreciated.
 
@@ -569,61 +569,69 @@ We welcome any contributions to improve this project! Whether it's bug fixes or 
 
 We look forward to your contributions!
 
-# Install Dependencies & Build
+# `>_` Install Dependencies & Build
 
-**Linux Prerequisites:**
+## `>_` Prerequisites
 
-**Note for Emoji Rendering:** If emojis appear as white outline glyphs instead of colored emojis in your terminal, install GNOME Terminal and set it as the default:
-
-```bash
-sudo apt install gnome-terminal
-sudo update-alternatives --config x-terminal-emulator
-# Select gnome-terminal from the list
+Install Python dependencies:
 ```
 
-This ensures proper color emoji rendering in CLI verbose output.
+<details>
+<summary><strong>📦 Build Instructions (Windows & Linux)</strong></summary>
 
-**Install Python Dependencies:**
+## `>_` Windows Build
 
-You can install all required Python packages using pip:
+See [`BUILD_WINDOWS.md`](BUILD_WINDOWS.md) for detailed instructions.
 
-```bash
-pip install -r requirements.txt
+**Quick start:**
+```powershell
+.\build-windows.ps1
 ```
 
-**Build the Application:**
+This will:
+- Build GUI executable
+- Build CLI executable  
+- Create installer with Inno Setup
 
-For Windows:
+## `>_` Linux Build
 
+See [`BUILD_LINUX.md`](BUILD_LINUX.md) for detailed instructions.
+
+**Quick start:**
 ```bash
-python -m PyInstaller FadCrypt.spec
+chmod +x build-deb.sh
+./build-deb.sh
 ```
 
-For Linux:
+This will:
+- Build GUI and CLI executables
+- Create .deb package
+- Install daemon service automatically
 
-```bash
-python3 -m PyInstaller FadCrypt_Linux.spec
-```
+</details>
 
-**Linux .deb Package Installation:**
+## `>_` Quick Start
 
-For the best Linux experience, use the pre-built .deb package:
+Ready to use FadCrypt? Download pre-built binaries from [Releases](https://github.com/anonfaded/FadCrypt/releases)
 
-```bash
-# Download from releases and install
-sudo dpkg -i fadcrypt_X.X.X_amd64.deb
+Or build from source using the instructions above.
 
-# Daemon service installs and starts automatically
-# No additional configuration needed
-```
+## `>_` License & Commercial Use
 
-Includes: Main application, elevated daemon service, desktop integration, automatic cleanup.
+**FadCrypt is open-source under the GNU General Public License v3.0 (GPLv3).**
 
-## Development Testing
+**Need a commercial license?** 
+If you want to use FadCrypt without GPLv3 requirements, 
+contact us for commercial licensing terms.
 
-For developers testing context menu functionality without full registry integration, FadCrypt provides special testing flags:
+📧 Email: fadedhood@proton.me
 
-### Context Menu Test Flags
+<details>
+<summary><strong>🧪 Development Testing</strong></summary>
+
+## Context Menu Test Flags
+
+For developers testing context menu functionality without full registry integration:
 
 ```bash
 # Test lock operation (single file)
@@ -660,51 +668,42 @@ python FadCrypt.py --test-context-lock "file1.txt" "file2.txt" "file3.txt"
 # All files will be processed and encrypted with progress updates
 ```
 
-# Reset Password
+</details>
 
-Follow the steps below to regain access to FadCrypt, or download the guide as a PDF for reference:  
-[FadCrypt_Reset_Password_Guide.pdf](https://github.com/user-attachments/files/19832431/FadCrypt_Reset_Password_Guide.pdf)
+<details>
+<summary><strong>🔑 Reset Password</strong></summary>
+
+Follow these steps to regain access to FadCrypt:
 
 ## 1. Terminate the app processes (if running)
 
-1. Open the search box: `Windows key + S`
-2. Type **"PowerShell"**, right-click, and select **"Run as administrator"**
-3. In the PowerShell window, enter the following command to kill all running instances of FadCrypt:
+**Windows:**
+1. Open PowerShell as Administrator: `Windows key + S` → type "PowerShell" → right-click → "Run as administrator"
+2. Run:
+   ```powershell
+   Stop-Process -Name "fadcrypt" -Force
+   ```
 
-```powershell
-Stop-Process -Name "fadcrypt" -Force
+**Linux:**
+```bash
+killall fadcrypt fadcrypt-cli
 ```
 
 ## 2. Delete the password binary file
 
-_(This allows you to create a new password without needing the old one)_
-
-**On Windows:**
-
-1. Navigate to and delete the following file:
-
+**Windows:**
+Delete these files:
 ```
 C:\Users\<YourUsername>\AppData\Roaming\FadCrypt\encrypted_password.bin
-```
-
-2. Also delete the backup copy from:
-
-```
 C:\ProgramData\FadCrypt\Backup\encrypted_password.bin
 ```
 
-**On Linux:**
-
-1. Navigate to and delete the following file:
-
-```
-~/.FadCrypt/encrypted_password.bin
+**Linux:**
+```bash
+rm ~/.config/FadCrypt/encrypted_password.bin
+rm ~/.local/share/FadCrypt/Backup/encrypted_password.bin
 ```
 
-2. Also delete the backup copy from:
+Now reopen FadCrypt and set a new password!
 
-```
-~/.local/share/FadCrypt/Backup/encrypted_password.bin
-```
-
-Now you can open the app again and set a new password — it'll work like a charm!
+</details>
