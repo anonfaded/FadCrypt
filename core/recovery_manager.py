@@ -190,10 +190,14 @@ class RecoveryCodeManager:
                     'created_at': datetime.now().isoformat()
                 })
             
-            # Save to file (plain JSON, no encryption needed)
+            # Save to file using safe write (plain JSON, no encryption needed)
             # The hashes are useless without the actual codes
-            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
-                json.dump(recovery_data, f, indent=2)
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(recovery_data, indent=2)
+            success, error = safe_write_to_protected_file(self.recovery_codes_file, content)
+            if not success:
+                vlog(f"[RecoveryCodeManager] ❌ Failed to write recovery codes: {error}")
+                return False, None
             
             vlog(f"[RecoveryCodeManager] ✅ Created {len(codes)} recovery codes with secure hashes")
             vlog(f"[RecoveryCodeManager] Hash algorithm: PBKDF2-HMAC-SHA256 ({self.HASH_ITERATIONS} iterations)")
@@ -319,9 +323,14 @@ class RecoveryCodeManager:
             if not code_found:
                 return False, "Recovery code not found"
             
-            # Save updated data
-            with open(self.recovery_codes_file, 'w', encoding='utf-8') as f:
-                json.dump(recovery_data, f, indent=2)
+            # Save updated data using safe write to handle file permissions
+            from core.file_protection import safe_write_to_protected_file
+            content = json.dumps(recovery_data, indent=2)
+            success, error = safe_write_to_protected_file(self.recovery_codes_file, content)
+            if not success:
+                from core.verbose_logger import vlog
+                vlog(f"[RecoveryCodeManager] ❌ Failed to write recovery codes: {error}")
+                return False, error
             
             from core.verbose_logger import vlog
             vlog("[RecoveryCodeManager] Recovery code marked as used")

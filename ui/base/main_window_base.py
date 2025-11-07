@@ -1498,6 +1498,7 @@ class MainWindowBase(QMainWindow):
     def save_settings(self, settings):
         """Save UI settings to settings.json (encryption is now handled separately in apps_config.json)"""
         import json
+        from core.file_protection import safe_write_to_protected_file
         
         fadcrypt_folder = self.get_fadcrypt_folder()
         settings_file = os.path.join(fadcrypt_folder, 'settings.json')
@@ -1505,9 +1506,12 @@ class MainWindowBase(QMainWindow):
         try:
             # Save general settings (dialog_style, wallpaper, file_protection_enabled, etc.)
             # NOTE: encryption_enabled is NO LONGER stored here - it's unified in apps_config.json
-            with open(settings_file, 'w') as f:
-                json.dump(settings, f, indent=4)
-            print(f"Settings saved to {settings_file}")
+            content = json.dumps(settings, indent=4)
+            success, error_msg = safe_write_to_protected_file(settings_file, content)
+            if success:
+                print(f"Settings saved to {settings_file}")
+            else:
+                print(f"Error saving settings: {error_msg}")
                 
         except Exception as e:
             print(f"Error saving settings: {e}")
