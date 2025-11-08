@@ -65,6 +65,12 @@ class MainWindowWindows(MainWindowBase):
         """Check if autostart registry entry exists and points to valid executable"""
         if not WINDOWS_AVAILABLE:
             return
+        
+        # Only validate registry entries on frozen (compiled) builds
+        # During development, registry updates should only happen via explicit user action
+        if not getattr(sys, 'frozen', False):
+            print("[MainWindowWindows] Skipping autostart registry validation (development mode)")
+            return
             
         try:
             # Check if autostart is currently enabled
@@ -81,12 +87,8 @@ class MainWindowWindows(MainWindowBase):
                     current_value, _ = winreg.QueryValueEx(key, "FadCrypt")
                     winreg.CloseKey(key)
                     
-                    # Get what the registry value should be
-                    if getattr(sys, 'frozen', False):
-                        expected_exec_path = sys.executable
-                    else:
-                        expected_exec_path = f'pythonw "{os.path.abspath(sys.argv[0])}"'
-                    
+                    # Get what the registry value should be (frozen build only at this point)
+                    expected_exec_path = sys.executable
                     expected_value = f'"{expected_exec_path}" --auto-monitor'
                     
                     # If registry doesn't match current executable, update it
@@ -130,17 +132,24 @@ class MainWindowWindows(MainWindowBase):
             )
             return False
         
+        # Prevent autostart configuration in development mode
+        # Autostart should only work with frozen (compiled) executables
+        if not getattr(sys, 'frozen', False):
+            if enable:
+                QMessageBox.warning(
+                    self,
+                    "Development Mode",
+                    "Autostart can only be configured with the compiled FadCrypt.exe.\n\n"
+                    "Please build FadCrypt using: python -m PyInstaller FadCrypt.spec"
+                )
+            return False
+        
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         value_name = "FadCrypt"
         
         try:
-            # Get the path to the executable
-            if getattr(sys, 'frozen', False):
-                # Running as PyInstaller bundle
-                exec_path = sys.executable
-            else:
-                # Running as script - use pythonw to avoid console
-                exec_path = f'pythonw "{os.path.abspath(sys.argv[0])}"'
+            # Running as PyInstaller bundle (guaranteed by frozen check above)
+            exec_path = sys.executable
             
             # Add --auto-monitor flag
             exec_command = f'"{exec_path}" --auto-monitor'

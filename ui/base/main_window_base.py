@@ -2475,22 +2475,31 @@ class MainWindowBase(QMainWindow):
         # Check if password is set (overall security requirement)
         password_file = os.path.join(self.get_fadcrypt_folder(), "encrypted_password.bin")
         if not os.path.exists(password_file):
-            self.show_message(
-                "Hey!",
-                "Please set your password, and I'll enjoy some biryani 🍚.\nBy the way, do you like biryani as well?",
-                "info"
-            )
+            error_msg = "Password not set - cannot start monitoring"
+            if self.auto_monitor_mode:
+                print(f"[Auto-Monitor] {error_msg}")
+            else:
+                self.show_message(
+                    "Hey!",
+                    "Please set your password, and I'll enjoy some biryani 🍚.\nBy the way, do you like biryani as well?",
+                    "info"
+                )
             return
 
         # Check if any apps are added (file/folder management is CLI-only, not monitored in UI)
         apps_count = len(self.app_list_widget.apps_data) if self.app_list_widget.apps_data else 0
 
         if apps_count == 0:
-            self.show_message(
-                "No Applications to Monitor",
-                "Please add applications to monitor first.\nFiles and folders are managed via CLI (fadcrypt --lock/unlock).",
-                "info"
-            )
+            error_msg = "No applications to monitor - monitoring will not start"
+            if self.auto_monitor_mode:
+                print(f"[Auto-Monitor] {error_msg}")
+                print("[Auto-Monitor] ⚠️  Tip: Add applications in FadCrypt GUI to enable monitoring on next boot")
+            else:
+                self.show_message(
+                    "No Applications to Monitor",
+                    "Please add applications to monitor first.\nFiles and folders are managed via CLI (fadcrypt --lock/unlock).",
+                    "info"
+                )
             return
 
         # Prepare applications list for monitoring

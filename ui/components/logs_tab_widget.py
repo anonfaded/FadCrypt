@@ -127,13 +127,21 @@ class TeeOutput:
     
     def write(self, text):
         if self.original is not None:
-            self.original.write(text)
-            self.original.flush()
+            try:
+                self.original.write(text)
+                self.original.flush()
+            except (OSError, ValueError) as e:
+                # Silently ignore flush errors (stream might be in invalid state)
+                pass
         self.buffer.write(text)
     
     def flush(self):
         if self.original is not None:
-            self.original.flush()
+            try:
+                self.original.flush()
+            except (OSError, ValueError):
+                # Silently ignore flush errors
+                pass
 
 
 class LogsTabWidget(QWidget):

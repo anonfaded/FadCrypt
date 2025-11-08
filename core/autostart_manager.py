@@ -203,7 +203,7 @@ class AutostartManagerWindows(AutostartManagerBase):
             if with_monitoring:
                 exec_command += " --auto-monitor"
             
-            # Open registry key
+            # 1. Set the Run registry key (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
             key = self.winreg.OpenKey(
                 self.winreg.HKEY_CURRENT_USER,
                 self.reg_path,
@@ -211,7 +211,6 @@ class AutostartManagerWindows(AutostartManagerBase):
                 self.winreg.KEY_SET_VALUE
             )
             
-            # Set value
             self.winreg.SetValueEx(
                 key,
                 self.app_name,
@@ -221,7 +220,41 @@ class AutostartManagerWindows(AutostartManagerBase):
             )
             
             self.winreg.CloseKey(key)
-            print(f"[AutostartManager] Autostart enabled in registry")
+            
+            # 2. Set the StartupApproved entry to enable it in Task Manager
+            # This is required for Windows to actually run the startup entry
+            # Value format: Binary REG_BINARY with specific byte pattern for "enabled"
+            # Enabled = 02 00 00 00 ... (first byte is 0x02 for enabled)
+            try:
+                approval_path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
+                approval_key = self.winreg.OpenKey(
+                    self.winreg.HKEY_CURRENT_USER,
+                    approval_path,
+                    0,
+                    self.winreg.KEY_SET_VALUE
+                )
+                
+                # Create approval value: enabled = 0x02, then zeros
+                # The value needs to be long enough (typically 12 bytes for app names)
+                app_name_bytes = self.app_name.encode('utf-8')
+                approval_value = bytes([0x02]) + bytes(11)  # 0x02 = enabled, rest zeros
+                
+                self.winreg.SetValueEx(
+                    approval_key,
+                    self.app_name,
+                    0,
+                    self.winreg.REG_BINARY,
+                    approval_value
+                )
+                
+                self.winreg.CloseKey(approval_key)
+                print(f"[AutostartManager] ✓ Autostart enabled in Run registry")
+                print(f"[AutostartManager] ✓ StartupApproved entry created (Task Manager will show as enabled)")
+                
+            except Exception as approval_error:
+                print(f"[AutostartManager] Warning: Could not create StartupApproved entry: {approval_error}")
+                print(f"[AutostartManager] Note: Autostart will still work, but Task Manager may show as disabled")
+            
             return True
             
         except Exception as e:
@@ -230,7 +263,7 @@ class AutostartManagerWindows(AutostartManagerBase):
     
     def disable_autostart(self) -> bool:
         """
-        Disable autostart by removing registry key.
+        Disable autostart by removing registry keys.
         
         Returns:
             True if autostart disabled successfully, False otherwise
@@ -240,7 +273,7 @@ class AutostartManagerWindows(AutostartManagerBase):
             return False
         
         try:
-            # Open registry key
+            # 1. Remove from Run registry key
             key = self.winreg.OpenKey(
                 self.winreg.HKEY_CURRENT_USER,
                 self.reg_path,
@@ -251,11 +284,33 @@ class AutostartManagerWindows(AutostartManagerBase):
             # Delete value
             try:
                 self.winreg.DeleteValue(key, self.app_name)
-                print(f"[AutostartManager] Autostart disabled in registry")
+                print(f"[AutostartManager] ✓ Autostart disabled in Run registry")
             except FileNotFoundError:
-                print("[AutostartManager] Autostart was not enabled")
+                print("[AutostartManager] Autostart was not enabled in Run registry")
             
             self.winreg.CloseKey(key)
+            
+            # 2. Remove from StartupApproved registry key
+            try:
+                approval_path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
+                approval_key = self.winreg.OpenKey(
+                    self.winreg.HKEY_CURRENT_USER,
+                    approval_path,
+                    0,
+                    self.winreg.KEY_SET_VALUE
+                )
+                
+                try:
+                    self.winreg.DeleteValue(approval_key, self.app_name)
+                    print(f"[AutostartManager] ✓ Autostart disabled in StartupApproved")
+                except FileNotFoundError:
+                    pass  # Already not in StartupApproved
+                
+                self.winreg.CloseKey(approval_key)
+                
+            except Exception as approval_error:
+                print(f"[AutostartManager] Warning: Could not remove StartupApproved entry: {approval_error}")
+            
             return True
             
         except Exception as e:
