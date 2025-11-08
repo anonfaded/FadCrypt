@@ -96,6 +96,27 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <img src="img/demo/gui/windows_contextmenu.png" style="width: 600px; height: auto;" >
 <br><em>Context Menu - Right-click to lock files and folders directly (Windows only)</em>
 
+<img src="img/demo/gui/configtab.png" style="width: 600px; height: auto;" >
+<br><em>Config Tab - Application configuration and their paths</em>
+
+<img src="img/demo/gui/statswindow.png" style="width: 600px; height: auto;" >
+<br><em>Statistics Window - Monitor app lock/unlock activity and statistics like FadCrypt uptime</em>
+
+<img src="img/demo/gui/fadguidetab1.png" style="width: 600px; height: auto;" >
+<br><em>FadGuide Tab 1 - Interactive tutorial and feature guide for FadCrypt command line usage</em>
+
+<img src="img/demo/gui/fadguidetab2.png" style="width: 600px; height: auto;" >
+<br><em>FadGuide Tab 2 - Continued tutorial with more information</em>
+
+<img src="img/preview1.png" style="width: 600px; height: auto;" >
+<br><em>Password Dialog Simple - Password entry prompt for app authentication</em>
+
+<img src="img/preview2.png" style="width: 600px; height: auto;" >
+<br><em>Password Prompt Fullscreen - Immersive password entry with wallpaper background</em>
+
+<img src="img/demo/gui/readme.png" style="width: 600px; height: auto;" >
+<br><em>README Info - Application information and documentation display</em>
+
 <img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
 <br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
 
@@ -112,7 +133,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <br><em>Lock Screen - Select files and folders to encrypt</em>
 
 <img src="img/demo/cli/passwordprompt.png" style="width: 600px; height: auto;" >
-<br><em>Password Prompt - Secure master password entry with visual feedback</em>
+<br><em>Password Prompt - Password entry with visual feedback</em>
 
 <img src="img/demo/cli/lock-confirmation.png" style="width: 600px; height: auto;" >
 <br><em>Lock Confirmation - Review and confirm file encryption details</em>
