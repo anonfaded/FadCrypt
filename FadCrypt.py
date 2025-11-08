@@ -1942,15 +1942,33 @@ def handle_direct_cli_commands():
         
         for path in paths:
             try:
+                # For relative paths, resolve them from the user's current working directory (PWD env var)
+                # This is needed because the process may start with a different cwd than the user's shell
+                if not os.path.isabs(path):
+                    user_cwd = os.environ.get('PWD', os.getcwd())
+                    abs_path = os.path.abspath(os.path.join(user_cwd, path))
+                else:
+                    abs_path = os.path.abspath(path)
+                
+                if VERBOSE_MODE:
+                    print(f"[TOGGLE] Input path: {path}")
+                    print(f"[TOGGLE] User PWD: {os.environ.get('PWD', 'not set')}")
+                    print(f"[TOGGLE] Absolute path: {abs_path}")
+                
                 # Use lexists() instead of exists() because protected folders (chmod 000) 
                 # are inaccessible but still exist on the filesystem
-                if not os.path.lexists(path):
+                if not os.path.lexists(abs_path):
+                    if VERBOSE_MODE:
+                        print(f"[TOGGLE] Path check failed with lexists(): {abs_path}")
                     print_error(f"✗ Path does not exist: {path}")
                     failed_count += 1
                     continue
                 
+                if VERBOSE_MODE:
+                    print(f"[TOGGLE] Path exists, checking protection state...")
+                
                 # Check current protection state
-                current_protected_state = cli_handler.is_tamper_proof_enabled(path)
+                current_protected_state = cli_handler.is_tamper_proof_enabled(abs_path)
                 
                 # Only toggle if state is different from desired state
                 if current_protected_state == toggle_mode:
@@ -1958,7 +1976,7 @@ def handle_direct_cli_commands():
                     continue
                 
                 # Toggle protection
-                if cli_handler.toggle_tamper_proof(path, toggle_mode):
+                if cli_handler.toggle_tamper_proof(abs_path, toggle_mode):
                     toggled_paths.append(os.path.basename(path))
                     toggled_count += 1
                 else:
