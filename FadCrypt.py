@@ -462,32 +462,64 @@ if '--context-lock' in sys.argv or '--context-unlock' in sys.argv:
         if '--context-lock' in sys.argv:
             idx = sys.argv.index('--context-lock')
             if idx + 1 < len(sys.argv):
-                # Get all paths after --context-lock (support batch operations)
-                paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
-                if not paths:
-                    safe_print(f"[CONTEXT MENU] No paths provided")
-                    sys.exit(1)
+                # Get the first path after --context-lock
+                first_path = sys.argv[idx + 1]
                 
-                safe_print(f"[CONTEXT MENU] Locking {len(paths)} item(s): {paths}")
-                from core.windows.cli_lock_handler import lock_multiple_with_password
-                success, info = lock_multiple_with_password(paths)
-                safe_print(f"[CONTEXT MENU] Lock result: {success}")
-                sys.exit(0 if success else 1)
+                # Use batch coordinator to handle multiple context menu calls
+                if platform.system() == 'Windows':
+                    from core.windows.batch_coordinator import coordinate_batch_operation
+                    paths, should_show_ui = coordinate_batch_operation('lock', first_path)
+                else:
+                    # On Linux, no batch coordination needed (uses symlink approach)
+                    paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+                    should_show_ui = True
+                
+                # Only show UI and process if this is the primary caller
+                if should_show_ui:
+                    if not paths:
+                        safe_print(f"[CONTEXT MENU] No paths provided")
+                        sys.exit(1)
+                    
+                    safe_print(f"[CONTEXT MENU] Locking {len(paths)} item(s): {paths}")
+                    from core.windows.cli_lock_handler import lock_multiple_with_password
+                    success, info = lock_multiple_with_password(paths)
+                    safe_print(f"[CONTEXT MENU] Lock result: {success}")
+                    sys.exit(0 if success else 1)
+                else:
+                    # Secondary caller - wait for primary to complete
+                    safe_print(f"[CONTEXT MENU] Waiting for primary caller to process batch...")
+                    sys.exit(0)
         
         elif '--context-unlock' in sys.argv:
             idx = sys.argv.index('--context-unlock')
             if idx + 1 < len(sys.argv):
-                # Get all paths after --context-unlock (support batch operations)
-                paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
-                if not paths:
-                    safe_print(f"[CONTEXT MENU] No paths provided")
-                    sys.exit(1)
+                # Get the first path after --context-unlock
+                first_path = sys.argv[idx + 1]
                 
-                safe_print(f"[CONTEXT MENU] Unlocking {len(paths)} item(s): {paths}")
-                from core.windows.cli_lock_handler import unlock_multiple_with_password
-                success, info = unlock_multiple_with_password(paths)
-                safe_print(f"[CONTEXT MENU] Unlock result: {success}")
-                sys.exit(0 if success else 1)
+                # Use batch coordinator to handle multiple context menu calls
+                if platform.system() == 'Windows':
+                    from core.windows.batch_coordinator import coordinate_batch_operation
+                    paths, should_show_ui = coordinate_batch_operation('unlock', first_path)
+                else:
+                    # On Linux, no batch coordination needed
+                    paths = [arg for arg in sys.argv[idx + 1:] if not arg.startswith('--')]
+                    should_show_ui = True
+                
+                # Only show UI and process if this is the primary caller
+                if should_show_ui:
+                    if not paths:
+                        safe_print(f"[CONTEXT MENU] No paths provided")
+                        sys.exit(1)
+                    
+                    safe_print(f"[CONTEXT MENU] Unlocking {len(paths)} item(s): {paths}")
+                    from core.windows.cli_lock_handler import unlock_multiple_with_password
+                    success, info = unlock_multiple_with_password(paths)
+                    safe_print(f"[CONTEXT MENU] Unlock result: {success}")
+                    sys.exit(0 if success else 1)
+                else:
+                    # Secondary caller - wait for primary to complete
+                    safe_print(f"[CONTEXT MENU] Waiting for primary caller to process batch...")
+                    sys.exit(0)
     except Exception as e:
         safe_print(f"[CLI] Error: {e}")
         import traceback
@@ -554,6 +586,54 @@ if '--cleanup' in sys.argv:
             fadcrypt_folder = os.path.join(user_home, '.config', 'FadCrypt')
             fadcrypt_backup_folder = os.path.join(user_home, '.local', 'share', 'FadCrypt', 'Backup')
             
+            # CRITICAL: Remove all locks before deleting data directories
+            print("[CLEANUP] Removing locks from all locked items...", flush=True)
+            try:
+                config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+                
+                if os.path.exists(config_file):
+                    import json
+                    # Read and close file immediately to release handle
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                    
+                    locked_items = config.get("locked_files_and_folders", [])
+                    if locked_items:
+                        print(f"[CLEANUP] Found {len(locked_items)} locked items", flush=True)
+                        
+                        # Create a temporary file lock manager to unlock items
+                        from core.linux.file_lock_manager_linux import FileLockManagerLinux
+                        lock_manager = FileLockManagerLinux(fadcrypt_folder)
+                        
+                        unlocked_count = 0
+                        for item in locked_items:
+                            try:
+                                item_path = item.get('path', '')
+                                item_name = item.get('name', os.path.basename(item_path))
+                                if lock_manager.remove_item(item_path):
+                                    print(f"[CLEANUP] ✓ Unlocked: {item_name}", flush=True)
+                                    unlocked_count += 1
+                                else:
+                                    print(f"[CLEANUP] ⚠ Could not unlock: {item_name}", flush=True)
+                            except Exception as e:
+                                print(f"[CLEANUP] Warning: Error unlocking item: {e}", flush=True)
+                        
+                        if unlocked_count > 0:
+                            print(f"[CLEANUP] Successfully unlocked {unlocked_count}/{len(locked_items)} items", flush=True)
+                        
+                        # Force garbage collection to release any remaining handles
+                        import gc
+                        gc.collect()
+                        
+                    else:
+                        print("[CLEANUP] No locked items found", flush=True)
+                else:
+                    print("[CLEANUP] Config file not found, skipping unlock", flush=True)
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not unlock items: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+            
             # CRITICAL: Remove immutable flags before deletion (files may have chattr +i from file protection)
             folders_to_clean = [
                 fadcrypt_folder,
@@ -578,7 +658,7 @@ if '--cleanup' in sys.argv:
                             print("[CLEANUP] [WARN] Could not remove immutable flags via chattr", flush=True)
                             print(f"[CLEANUP]     Note: Daemon will handle cleanup when service stops", flush=True)
                     except Exception as e:
-                        print("[CLEANUP] [WARN] Warning: Could not remove immutable flags: {e}", flush=True)
+                        print(f"[CLEANUP] [WARN] Warning: Could not remove immutable flags: {e}", flush=True)
             
             # Remove all FadCrypt config and backup folders
             folders_to_remove = [
@@ -800,6 +880,60 @@ if '--cleanup' in sys.argv:
             
             print(f"[CLEANUP] OK Restored {restored_count} Windows settings", flush=True)
             
+            # CRITICAL: Remove all locks before deleting data directories
+            print("[CLEANUP] Removing locks from all locked items...", flush=True)
+            try:
+                appdata = os.environ.get('APPDATA', '')
+                config_file = os.path.join(appdata, 'FadCrypt', 'config', 'apps_config.json')
+                
+                if os.path.exists(config_file):
+                    import json
+                    # Read and close file immediately to release handle
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                    
+                    locked_items = config.get("locked_files_and_folders", [])
+                    if locked_items:
+                        print(f"[CLEANUP] Found {len(locked_items)} locked items", flush=True)
+                        
+                        # Create a temporary file lock manager to unlock items
+                        from core.windows.file_lock_manager_windows import FileLockManagerWindows
+                        temp_config = os.path.join(appdata, 'FadCrypt', 'config')
+                        lock_manager = FileLockManagerWindows(temp_config)
+                        
+                        unlocked_count = 0
+                        for item in locked_items:
+                            try:
+                                item_path = item.get('path', '')
+                                item_name = item.get('name', os.path.basename(item_path))
+                                if lock_manager.remove_item(item_path):
+                                    print(f"[CLEANUP] ✓ Unlocked: {item_name}", flush=True)
+                                    unlocked_count += 1
+                                else:
+                                    print(f"[CLEANUP] ⚠ Could not unlock: {item_name}", flush=True)
+                            except Exception as e:
+                                print(f"[CLEANUP] Warning: Error unlocking item: {e}", flush=True)
+                        
+                        if unlocked_count > 0:
+                            print(f"[CLEANUP] Successfully unlocked {unlocked_count}/{len(locked_items)} items", flush=True)
+                        
+                        # Force garbage collection to release any remaining handles
+                        import gc
+                        gc.collect()
+                        
+                    else:
+                        print("[CLEANUP] No locked items found", flush=True)
+                else:
+                    print("[CLEANUP] Config file not found, skipping unlock", flush=True)
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not unlock items: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+            
+            # Give system time to release file handles
+            import time
+            time.sleep(0.5)
+            
             # Remove FadCrypt data directories
             print("[CLEANUP] Removing FadCrypt data directories...", flush=True)
             import shutil
@@ -821,14 +955,70 @@ if '--cleanup' in sys.argv:
             for data_dir in data_dirs_to_remove:
                 if os.path.exists(data_dir):
                     try:
+                        # Step 0: Close all handles by using handle locking tools
+                        try:
+                            subprocess.run(
+                                ['powershell', '-Command', f'Get-Item \"{data_dir}\" | %{{$_.Attributes = \"Normal\"}}'],
+                                capture_output=True,
+                                timeout=10
+                            )
+                        except:
+                            pass
+                        
+                        # Step 1: Remove all file attributes (read-only, system, hidden)
+                        try:
+                            subprocess.run(
+                                ['attrib', '-r', '-s', '-h', data_dir, '/S', '/D'],
+                                capture_output=True,
+                                timeout=30
+                            )
+                        except:
+                            pass
+                        
+                        # Step 2: Reset ACL locks recursively
+                        try:
+                            subprocess.run(
+                                ['icacls', data_dir, '/reset', '/T', '/C'],
+                                capture_output=True,
+                                timeout=30
+                            )
+                        except:
+                            pass
+                        
+                        # Step 3: Grant full control to current user for deletion
+                        try:
+                            import getpass
+                            current_user = getpass.getuser()
+                            subprocess.run(
+                                ['icacls', data_dir, '/grant', f'{current_user}:(F)', '/T', '/C'],
+                                capture_output=True,
+                                timeout=30
+                            )
+                        except:
+                            pass
+                        
+                        # Step 4: Attempt deletion
                         shutil.rmtree(data_dir)
-                        print("[CLEANUP] [OK] Removed data directory: {data_dir}", flush=True)
+                        print(f"[CLEANUP] [OK] Removed data directory: {data_dir}", flush=True)
                         removed_count += 1
                     except Exception as e:
-                        print("[CLEANUP] [WARN] Warning: Could not remove {data_dir}: {e}", flush=True)
+                        print(f"[CLEANUP] [WARN] Warning: Could not remove {data_dir}: {e}", flush=True)
+                        # Try forceful deletion using cmd.exe as fallback
+                        try:
+                            print(f"[CLEANUP] Attempting forceful deletion via cmd.exe...", flush=True)
+                            subprocess.run(
+                                ['cmd.exe', '/c', 'rmdir', '/s', '/q', data_dir],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            if not os.path.exists(data_dir):
+                                print(f"[CLEANUP] [OK] Forcefully removed data directory: {data_dir}", flush=True)
+                                removed_count += 1
+                        except Exception as e2:
+                            print(f"[CLEANUP] [WARN] Forceful deletion also failed: {e2}", flush=True)
             
             if removed_count > 0:
-                print("[CLEANUP] [OK] Removed {removed_count} data directories", flush=True)
+                print(f"[CLEANUP] [OK] Removed {removed_count} data directories", flush=True)
             else:
                 print("[CLEANUP] [INFO] No data directories found to remove", flush=True)
             
