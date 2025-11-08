@@ -55,19 +55,40 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <br>
 
 - [FadCrypt](#fadcrypt)
-  - [📱 Screenshots](#-screenshots)
+  - [🎯 What is FadCrypt?](#-what-is-fadcrypt)
+    - [�️ GUI Mode: Application Locking](#️-gui-mode-application-locking)
+    - [💾 CLI Mode: File & Folder Encryption](#-cli-mode-file--folder-encryption)
+  - [�📱 Screenshots](#-screenshots)
+    - [🖥️ GUI Mode - Application Locking](#️-gui-mode---application-locking)
+    - [💻 CLI/TUI Mode - File & Folder Encryption](#-clutui-mode---file--folder-encryption)
   - [How FadCrypt Works:](#how-fadcrypt-works)
-  - [⬇️ Download](#️-download)
-  - [Features:](#features)
-  - [Featured On](#featured-on)
-  - [Join Community](#join-community)
-  - [Support](#support)
-  - [Contributions](#contributions)
+    - [File & Folder Encryption (CLI Mode)](#file--folder-encryption-cli-mode)
+    - [Application Locking (GUI Mode)](#application-locking-gui-mode)
+    - [Core Encryption Technology (Both Modes)](#core-encryption-technology-both-modes)
+    - [Platform-Specific Implementation](#platform-specific-implementation)
+    - [Unified CLI Interface (Both Platforms)](#unified-cli-interface-both-platforms)
+    - [Password & Recovery System (Both Platforms)](#password--recovery-system-both-platforms)
+    - [Monitoring Mode (Both Platforms)](#monitoring-mode-both-platforms)
+    - [Security Features (Both Platforms)](#security-features-both-platforms)
+  - [Password Creation & Setup](#-password-creation--setup)
+  - [⬇️ Installation & Setup](#️-installation--setup)
+    - [Windows](#windows)
+    - [Linux](#linux)
+    - [ℹ️ Linux-Specific Details](#️-linux-specific-details)
+  - [Features:](#-features)
+  - [Command-Line Interface (CLI)](#️-command-line-interface-cli)
+    - [Usage Examples](#usage-examples)
+    - [CLI Features](#cli-features)
+    - [Tamper-Proof Protection Control](#tamper-proof-protection-control)
+  - [Performance](#️-performance)
+  - [Featured On](#️-featured-on)
+  - [Join Community](#️-join-community)
+  - [Support](#️-support)
+  - [Contributions](#️-contributions)
     - [How to Contribute](#how-to-contribute)
-- [Install Dependencies \& Build](#install-dependencies--build)
-- [Reset Password](#reset-password)
-  - [1. Terminate the app processes (if running)](#1-terminate-the-app-processes-if-running)
-  - [2. Delete the password binary file](#2-delete-the-password-binary-file)
+  - [Install Dependencies & Build](#️-install-dependencies--build)
+    - [📦 Build Instructions (Windows & Linux)](#-build-instructions-windows--linux)
+  - [Reset Password](#-reset-password)
 </details>
 
 ---
@@ -76,78 +97,58 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 
 ### 🖥️ GUI Mode - Application Locking
 
-<div align="center">
-
-<img src="img/demo/gui/hometab.png" style="width: 600px; height: auto;" >
-<br><em>Home Tab - Dashboard with buttons</em>
-
-<img src="img/demo/gui/applicationstab.png" style="width: 600px; height: auto;" >
-<br><em>Applications Tab - Lock and manage installed applications/software</em>
-
-<img src="img/demo/gui/filesandfolderstab.png" style="width: 600px; height: auto;" >
-<br><em>Files & Folders Tab - View the encrypted files and folders</em>
-
-<img src="img/demo/gui/activitytab.png" style="width: 600px; height: auto;" >
-<br><em>Activity Tab - Track all lock/unlock events and access attempts</em>
-
-<img src="img/demo/gui/settingstab.png" style="width: 600px; height: auto;" >
-<br><em>Settings Tab - Configure password, recovery codes, and preferences</em>
-
-<img src="img/demo/gui/windows_contextmenu.png" style="width: 600px; height: auto;" >
-<br><em>Context Menu - Right-click to lock files and folders directly (Windows only)</em>
-
-<img src="img/demo/gui/configtab.png" style="width: 600px; height: auto;" >
-<br><em>Config Tab - Application configuration and their paths</em>
-
-<img src="img/demo/gui/statswindow.png" style="width: 600px; height: auto;" >
-<br><em>Statistics Window - Monitor app lock/unlock activity and statistics like FadCrypt uptime</em>
-
-<img src="img/demo/gui/fadguidetab1.png" style="width: 600px; height: auto;" >
-<br><em>FadGuide Tab 1 - Interactive tutorial and feature guide for FadCrypt command line usage</em>
-
-<img src="img/demo/gui/fadguidetab2.png" style="width: 600px; height: auto;" >
-<br><em>FadGuide Tab 2 - Continued tutorial with more information</em>
-
-<img src="img/preview1.png" style="width: 600px; height: auto;" >
-<br><em>Password Dialog Simple - Password entry prompt for app authentication</em>
-
-<img src="img/preview2.png" style="width: 600px; height: auto;" >
-<br><em>Password Prompt Fullscreen - Immersive password entry with wallpaper background</em>
-
-<img src="img/demo/gui/readme.png" style="width: 600px; height: auto;" >
-<br><em>README Info - Application information and documentation display</em>
-
-<img src="img/demo/gui/passrecovery.png" style="width: 600px; height: auto;" >
-<br><em>Password Recovery - Recovery codes management and password reset options</em>
-
-<img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
-<br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
-
-</div>
+<table>
+<tr>
+<td align="center"><img src="img/demo/gui/hometab.png" width="300"><br><em><strong>Home Tab</strong> - Dashboard with overview</em></td>
+<td align="center"><img src="img/demo/gui/applicationstab.png" width="300"><br><em><strong>Applications Tab</strong> - Lock and manage apps/software</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/gui/filesandfolderstab.png" width="300"><br><em><strong>Files & Folders Tab</strong> - View encrypted files</em></td>
+<td align="center"><img src="img/demo/gui/activitytab.png" width="300"><br><em><strong>Activity Tab</strong> - Track events and access</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/gui/settingstab.png" width="300"><br><em><strong>Settings Tab</strong> - Recovery codes & preferences</em></td>
+<td align="center"><img src="img/demo/gui/windows_contextmenu.png" width="300"><br><em><strong>Context Menu</strong> - Right-click lock/unlock *(Windows)*</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/gui/configtab.png" width="300"><br><em><strong>Config Tab</strong> - Application configuration</em></td>
+<td align="center"><img src="img/demo/gui/statswindow.png" width="300"><br><em><strong>Statistics Window</strong> - Activity & uptime</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/gui/fadguidetab1.png" width="300"><br><em><strong>FadGuide Tab 1</strong> - Interactive tutorial</em></td>
+<td align="center"><img src="img/demo/gui/fadguidetab2.png" width="300"><br><em><strong>FadGuide Tab 2</strong> - More information</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/preview1.png" width="300"><br><em><strong>Password Dialog</strong> - Secure entry prompt</em></td>
+<td align="center"><img src="img/preview2.png" width="300"><br><em><strong>Password Fullscreen</strong> - With wallpaper</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/gui/readme.png" width="300"><br><em><strong>README Info</strong> - Documentation display</em></td>
+<td align="center"><img src="img/demo/gui/passrecovery.png" width="300"><br><em><strong>Password Recovery</strong> - Recovery codes</em></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><img src="img/legacy/snake.png" width="300"><br><em><strong>Snake Game</strong> - Entertainment feature on home tab</em></td>
+</tr>
+</table>
 
 ### 💻 CLI/TUI Mode - File & Folder Encryption
 
-<div align="center">
+<table>
+<tr>
+<td align="center"><img src="img/demo/cli/fadcryptcli_mainmenu.png" width="300"><br><em><strong>Main Menu</strong> - Terminal UI with animations</em></td>
+<td align="center"><img src="img/demo/cli/lockscreen.png" width="300"><br><em><strong>Lock Screen</strong> - Select files to encrypt</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/cli/passwordprompt.png" width="300"><br><em><strong>Password Prompt</strong> - Secure entry</em></td>
+<td align="center"><img src="img/demo/cli/lock-confirmation.png" width="300"><br><em><strong>Lock Confirmation</strong> - Review & confirm</em></td>
+</tr>
+<tr>
+<td align="center"><img src="img/demo/cli/locked-items-list.png" width="300"><br><em><strong>Locked Items List</strong> - View encrypted files</em></td>
+<td align="center"><img src="img/demo/cli/unlockscreen.png" width="300"><br><em><strong>Unlock Screen</strong> - Decrypt files</em></td>
+</tr>
+</table>
 
-<img src="img/demo/cli/fadcryptcli_mainmenu.png" style="width: 600px; height: auto;" >
-<br><em>Main Menu - Terminal UI with smooth navigation and animations</em>
 
-<img src="img/demo/cli/lockscreen.png" style="width: 600px; height: auto;" >
-<br><em>Lock Screen - Select files and folders to encrypt</em>
-
-<img src="img/demo/cli/passwordprompt.png" style="width: 600px; height: auto;" >
-<br><em>Password Prompt - Password entry with visual feedback</em>
-
-<img src="img/demo/cli/lock-confirmation.png" style="width: 600px; height: auto;" >
-<br><em>Lock Confirmation - Review and confirm file encryption details</em>
-
-<img src="img/demo/cli/locked-items-list.png" style="width: 600px; height: auto;" >
-<br><em>Locked Items List - View all encrypted files with metadata</em>
-
-<img src="img/demo/cli/unlockscreen.png" style="width: 600px; height: auto;" >
-<br><em>Unlock Screen - Decrypt and restore your protected files</em>
-
-</div>
 <!--     <details>
         <summary><strong>More Screenshots</strong></summary>
         <img src="/img/3.png" style="width: 700px; height: auto;" >
