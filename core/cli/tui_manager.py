@@ -207,7 +207,7 @@ class TUIManager:
                     self.show_header()
                     print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
                     
-                    success, failed, _ = self.cli_handler.lock_multiple(actual_paths)
+                    success, failed, _, _ = self.cli_handler.lock_multiple(actual_paths)
                     
                     # Styled summary box like --lock
                     if success > 0 or failed > 0:
@@ -298,7 +298,7 @@ class TUIManager:
                 self.show_header()
                 print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
                 
-                success, failed, _ = self.cli_handler.unlock_multiple(actual_paths)
+                success, failed, _, _ = self.cli_handler.unlock_multiple(actual_paths)
                 
                 # Styled summary box like --unlock
                 if success > 0 or failed > 0:
@@ -459,7 +459,7 @@ class TUIManager:
                                     if actual_paths:
                                         self.show_header()
                                         print_colored(f"🔒 Locking {len(actual_paths)} item(s)...\n", Colors.INFO)
-                                        success, failed, _ = self.cli_handler.lock_multiple(actual_paths)
+                                        success, failed, _, _ = self.cli_handler.lock_multiple(actual_paths)
                                         if success > 0:
                                             print_success(f"Successfully locked {success} item(s)!")
                                         if failed > 0:
@@ -475,7 +475,7 @@ class TUIManager:
                                 if actual_paths:
                                     self.show_header()
                                     print_colored(f"🔓 Unlocking {len(actual_paths)} item(s)...\n", Colors.INFO)
-                                    success, failed, _ = self.cli_handler.unlock_multiple(actual_paths)
+                                    success, failed, _, _ = self.cli_handler.unlock_multiple(actual_paths)
                                     if success > 0:
                                         print_success(f"✅ Successfully unlocked {success} item(s)!")
                                     if failed > 0:
