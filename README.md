@@ -631,6 +631,8 @@ We look forward to your contributions!
 ## `>_` Prerequisites
 
 Install Python dependencies:
+```python
+pip install -r requirements.txt
 ```
 
 <details>
