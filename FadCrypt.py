@@ -1942,7 +1942,9 @@ def handle_direct_cli_commands():
         
         for path in paths:
             try:
-                if not os.path.exists(path):
+                # Use lexists() instead of exists() because protected folders (chmod 000) 
+                # are inaccessible but still exist on the filesystem
+                if not os.path.lexists(path):
                     print_error(f"✗ Path does not exist: {path}")
                     failed_count += 1
                     continue

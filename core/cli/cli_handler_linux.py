@@ -101,25 +101,33 @@ class CLIHandlerLinux(CLIHandlerBase):
             return False
     
     def is_tamper_proof_enabled(self, path: str) -> bool:
-        if not self.validate_path(path):
+        # Use lexists instead of validate_path because we need to check protection state
+        # even if the path is inaccessible (chmod 000)
+        if not os.path.lexists(path):
             return False
+        
         abs_path = os.path.abspath(path)
         try:
-            stat_info = os.stat(abs_path)
+            # Use lstat instead of stat to follow symlinks and work on protected paths
+            stat_info = os.lstat(abs_path)
             perms = stat_info.st_mode & 0o777
-            if perms != 0o000:
-                return False
-            try:
-                result = subprocess.run(['lsattr', abs_path], capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    output = result.stdout.strip()
-                    if len(output) > 4:
-                        flags = output.split()[0]
-                        if len(flags) > 4 and flags[4] == 'i':
-                            return True
-                return False
-            except Exception:
-                return True
-        except Exception:
+            
+            # If permissions are 000, it's protected
+            if perms == 0o000:
+                # Check immutable flag to confirm it's our protection
+                try:
+                    result = subprocess.run(['lsattr', '-d', abs_path], capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        output = result.stdout.strip()
+                        if len(output) > 4:
+                            flags = output.split()[0]
+                            if len(flags) > 4 and flags[4] == 'i':
+                                return True
+                    # Even without immutable flag, 000 permissions mean it's protected
+                    return True
+                except Exception:
+                    # If lsattr fails due to permissions, 000 perms indicate protection
+                    return True
             return False
+        except Exception:
             return False

@@ -674,15 +674,20 @@ class CLIHandlerBase(ABC):
         Returns:
             True if valid, False otherwise
         """
-        if not os.path.exists(path):
+        # Use lexists() instead of exists() because protected folders (chmod 000) 
+        # are inaccessible but still exist on the filesystem
+        if not os.path.lexists(path):
             return False
         
         try:
-            # Try to access the path
+            # Try to access the path - this may fail for protected paths, but that's OK
+            # We just need to know the path exists (via lexists)
             os.stat(path)
             return True
         except (PermissionError, OSError):
-            return False
+            # Path exists but is not accessible - that's OK for toggle operations
+            # Return True to allow operations on protected paths
+            return os.path.lexists(path)
     
     def _ensure_config_initialized(self):
         """
