@@ -149,7 +149,7 @@ class ContextMenuManager:
         return self.register_context_menu()
     
     def _register_file_lock(self):
-        """Register Lock for files"""
+        """Register Lock for files - with batch support"""
         try:
             key_path = f"{self.REGISTRY_BASE}\\{self.FILE_LOCK_KEY}"
             
@@ -157,16 +157,11 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Use START command to launch GUI without showing terminal window
-            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - use GUI exe with --gui flag
-                    # Direct exe path without cmd/powershell wrapper for context menu reliability
                     cmd = f'"{self.exe_path}" --gui --context-lock "%1"'
                 else:
-                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
                     cmd = f'"{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
@@ -177,7 +172,7 @@ class ContextMenuManager:
             raise
     
     def _register_file_unlock(self):
-        """Register Unlock for files"""
+        """Register Unlock for files - with batch support"""
         try:
             key_path = f"{self.REGISTRY_BASE}\\{self.FILE_UNLOCK_KEY}"
             
@@ -185,15 +180,11 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Use START command to launch GUI without showing terminal window
-            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - use GUI exe with --gui flag
                     cmd = f'"{self.exe_path}" --gui --context-unlock "%1"'
                 else:
-                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
                     cmd = f'"{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
@@ -204,7 +195,7 @@ class ContextMenuManager:
             raise
     
     def _register_folder_lock(self):
-        """Register Lock for folders"""
+        """Register Lock for folders - with batch support"""
         try:
             key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_LOCK_KEY}"
             
@@ -212,15 +203,11 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Lock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Use START command to launch GUI without showing terminal window
-            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - use GUI exe with --gui flag
                     cmd = f'"{self.exe_path}" --gui --context-lock "%1"'
                 else:
-                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
                     cmd = f'"{python_path}" "{self.exe_path}" --gui --context-lock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
@@ -231,7 +218,7 @@ class ContextMenuManager:
             raise
     
     def _register_folder_unlock(self):
-        """Register Unlock for folders"""
+        """Register Unlock for folders - with batch support"""
         try:
             key_path = f"{self.REGISTRY_BASE}\\{self.FOLDER_UNLOCK_KEY}"
             
@@ -239,15 +226,11 @@ class ContextMenuManager:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Unlock with FadCrypt")
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f"{self.exe_path},0")
             
-            # Use START command to launch GUI without showing terminal window
-            # START command launches separate process, GUI dialog will show
             cmd_key = f"{key_path}\\command"
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as key:
                 if self.is_packaged:
-                    # Packaged app - use GUI exe with --gui flag
                     cmd = f'"{self.exe_path}" --gui --context-unlock "%1"'
                 else:
-                    # Script execution - use python.exe so dialog can show
                     python_path = sys.executable
                     cmd = f'"{python_path}" "{self.exe_path}" --gui --context-unlock "%1"'
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, cmd)
