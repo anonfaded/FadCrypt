@@ -79,16 +79,13 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <div align="center">
 
 <img src="img/demo/gui/hometab.png" style="width: 600px; height: auto;" >
-<br><em>Home Tab - Dashboard with locked applications overview</em>
-
-<img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
-<br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
+<br><em>Home Tab</em>
 
 <img src="img/demo/gui/applicationstab.png" style="width: 600px; height: auto;" >
-<br><em>Applications Tab - Lock and manage installed applications</em>
+<br><em>Applications Tab - Lock and manage installed applications/software</em>
 
 <img src="img/demo/gui/filesandfolderstab.png" style="width: 600px; height: auto;" >
-<br><em>Files & Folders Tab - Encrypt and protect sensitive data</em>
+<br><em>Files & Folders Tab - View the encrypted files and folders</em>
 
 <img src="img/demo/gui/activitytab.png" style="width: 600px; height: auto;" >
 <br><em>Activity Tab - Track all lock/unlock events and access attempts</em>
@@ -97,7 +94,10 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <br><em>Settings Tab - Configure password, recovery codes, and preferences</em>
 
 <img src="img/demo/gui/windows_contextmenu.png" style="width: 600px; height: auto;" >
-<br><em>Context Menu - Right-click to lock files and folders directly</em>
+<br><em>Context Menu - Right-click to lock files and folders directly (Windows only)</em>
+
+<img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
+<br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
 
 </div>
 
