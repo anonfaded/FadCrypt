@@ -145,6 +145,48 @@ class AnimatedCursesMenu:
                     # Normal characters in WHITE
                     self.stdscr.addstr(row, padding + i, char, curses.color_pair(2) | curses.A_BOLD)
             
+            # Add author/GitHub info right below FADCRYPT animation (with continuous glitch)
+            author_row = vertical_start + 3  # Right after hex animation
+            author_label = "Author: "
+            author_text = "Faded"
+            separator = " | "
+            github_url = "github.com/anonfaded"
+            
+            # Build glitched "Faded" text (continuous animation each frame)
+            glitched_faded = ""
+            for char in author_text:
+                if random.random() > 0.92:  # Same 8% glitch rate
+                    glitched_faded += random.choice(glitch_chars)
+                else:
+                    glitched_faded += char
+            
+            # Calculate centered position for author line
+            full_line = author_label + glitched_faded + separator + github_url
+            full_line_length = len(author_label) + len(author_text) + len(separator) + len(github_url)
+            author_col = (width - full_line_length) // 2
+            
+            try:
+                # Draw "Author: " label
+                self.stdscr.addstr(author_row, author_col, author_label, curses.color_pair(2))
+                col_pos = author_col + len(author_label)
+                
+                # Draw "Faded" with glitch effect
+                for i, char in enumerate(glitched_faded):
+                    if char in glitch_chars:
+                        self.stdscr.addstr(author_row, col_pos + i, char, curses.color_pair(6) | curses.A_BOLD)
+                    else:
+                        self.stdscr.addstr(author_row, col_pos + i, char, curses.color_pair(2) | curses.A_BOLD)
+                col_pos += len(author_text)
+                
+                # Draw separator
+                self.stdscr.addstr(author_row, col_pos, separator, curses.color_pair(2))
+                col_pos += len(separator)
+                
+                # Draw GitHub link
+                self.stdscr.addstr(author_row, col_pos, github_url, curses.color_pair(7))
+            except curses.error:
+                pass
+            
             # Add footer branding near bottom of screen (with safety check)
             height, width = self.stdscr.getmaxyx()
             min_footer_space = 6  # Need 4 lines for logo + 1 for branding + 1 spacing
