@@ -56,9 +56,9 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 
 - [FadCrypt](#fadcrypt)
   - [🎯 What is FadCrypt?](#-what-is-fadcrypt)
-    - [�️ GUI Mode: Application Locking](#️-gui-mode-application-locking)
+    - [🖥️ GUI Mode: Application Locking](#️-gui-mode-application-locking)
     - [💾 CLI Mode: File & Folder Encryption](#-cli-mode-file--folder-encryption)
-  - [�📱 Screenshots](#-screenshots)
+  - [📱 Screenshots](#-screenshots)
     - [🖥️ GUI Mode - Application Locking](#️-gui-mode---application-locking)
     - [💻 CLI/TUI Mode - File & Folder Encryption](#-clutui-mode---file--folder-encryption)
   - [How FadCrypt Works:](#how-fadcrypt-works)
