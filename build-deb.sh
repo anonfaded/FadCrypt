@@ -5,11 +5,11 @@ set -e
 
 echo "=== Building FadCrypt for Linux ==="
 
-# Extract version from version.py
-VERSION=$(python3 -c "from version import __version__; print(__version__)")
-PACKAGE_NAME=$(python3 -c "from version import PACKAGE_NAME; print(PACKAGE_NAME)")
-MAINTAINER=$(python3 -c "from version import MAINTAINER_FULL; print(MAINTAINER_FULL)")
-DESCRIPTION=$(python3 -c "from version import PACKAGE_DESCRIPTION; print(PACKAGE_DESCRIPTION)")
+# Extract version from core/version.py
+VERSION=$(python3 -c "import sys; sys.path.insert(0, '.'); from core.version import __version__; print(__version__)")
+PACKAGE_NAME=$(python3 -c "import sys; sys.path.insert(0, '.'); from core.version import PACKAGE_NAME; print(PACKAGE_NAME)")
+MAINTAINER=$(python3 -c "import sys; sys.path.insert(0, '.'); from core.version import MAINTAINER_FULL; print(MAINTAINER_FULL)")
+DESCRIPTION=$(python3 -c "import sys; sys.path.insert(0, '.'); from core.version import PACKAGE_DESCRIPTION; print(PACKAGE_DESCRIPTION)")
 
 # Strip 'v' prefix from version for Debian package (Debian versions must start with a digit)
 DEB_VERSION="${VERSION#v}"
@@ -27,22 +27,56 @@ rm -rf build dist fadcrypt-deb
 
 # Build GUI executable with PyInstaller (console=False)
 echo "Building GUI executable with PyInstaller..."
-pyinstaller --clean FadCrypt_Linux.spec
+python3 -m PyInstaller FadCrypt_Linux.spec --clean --noconfirm
 
 # Check if GUI build succeeded
-if [ ! -f "dist/fadcrypt" ]; then
-    echo "Error: GUI build failed - executable not found"
+if [ ! -f "dist/FadCrypt/fadcrypt" ]; then
+    echo "Error: GUI build failed - executable not found at dist/FadCrypt/fadcrypt"
     exit 1
+fi
+
+# Optimize GUI bundle size
+echo "Optimizing GUI bundle size..."
+# Remove unnecessary icon themes (keep only Adwaita/hicolor - most compatible)
+if [ -d "dist/FadCrypt/_internal/share/icons" ]; then
+    cd dist/FadCrypt/_internal/share/icons
+    ls -1 | grep -v -E "^(Adwaita|hicolor)$" | xargs rm -rf
+    cd - > /dev/null
+    echo "  Removed unnecessary icon themes"
+fi
+# Remove large locale files (keep only English)
+if [ -d "dist/FadCrypt/_internal/share/locale" ]; then
+    cd dist/FadCrypt/_internal/share/locale
+    ls -1 | grep -v -E "^(en|en_US|en_GB)$" | xargs rm -rf
+    cd - > /dev/null
+    echo "  Removed unnecessary locales"
 fi
 
 # Build CLI executable with PyInstaller (console=True)
 echo "Building CLI executable with PyInstaller..."
-pyinstaller --clean FadCrypt_Linux_CLI.spec
+python3 -m PyInstaller FadCrypt_Linux_CLI.spec --clean --noconfirm
 
 # Check if CLI build succeeded
-if [ ! -f "dist/fadcrypt-cli" ]; then
-    echo "Error: CLI build failed - executable not found"
+if [ ! -f "dist/FadCryptCLI/fadcrypt-cli" ]; then
+    echo "Error: CLI build failed - executable not found at dist/FadCryptCLI/fadcrypt-cli"
     exit 1
+fi
+
+# Optimize CLI bundle size
+echo "Optimizing CLI bundle size..."
+# Remove unnecessary icon themes
+if [ -d "dist/FadCryptCLI/_internal/share/icons" ]; then
+    cd dist/FadCryptCLI/_internal/share/icons
+    ls -1 | grep -v -E "^(Adwaita|hicolor)$" | xargs rm -rf
+    cd - > /dev/null
+    echo "  Removed unnecessary icon themes"
+fi
+# Remove large locale files
+if [ -d "dist/FadCryptCLI/_internal/share/locale" ]; then
+    cd dist/FadCryptCLI/_internal/share/locale
+    ls -1 | grep -v -E "^(en|en_US|en_GB)$" | xargs rm -rf
+    cd - > /dev/null
+    echo "  Removed unnecessary locales"
 fi
 
 # Create .deb package structure
@@ -57,8 +91,24 @@ mkdir -p fadcrypt-deb/usr/share/fadcrypt
 
 # Copy files
 echo "Copying files..."
-cp dist/fadcrypt fadcrypt-deb/usr/bin/
-cp dist/fadcrypt-cli fadcrypt-deb/usr/bin/
+# Copy entire ONEDIR bundles (not just executables)
+cp -r dist/FadCrypt fadcrypt-deb/usr/share/fadcrypt-gui
+cp -r dist/FadCryptCLI fadcrypt-deb/usr/share/fadcrypt-cli
+
+# Create wrapper scripts in /usr/bin
+cat > fadcrypt-deb/usr/bin/fadcrypt << 'EOF'
+#!/bin/bash
+exec /usr/share/fadcrypt-gui/fadcrypt "$@"
+EOF
+
+cat > fadcrypt-deb/usr/bin/fadcrypt-cli << 'EOF'
+#!/bin/bash
+exec /usr/share/fadcrypt-cli/fadcrypt-cli "$@"
+EOF
+
+chmod 755 fadcrypt-deb/usr/bin/fadcrypt
+chmod 755 fadcrypt-deb/usr/bin/fadcrypt-cli
+
 cp debian/fadcrypt.desktop fadcrypt-deb/usr/share/applications/
 cp debian/fadcrypt-cli.desktop fadcrypt-deb/usr/share/applications/
 cp img/1.png fadcrypt-deb/usr/share/pixmaps/fadcrypt.png
@@ -89,9 +139,7 @@ if [ -f debian/postinst ]; then
     echo "Added postinst script for daemon service setup"
 fi
 
-# Set permissions
-chmod 755 fadcrypt-deb/usr/bin/fadcrypt
-chmod 755 fadcrypt-deb/usr/bin/fadcrypt-cli
+# Set desktop file permissions
 chmod 644 fadcrypt-deb/usr/share/applications/fadcrypt.desktop
 chmod 644 fadcrypt-deb/usr/share/applications/fadcrypt-cli.desktop
 
@@ -118,13 +166,15 @@ Description: ${DESCRIPTION}
   - Built-in mini snake game
 EOF
 
-# Build the .deb package
-echo "Building .deb package..."
-dpkg-deb --build fadcrypt-deb ${PACKAGE_NAME}_${DEB_VERSION}_amd64.deb
+# Build the .deb package with maximum compression
+echo "Building .deb package with xz compression..."
+dpkg-deb --build --root-owner-group -Zxz -z9 fadcrypt-deb ${PACKAGE_NAME}_${DEB_VERSION}_amd64.deb
 
+# Show size comparison
 echo ""
 echo "=== Build Complete ==="
 echo "Package: ${PACKAGE_NAME}_${DEB_VERSION}_amd64.deb"
+echo "Package Size: $(du -h ${PACKAGE_NAME}_${DEB_VERSION}_amd64.deb | cut -f1)"
 echo "App Version: ${VERSION}"
 echo ""
 echo "To install:"

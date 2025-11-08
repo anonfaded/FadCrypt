@@ -14,24 +14,26 @@ pip install pyinstaller
 
 ## Build Steps
 
-### 1. Build GUI Executable (console=False)
+### 1. Build GUI Executable (onedir, console=False)
 ```bash
-pyinstaller --clean FadCrypt_Linux.spec
+python3 -m PyInstaller FadCrypt_Linux.spec --clean --noconfirm
 ```
-Creates: `dist/fadcrypt`
+Creates: `dist/FadCrypt/` folder with `fadcrypt` executable
 
-### 2. Build CLI Executable (console=True)
+### 2. Build CLI Executable (onedir, console=True)
 ```bash
-pyinstaller --clean FadCrypt_Linux_CLI.spec
+python3 -m PyInstaller FadCrypt_Linux_CLI.spec --clean --noconfirm
 ```
-Creates: `dist/fadcrypt-cli`
+Creates: `dist/FadCryptCLI/` folder with `fadcrypt-cli` executable
 
-### 3. Create .deb Package (includes both binaries)
+### 3. Create .deb Package (includes both bundles)
 ```bash
 chmod +x build-deb.sh
 ./build-deb.sh
 ```
 Creates: `fadcrypt_<version>_amd64.deb`
+
+**Note:** Both executables are built in **onedir mode** (folder structure with dependencies), not as single-file executables. The `--clean --noconfirm` flags ensure a fresh build without prompts.
 
 ## Installation
 
@@ -42,8 +44,25 @@ sudo dpkg -i fadcrypt_<version>_amd64.deb
 
 ### Manual installation (without package)
 ```bash
-sudo cp dist/fadcrypt /usr/bin/
-sudo cp dist/fadcrypt-cli /usr/bin/
+# Copy onedir bundles
+sudo cp -r dist/FadCrypt /usr/share/fadcrypt-gui
+sudo cp -r dist/FadCryptCLI /usr/share/fadcrypt-cli
+
+# Create wrapper scripts
+sudo tee /usr/bin/fadcrypt > /dev/null << 'EOF'
+#!/bin/bash
+exec /usr/share/fadcrypt-gui/fadcrypt "$@"
+EOF
+
+sudo tee /usr/bin/fadcrypt-cli > /dev/null << 'EOF'
+#!/bin/bash
+exec /usr/share/fadcrypt-cli/fadcrypt-cli "$@"
+EOF
+
+sudo chmod 755 /usr/bin/fadcrypt
+sudo chmod 755 /usr/bin/fadcrypt-cli
+
+# Copy desktop files and icons
 sudo cp debian/fadcrypt.desktop /usr/share/applications/
 sudo cp debian/fadcrypt-cli.desktop /usr/share/applications/
 sudo cp img/1.png /usr/share/pixmaps/fadcrypt.png
@@ -71,8 +90,14 @@ fadcrypt-cli --list            # List locked items
 
 After installation, the .deb provides:
 
-- **GUI Binary:** `/usr/bin/fadcrypt` (console=False, launches GUI)
-- **CLI Binary:** `/usr/bin/fadcrypt-cli` (console=True, launches TUI)
+- **GUI Bundle:** `/usr/share/fadcrypt-gui/` (onedir PyInstaller bundle)
+  - Main executable: `/usr/share/fadcrypt-gui/fadcrypt`
+  - Dependencies: `_internal/` folder with Python libs
+- **GUI Wrapper:** `/usr/bin/fadcrypt` (shell script calling the bundle)
+- **CLI Bundle:** `/usr/share/fadcrypt-cli/` (onedir PyInstaller bundle)
+  - Main executable: `/usr/share/fadcrypt-cli/fadcrypt-cli`
+  - Dependencies: `_internal/` folder with Python libs
+- **CLI Wrapper:** `/usr/bin/fadcrypt-cli` (shell script calling the bundle)
 - **Daemon Script:** `/usr/share/fadcrypt/elevated-daemon.py`
 - **Systemd Service:** `/etc/systemd/system/fadcrypt-elevated.service`
 - **Desktop Files:** 
@@ -84,6 +109,8 @@ After installation, the .deb provides:
 - **Documentation:** `/usr/share/doc/fadcrypt/`
 - **User Config:** `~/.config/FadCrypt/`
 - **User Backups:** `~/.local/share/FadCrypt/Backup/`
+
+**Note:** The onedir structure means each executable has its own folder with all dependencies bundled. Wrapper scripts in `/usr/bin/` provide convenient command-line access.
 
 ## Daemon Service
 

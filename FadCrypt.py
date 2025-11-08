@@ -589,7 +589,8 @@ if '--cleanup' in sys.argv:
             # CRITICAL: Remove all locks before deleting data directories
             print("[CLEANUP] Removing locks from all locked items...", flush=True)
             try:
-                config_file = os.path.join(fadcrypt_folder, 'apps_config.json')
+                config_folder_path = os.path.join(fadcrypt_folder, 'config')
+                config_file = os.path.join(config_folder_path, 'apps_config.json')
                 
                 if os.path.exists(config_file):
                     import json
@@ -603,20 +604,22 @@ if '--cleanup' in sys.argv:
                         
                         # Create a temporary file lock manager to unlock items
                         from core.linux.file_lock_manager_linux import FileLockManagerLinux
-                        lock_manager = FileLockManagerLinux(fadcrypt_folder)
+                        lock_manager = FileLockManagerLinux(config_folder_path)
                         
                         unlocked_count = 0
                         for item in locked_items:
                             try:
                                 item_path = item.get('path', '')
                                 item_name = item.get('name', os.path.basename(item_path))
+                                
+                                # Unlock via file lock manager (handles daemon communication)
                                 if lock_manager.remove_item(item_path):
                                     print(f"[CLEANUP] ✓ Unlocked: {item_name}", flush=True)
                                     unlocked_count += 1
                                 else:
                                     print(f"[CLEANUP] ⚠ Could not unlock: {item_name}", flush=True)
                             except Exception as e:
-                                print(f"[CLEANUP] Warning: Error unlocking item: {e}", flush=True)
+                                print(f"[CLEANUP] Warning: Error unlocking item {item_name}: {e}", flush=True)
                         
                         if unlocked_count > 0:
                             print(f"[CLEANUP] Successfully unlocked {unlocked_count}/{len(locked_items)} items", flush=True)
@@ -634,46 +637,84 @@ if '--cleanup' in sys.argv:
                 import traceback
                 traceback.print_exc()
             
+            # Give system time to release file handles
+            import time
+            time.sleep(0.5)
+            
             # CRITICAL: Remove immutable flags before deletion (files may have chattr +i from file protection)
             folders_to_clean = [
                 fadcrypt_folder,
                 fadcrypt_backup_folder
             ]
             
+            print("[CLEANUP] Removing immutable flags from protected files...", flush=True)
             for folder in folders_to_clean:
                 if os.path.exists(folder):
                     try:
-                        # Find all files and remove immutable flag
-                        print(f"[CLEANUP] Removing immutable flags from {folder}...", flush=True)
-                        result = subprocess.run(
-                            ['find', folder, '-type', 'f', '-exec', 'chattr', '-i', '{}', '+'],
-                            capture_output=True,
-                            text=True,
-                            check=False,
-                            timeout=10
-                        )
-                        if result.returncode == 0:
-                            print("[CLEANUP] [OK] Removed immutable flags", flush=True)
+                        # Use elevated daemon for chattr operations
+                        from core.linux.elevated_daemon_client import get_elevated_client
+                        daemon_client = get_elevated_client()
+                        
+                        if daemon_client and daemon_client.is_available():
+                            # Find all files in the folder
+                            import glob
+                            all_files = []
+                            for root, dirs, files in os.walk(folder):
+                                for file in files:
+                                    all_files.append(os.path.join(root, file))
+                            
+                            if all_files:
+                                # Remove immutable flags via daemon (batch operation)
+                                success, message = daemon_client.chattr(all_files, set_immutable=False)
+                                if success:
+                                    print(f"[CLEANUP] ✓ Removed immutable flags from {len(all_files)} files in {folder}", flush=True)
+                                else:
+                                    print(f"[CLEANUP] ⚠ Daemon failed to remove immutable flags: {message}", flush=True)
                         else:
-                            print("[CLEANUP] [WARN] Could not remove immutable flags via chattr", flush=True)
-                            print(f"[CLEANUP]     Note: Daemon will handle cleanup when service stops", flush=True)
+                            # Fallback: Try direct chattr (may fail without root)
+                            result = subprocess.run(
+                                ['find', folder, '-type', 'f', '-exec', 'chattr', '-i', '{}', '+'],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                                timeout=10
+                            )
+                            if result.returncode == 0:
+                                print(f"[CLEANUP] ✓ Removed immutable flags from {folder}", flush=True)
+                            else:
+                                print(f"[CLEANUP] ⚠ Could not remove immutable flags via chattr (daemon not available)", flush=True)
+                                
                     except Exception as e:
-                        print(f"[CLEANUP] [WARN] Warning: Could not remove immutable flags: {e}", flush=True)
+                        print(f"[CLEANUP] Warning: Could not remove immutable flags from {folder}: {e}", flush=True)
             
             # Remove all FadCrypt config and backup folders
+            print("[CLEANUP] Removing FadCrypt data directories...", flush=True)
             folders_to_remove = [
                 fadcrypt_folder,
                 fadcrypt_backup_folder
             ]
             
+            removed_count = 0
             for folder in folders_to_remove:
                 if os.path.exists(folder):
                     try:
                         import shutil
                         shutil.rmtree(folder)
-                        print(f"[CLEANUP] OK Removed: {folder}", flush=True)
+                        print(f"[CLEANUP] ✓ Removed: {folder}", flush=True)
+                        removed_count += 1
+                    except PermissionError as e:
+                        # Try with sudo if permission denied
+                        try:
+                            subprocess.run(['rm', '-rf', folder], check=True, timeout=10)
+                            print(f"[CLEANUP] ✓ Removed (via rm): {folder}", flush=True)
+                            removed_count += 1
+                        except Exception as rm_error:
+                            print(f"[CLEANUP] ⚠ Warning: Could not remove {folder}: {rm_error}", flush=True)
                     except Exception as e:
-                        print(f"[CLEANUP] WARN Warning: Could not remove {folder}: {e}", flush=True)
+                        print(f"[CLEANUP] ⚠ Warning: Could not remove {folder}: {e}", flush=True)
+            
+            if removed_count > 0:
+                print(f"[CLEANUP] ✓ Removed {removed_count} data directories", flush=True)
             
             # List of common system tools that might have been disabled
             all_tools = [
@@ -725,16 +766,27 @@ if '--cleanup' in sys.argv:
             if os.path.exists(lock_file):
                 try:
                     os.remove(lock_file)
-                    print("[CLEANUP] [OK] Removed lock file: {lock_file}", flush=True)
+                    print(f"[CLEANUP] ✓ Removed lock file: {lock_file}", flush=True)
                 except PermissionError:
                     # Lock file might be owned by different user - cleanup script runs as root
                     try:
-                        subprocess.run(['rm', '-f', lock_file], check=True)
-                        print(f"[CLEANUP] OK Removed lock file: {lock_file}", flush=True)
+                        subprocess.run(['rm', '-f', lock_file], check=True, timeout=5)
+                        print(f"[CLEANUP] ✓ Removed lock file: {lock_file}", flush=True)
                     except Exception as e:
-                        print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+                        print(f"[CLEANUP] ⚠ Warning: Could not remove lock file: {e}", flush=True)
                 except Exception as e:
-                    print(f"[CLEANUP] Warning: Could not remove lock file: {e}", flush=True)
+                    print(f"[CLEANUP] ⚠ Warning: Could not remove lock file: {e}", flush=True)
+            
+            # Remove autostart entry
+            autostart_file = os.path.join(user_home, '.config', 'autostart', 'fadcrypt.desktop')
+            if os.path.exists(autostart_file):
+                try:
+                    os.remove(autostart_file)
+                    print(f"[CLEANUP] ✓ Removed autostart entry: {autostart_file}", flush=True)
+                except Exception as e:
+                    print(f"[CLEANUP] ⚠ Warning: Could not remove autostart entry: {e}", flush=True)
+            
+            print("[CLEANUP] ✓ Cleanup completed successfully", flush=True)
         
         elif system == "Windows":
             print("[CLEANUP] Windows cleanup - restoring system tools and cleaning registry...", flush=True)

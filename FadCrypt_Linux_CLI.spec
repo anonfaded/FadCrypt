@@ -89,12 +89,19 @@ a = Analysis(
         'core.cli.curses_password',
         'core.cli.curses_menu',
         'core.cli.curses_file_browser',
+        # Curses library (required for CLI/TUI)
+        'curses',
+        'curses.ascii',
+        'curses.panel',
+        'curses.textpad',
         # External dependencies - PyQt6
         'PyQt6',
         'PyQt6.QtWidgets',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.sip',
+        'PyQt6.QtNetwork',
+        'PyQt6.QtDBus',
         # External dependencies - Other
         'PIL',
         'PIL.Image',
@@ -108,6 +115,12 @@ a = Analysis(
         'cryptography.hazmat',
         'cryptography.hazmat.primitives',
         'cryptography.hazmat.backends',
+        'cryptography.hazmat.primitives.ciphers',
+        'cryptography.hazmat.primitives.ciphers.aead',
+        'cryptography.hazmat.primitives.kdf',
+        'cryptography.hazmat.primitives.kdf.pbkdf2',
+        'cryptography.hazmat.primitives.padding',
+        'cryptography.hazmat.primitives.hashes',
         'psutil',
         'watchdog',
         'watchdog.observers',
@@ -130,7 +143,23 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Exclude unnecessary packages to reduce size
+        'tkinter',           # Tkinter GUI (we use PyQt6)
+        'matplotlib',        # Plotting (not used)
+        'IPython',           # Interactive Python (not used)
+        'jupyter',           # Jupyter (not used)
+        'test',              # Test modules
+        'unittest',          # Unit testing
+        'pydoc',             # Documentation
+        'xml.etree',         # XML parsing (minimal usage)
+        'email',             # Email (not used)
+        'http',              # HTTP server (not used)
+        'urllib3',           # URL library (minimal usage)
+        'setuptools',        # Setup tools (not needed at runtime)
+        'pip',               # Package installer (not needed)
+        'distutils',         # Distribution utils (not needed)
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -146,8 +175,8 @@ exe = EXE(
     name='fadcrypt-cli',  # CLI version with console
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
+    strip=True,           # Strip debug symbols - ENABLED
+    upx=True,             # UPX compression - ENABLED
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # CLI app, needs console for TUI
@@ -163,8 +192,8 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=False,
-    upx=True,
+    strip=True,   # Strip binaries in final bundle
+    upx=True,     # Compress binaries with UPX
     upx_exclude=[],
     name='FadCryptCLI'
 )
