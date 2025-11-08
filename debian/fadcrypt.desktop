@@ -2,7 +2,7 @@
 Type=Application
 Name=FadCrypt
 Comment=Application locker and monitor
-Exec=fadcrypt
+Exec=fadcrypt --gui
 Icon=fadcrypt
 Terminal=false
 Categories=Utility;Security;

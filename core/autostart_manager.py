@@ -105,8 +105,8 @@ class AutostartManagerLinux(AutostartManagerBase):
             # Create autostart directory if it doesn't exist
             os.makedirs(self.autostart_dir, exist_ok=True)
             
-            # Build exec command
-            exec_command = self.app_path
+            # Build exec command with --gui flag
+            exec_command = self.app_path + " --gui"
             if with_monitoring:
                 exec_command += " --auto-monitor"
             
