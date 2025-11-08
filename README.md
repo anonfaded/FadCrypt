@@ -117,6 +117,9 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <img src="img/demo/gui/readme.png" style="width: 600px; height: auto;" >
 <br><em>README Info - Application information and documentation display</em>
 
+<img src="img/demo/gui/passrecovery.png" style="width: 600px; height: auto;" >
+<br><em>Password Recovery - Recovery codes management and password reset options</em>
+
 <img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
 <br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
 
