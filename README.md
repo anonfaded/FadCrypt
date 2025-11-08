@@ -1,6 +1,6 @@
 <div align="center">
     
-<img src="https://github.com/user-attachments/assets/c9fc6bd3-daae-402d-8eeb-828473ede8d4" style="width: 700px; height: auto;" >
+<img src="img/banner-rounded.png" style="width: 700px; height: auto;" >
 
 <!-- https://github.com/user-attachments/assets/c9eeaf74-6649-4810-b420-e2c4ad4bd365 -->
 
@@ -11,7 +11,7 @@
 
 ---
 
-<img src="https://github.com/user-attachments/assets/c730eda3-5887-458d-8df1-971a74807b73" style="width: 100px; height: auto;" >
+<img src="img/icon.png" style="width: 100px; height: auto;" >
 
 # `>_` FadCrypt
 
@@ -74,22 +74,54 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 
 ## `>_` 📱 Screenshots
 
-<div align="center">
-<!--     <img src="https://github.com/anonfaded/FadCam/assets/124708903/4a93c111-fc67-4d75-94b1-fa4e01822998" style="width: 50px; height: auto;" >
-    <br>
-    <em>apk icon</em> -->
-    <br><br>
-    <img src="https://github.com/user-attachments/assets/b81daec5-8c0f-49f0-9cac-bec61d303eef" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/df93ac6d-d8eb-45e7-b150-3a1e6d6a80c2" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/28db5d03-0b08-47fa-bdc6-01244947c124" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/01e1a2b1-8cdf-40a2-95e0-41109c07db5c" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/bcbf1b09-6920-46fb-8c3d-b475536060a0" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/b016d43d-0105-46b5-b2eb-5c697230fcd8" style="width: 500px; height: auto;" >
-    <img src="https://github.com/user-attachments/assets/ec7dcc78-2a36-42ef-81a3-8cdda3e33195" style="width: 500px; height: auto;" >
- <br>
+### 🖥️ GUI Mode - Application Locking
 
-<!--     <br> -->
-<!--     <em>UI</em> -->
+<div align="center">
+
+<img src="img/demo/gui/hometab.png" style="width: 600px; height: auto;" >
+<br><em>Home Tab - Dashboard with locked applications overview</em>
+
+<img src="img/legacy/snake.png" style="width: 600px; height: auto;" >
+<br><em>Snake Game - Classic arcade game available on home tab for entertainment</em>
+
+<img src="img/demo/gui/applicationstab.png" style="width: 600px; height: auto;" >
+<br><em>Applications Tab - Lock and manage installed applications</em>
+
+<img src="img/demo/gui/filesandfolderstab.png" style="width: 600px; height: auto;" >
+<br><em>Files & Folders Tab - Encrypt and protect sensitive data</em>
+
+<img src="img/demo/gui/activitytab.png" style="width: 600px; height: auto;" >
+<br><em>Activity Tab - Track all lock/unlock events and access attempts</em>
+
+<img src="img/demo/gui/settingstab.png" style="width: 600px; height: auto;" >
+<br><em>Settings Tab - Configure password, recovery codes, and preferences</em>
+
+<img src="img/demo/gui/windows_contextmenu.png" style="width: 600px; height: auto;" >
+<br><em>Context Menu - Right-click to lock files and folders directly</em>
+
+</div>
+
+### 💻 CLI/TUI Mode - File & Folder Encryption
+
+<div align="center">
+
+<img src="img/demo/cli/fadcryptcli_mainmenu.png" style="width: 600px; height: auto;" >
+<br><em>Main Menu - Terminal UI with smooth navigation and animations</em>
+
+<img src="img/demo/cli/lockscreen.png" style="width: 600px; height: auto;" >
+<br><em>Lock Screen - Select files and folders to encrypt</em>
+
+<img src="img/demo/cli/passwordprompt.png" style="width: 600px; height: auto;" >
+<br><em>Password Prompt - Secure master password entry with visual feedback</em>
+
+<img src="img/demo/cli/lock-confirmation.png" style="width: 600px; height: auto;" >
+<br><em>Lock Confirmation - Review and confirm file encryption details</em>
+
+<img src="img/demo/cli/locked-items-list.png" style="width: 600px; height: auto;" >
+<br><em>Locked Items List - View all encrypted files with metadata</em>
+
+<img src="img/demo/cli/unlockscreen.png" style="width: 600px; height: auto;" >
+<br><em>Unlock Screen - Decrypt and restore your protected files</em>
 
 </div>
 <!--     <details>
