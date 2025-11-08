@@ -374,7 +374,7 @@ Download the latest version from the [releases page](https://github.com/anonfade
 ### Windows
 
 1. **Download:** Get the installer from [Releases](https://github.com/anonfaded/FadCrypt/releases)
-2. **Install:** Run `FadCrypt-Setup.exe` and follow the wizard
+2. **Install:** Run `FadCryptSetup_vX.X.X.exe` and follow the wizard
 3. **Run:** 
    - Search "FadCrypt" in Start menu and launch, or
    - Run `fadcrypt` from Command Prompt/PowerShell
