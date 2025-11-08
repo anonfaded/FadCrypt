@@ -144,7 +144,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude unnecessary packages to reduce size
+        # Exclude unnecessary packages to reduce size (CRITICAL: Don't exclude stdlib modules needed by dependencies)
         'tkinter',           # Tkinter GUI (we use PyQt6)
         'matplotlib',        # Plotting (not used)
         'IPython',           # Interactive Python (not used)
@@ -152,11 +152,11 @@ a = Analysis(
         'test',              # Test modules
         'unittest',          # Unit testing
         'pydoc',             # Documentation
-        'xml.etree',         # XML parsing (minimal usage)
-        'email',             # Email (not used)
-        'http',              # HTTP server (not used)
-        'urllib3',           # URL library (minimal usage)
-        'setuptools',        # Setup tools (not needed at runtime)
+        # 'xml.etree',       # REMOVED - needed by some modules
+        # 'email',           # REMOVED - needed by pkg_resources
+        # 'http',            # REMOVED - needed by urllib3/requests
+        # 'urllib3',         # REMOVED - needed by requests
+        # 'setuptools',      # REMOVED - runtime hooks use pkg_resources
         'pip',               # Package installer (not needed)
         'distutils',         # Distribution utils (not needed)
     ],
@@ -171,6 +171,9 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,      # Include binaries in single executable
+    a.zipfiles,      # Include zipfiles in single executable
+    a.datas,         # Include data files in single executable
     [],
     name='fadcrypt',
     debug=False,
@@ -187,13 +190,4 @@ exe = EXE(
     entitlements_file=None,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=True,   # Strip binaries in final bundle
-    upx=True,     # Compress binaries with UPX
-    upx_exclude=[],
-    name='FadCrypt'
-)
+# NOTE: Removed COLLECT - using onefile mode for faster installation

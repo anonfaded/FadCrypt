@@ -114,8 +114,8 @@ python3 FadCrypt.py --gui         # Start GUI explicitly
 ```
 
 **Build distributables:**
-- **Windows:** `python3 -m PyInstaller FadCrypt.spec` (creates .exe)
-- **Linux:** `./build-deb.sh` (creates .deb package with daemon service)
+- **Windows:** `python3 -m PyInstaller FadCrypt.spec --clean --noconfirm` (creates onedir .exe bundle)
+- **Linux:** `./build-deb.sh` (creates .deb package with onefile executables)
 
 ### Common Change Patterns
 

@@ -30,54 +30,24 @@ echo "Building GUI executable with PyInstaller..."
 python3 -m PyInstaller FadCrypt_Linux.spec --clean --noconfirm
 
 # Check if GUI build succeeded
-if [ ! -f "dist/FadCrypt/fadcrypt" ]; then
-    echo "Error: GUI build failed - executable not found at dist/FadCrypt/fadcrypt"
+if [ ! -f "dist/fadcrypt" ]; then
+    echo "Error: GUI build failed - executable not found at dist/fadcrypt"
     exit 1
 fi
 
-# Optimize GUI bundle size
-echo "Optimizing GUI bundle size..."
-# Remove unnecessary icon themes (keep only Adwaita/hicolor - most compatible)
-if [ -d "dist/FadCrypt/_internal/share/icons" ]; then
-    cd dist/FadCrypt/_internal/share/icons
-    ls -1 | grep -v -E "^(Adwaita|hicolor)$" | xargs rm -rf
-    cd - > /dev/null
-    echo "  Removed unnecessary icon themes"
-fi
-# Remove large locale files (keep only English)
-if [ -d "dist/FadCrypt/_internal/share/locale" ]; then
-    cd dist/FadCrypt/_internal/share/locale
-    ls -1 | grep -v -E "^(en|en_US|en_GB)$" | xargs rm -rf
-    cd - > /dev/null
-    echo "  Removed unnecessary locales"
-fi
+echo "  GUI executable size: $(du -h dist/fadcrypt | cut -f1)"
 
 # Build CLI executable with PyInstaller (console=True)
 echo "Building CLI executable with PyInstaller..."
 python3 -m PyInstaller FadCrypt_Linux_CLI.spec --clean --noconfirm
 
 # Check if CLI build succeeded
-if [ ! -f "dist/FadCryptCLI/fadcrypt-cli" ]; then
-    echo "Error: CLI build failed - executable not found at dist/FadCryptCLI/fadcrypt-cli"
+if [ ! -f "dist/fadcrypt-cli" ]; then
+    echo "Error: CLI build failed - executable not found at dist/fadcrypt-cli"
     exit 1
 fi
 
-# Optimize CLI bundle size
-echo "Optimizing CLI bundle size..."
-# Remove unnecessary icon themes
-if [ -d "dist/FadCryptCLI/_internal/share/icons" ]; then
-    cd dist/FadCryptCLI/_internal/share/icons
-    ls -1 | grep -v -E "^(Adwaita|hicolor)$" | xargs rm -rf
-    cd - > /dev/null
-    echo "  Removed unnecessary icon themes"
-fi
-# Remove large locale files
-if [ -d "dist/FadCryptCLI/_internal/share/locale" ]; then
-    cd dist/FadCryptCLI/_internal/share/locale
-    ls -1 | grep -v -E "^(en|en_US|en_GB)$" | xargs rm -rf
-    cd - > /dev/null
-    echo "  Removed unnecessary locales"
-fi
+echo "  CLI executable size: $(du -h dist/fadcrypt-cli | cut -f1)"
 
 # Create .deb package structure
 echo "Creating .deb package structure..."
@@ -91,21 +61,9 @@ mkdir -p fadcrypt-deb/usr/share/fadcrypt
 
 # Copy files
 echo "Copying files..."
-# Copy entire ONEDIR bundles (not just executables)
-cp -r dist/FadCrypt fadcrypt-deb/usr/share/fadcrypt-gui
-cp -r dist/FadCryptCLI fadcrypt-deb/usr/share/fadcrypt-cli
-
-# Create wrapper scripts in /usr/bin
-cat > fadcrypt-deb/usr/bin/fadcrypt << 'EOF'
-#!/bin/bash
-exec /usr/share/fadcrypt-gui/fadcrypt "$@"
-EOF
-
-cat > fadcrypt-deb/usr/bin/fadcrypt-cli << 'EOF'
-#!/bin/bash
-exec /usr/share/fadcrypt-cli/fadcrypt-cli "$@"
-EOF
-
+# Copy onefile executables directly
+cp dist/fadcrypt fadcrypt-deb/usr/bin/
+cp dist/fadcrypt-cli fadcrypt-deb/usr/bin/
 chmod 755 fadcrypt-deb/usr/bin/fadcrypt
 chmod 755 fadcrypt-deb/usr/bin/fadcrypt-cli
 

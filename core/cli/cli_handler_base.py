@@ -75,17 +75,65 @@ class CLIHandlerBase(ABC):
         successful_paths = []
         error_messages = []
         
-        for path in paths:
-            # Check file size and confirm lock with user - returns (confirmed, is_large)
-            confirmed, is_large = self._check_file_size_and_confirm(path)
-            if not confirmed:
-                failure_count += 1
-                if is_large:
-                    error_messages.append(f"{path}: Cancelled - file too large (≥500 MB)")
-                else:
-                    error_messages.append(f"{path}: Cancelled by user")
-                continue
+        # For batch operations (multiple paths), show single confirmation for all items
+        if len(paths) > 1:
+            # Calculate total size and item counts for all paths
+            total_size = 0
+            total_files = 0
+            total_folders = 0
             
+            for path in paths:
+                # Calculate size and counts (try/except handles protected files)
+                try:
+                    total_size += self._get_item_size(path)
+                    file_count, folder_count = self._count_items(path)
+                    total_files += file_count
+                    total_folders += folder_count
+                except (PermissionError, OSError) as e:
+                    vlog(f"[Batch Lock] Warning: Could not calculate size for {path}: {e}")
+                    # Use default estimate if we can't read (likely protected)
+                    total_size += 1024 * 1024  # Assume 1MB default
+                    total_files += 1
+            
+            total_size_mb = total_size / (1024 * 1024)
+            is_large = total_size_mb >= 500
+            estimated_time = self._calculate_encryption_time(total_size)
+            
+            # Read encryption and platform settings
+            encryption_enabled = True
+            is_linux = platform.system() == "Linux"
+            try:
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    encryption_enabled = config.get("dangerous_operations", {}).get("encryption", True)
+            except:
+                encryption_enabled = True
+            
+            # Show single confirmation for all items
+            batch_path = f"{len(paths)} items"  # Display name for batch operation
+            import curses
+            user_confirmed = curses.wrapper(self._show_confirmation_menu, batch_path, total_size_mb, is_large,
+                                            estimated_time, total_files, total_folders,
+                                            encryption_enabled, is_linux)
+            
+            if not user_confirmed:
+                # User cancelled batch operation
+                return (0, len(paths), [], [f"Batch operation cancelled by user"])
+        
+        # Process each path (with or without per-file confirmation based on batch mode)
+        for path in paths:
+            # For single file operations, show individual confirmation
+            if len(paths) == 1:
+                confirmed, is_large = self._check_file_size_and_confirm(path)
+                if not confirmed:
+                    failure_count += 1
+                    if is_large:
+                        error_messages.append(f"{path}: Cancelled - file too large (≥500 MB)")
+                    else:
+                        error_messages.append(f"{path}: Cancelled by user")
+                    continue
+            
+            # Lock the path (batch confirmation already done above)
             success, error_msg = self.lock_path(path)
             if success:
                 success_count += 1

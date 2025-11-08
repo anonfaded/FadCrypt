@@ -102,13 +102,14 @@ def show_help():
         print(f"{RED}│{RESET}   --test-context-unlock <path> {DIM}(test unlock without registry){RESET}")
         print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
-    # Installation & Setup
-    print(f"{RED}╭─ ⚙️  {BRIGHT_RED}INSTALLATION & SETUP (Advanced){RESET}")
-    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--register-context{RESET}   : Add FadCrypt to Windows right-click menu")
-    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--unregister-context{RESET} : Remove from Windows right-click menu")
-    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--install-service{RESET}    : Install FadCrypt elevated service")
-    print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--uninstall-service{RESET}  : Uninstall FadCrypt elevated service")
-    print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
+    # Installation & Setup (Windows only)
+    if system == "Windows":
+        print(f"{RED}╭─ ⚙️  {BRIGHT_RED}INSTALLATION & SETUP (Advanced){RESET}")
+        print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--register-context{RESET}   : Add FadCrypt to Windows right-click menu")
+        print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--unregister-context{RESET} : Remove from Windows right-click menu")
+        print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--install-service{RESET}    : Install FadCrypt elevated service")
+        print(f"{RED}│{RESET} {DIM}•{RESET} {BRIGHT_RED}--uninstall-service{RESET}  : Uninstall FadCrypt elevated service")
+        print(f"{RED}╰──────────────────────────────────────────────────────────────────────{RESET}\n")
     
     # Dangerous Operations
     print(f"{RED}╭─ ⚠️  {YELLOW}DANGEROUS OPERATIONS (Use with Caution!){RESET}")

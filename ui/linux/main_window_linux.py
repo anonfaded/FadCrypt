@@ -336,3 +336,4 @@ X-GNOME-Autostart-enabled=true
             print(f"Error in enable_system_tools: {e}")
             return False
 
+

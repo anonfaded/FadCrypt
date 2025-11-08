@@ -514,17 +514,32 @@ class SettingsPanel(QWidget):
         cleanup_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         bottom_frame.addWidget(cleanup_title)
         
-        cleanup_info = QLabel(
-            "🧹 Complete system cleanup before uninstalling FadCrypt.\n\n"
-            "This will:\n"
-            "• Stop any active file monitoring\n"
-            "• Re-enable disabled system tools (Command Prompt, Task Manager, etc.)\n"
-            "• Remove FadCrypt from Windows startup\n"
-            "• Remove Windows Explorer context menu entries\n"
-            "• Delete all FadCrypt data directories and files\n"
-            "• Restart File Explorer to apply changes\n\n"
-            "Run this before uninstalling to ensure a clean system state."
-        )
+        # Platform-specific cleanup info
+        if self.platform_name == "Windows":
+            cleanup_text = (
+                "🧹 Complete system cleanup before uninstalling FadCrypt.\n\n"
+                "This will:\n"
+                "• Stop any active file monitoring\n"
+                "• Re-enable disabled system tools (Command Prompt, Task Manager, etc.)\n"
+                "• Remove FadCrypt from Windows startup\n"
+                "• Remove Windows Explorer context menu entries\n"
+                "• Delete all FadCrypt data directories and files\n"
+                "• Restart File Explorer to apply changes\n\n"
+                "Run this before uninstalling to ensure a clean system state."
+            )
+        else:  # Linux
+            cleanup_text = (
+                "🧹 Complete system cleanup before uninstalling FadCrypt.\n\n"
+                "This will:\n"
+                "• Unlock all locked files and folders\n"
+                "• Remove immutable flags from protected files\n"
+                "• Re-enable disabled system tools (gnome-terminal, htop, etc.)\n"
+                "• Remove autostart entry\n"
+                "• Delete all FadCrypt configuration and backup files\n\n"
+                "Run this before uninstalling to ensure a clean system state."
+            )
+        
+        cleanup_info = QLabel(cleanup_text)
         cleanup_info.setStyleSheet("color: #888888;")
         cleanup_info.setWordWrap(True)
         bottom_frame.addWidget(cleanup_info)

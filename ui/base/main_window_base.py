@@ -322,8 +322,8 @@ class MainWindowBase(QMainWindow):
         self.settings_panel.export_config_requested.connect(self.on_export_config)
         self.settings_panel.import_config_requested.connect(self.on_import_config)
         
-        # Connect context menu refresh button (Windows only)
-        if hasattr(self.settings_panel, 'on_refresh_context_menu'):
+        # Connect context menu refresh button (Windows only - check if main window has the method)
+        if hasattr(self, 'refresh_context_menu') and hasattr(self.settings_panel, 'on_refresh_context_menu'):
             self.settings_panel.on_refresh_context_menu = self.refresh_context_menu
         
         # Center window after everything is initialized
