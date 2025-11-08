@@ -160,6 +160,11 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
     
 ## `>_` How FadCrypt Works:
 
+<details>
+<summary><strong>📚 Technical Deep Dive (Click to expand)</strong></summary>
+
+<br>
+
 ### File & Folder Encryption (CLI Mode)
 
 **Encryption Process:**
@@ -352,6 +357,8 @@ When monitoring (auto-monitor) is enabled:
 
 **Config Protection:** Critical config files are backed up and protected; the daemon manages file immutability and restoration where applicable.
 
+</details>
+
 ## `>_` Password Creation & Setup
 
 When you first run FadCrypt:
@@ -418,6 +425,13 @@ Download the latest version from the [releases page](https://github.com/anonfade
 
 ## `>_` Features:
 
+✅ **Application Locking** | ✅ **File Encryption** | ✅ **Recovery Codes** | ✅ **Real-time Protection** | ✅ **Auto-Startup** | ✅ **Cross-Platform**
+
+<details>
+<summary><strong>📋 Full Feature List (Click to expand)</strong></summary>
+
+<br>
+
 - **Application Locking:** Secure apps with encrypted password protection; password cannot be recovered if lost and tool cannot be stopped without it.
 - **Real-time File Protection:** Detects and auto-recovers critical files/folders if deleted or modified.
 - **Recovery Codes:** Generate and use recovery codes to reset forgotten password securely (non-bypassable, one-time use).
@@ -425,54 +439,28 @@ Download the latest version from the [releases page](https://github.com/anonfade
 - **Statistics & Activity Logging:** Detailed monitoring statistics with activity history and duration tracking.
 - **Customizable UI:** Choose password dialog styles, UI themes, and system tray integration.
 - **Cross-Platform:** Works on both Windows and Linux with platform-specific features.
-
-⚠️ **Tamper-Proof Encryption:** When a file or folder is encrypted, it becomes tamper-proof and cannot be copied, moved, deleted, or modified until decrypted. The encrypted file is write-protected and read-restricted to ensure unauthorized access is prevented.
-
-**Security (Windows & Linux):**
-
-- **Optional System Tools Disabled (User Configurable):**
-  - **Windows:** Task Manager, Registry Editor, Command Prompt, Control Panel, msconfig
-  - **Linux:** Terminal emulators (gnome-terminal, konsole, xterm), system monitors (htop, top, gnome-system-monitor)
-- **Encrypted Storage:** All passwords and configuration data encrypted using industry-standard cryptography.
-- **File Immutability & Elevation:**
-  - **Windows:** Windows Service (FadCryptElevated) with SYSTEM privileges for seamless elevated operations
-  - **Linux:** Root daemon service with Unix socket communication for seamless elevated operations
-- **Single Instance Enforcement:** Only one FadCrypt instance can run at a time to prevent bypass attempts.
-- **Professional Authorization (Both Platforms):**
-  - **Windows:** Automatic service elevation (FadCryptElevated service with SYSTEM privileges)
-  - **Linux:** Automatic root daemon service (no authentication required)
-
-**Extras:**
-
 - **Snake Game:** Classic arcade Snake game available on home tab for entertainment.
 - **System Tray Integration:** Quick access from system tray with minimize/restore functionality.
 - **Auto-Recovery:** Crashes are detected and monitored files are recovered automatically on next startup.
 
-**Daemon Architecture (Linux):**
+### Security Features
 
-FadCrypt uses a client-daemon architecture for maximum security:
+- **Encrypted Storage:** All passwords and configuration data encrypted using industry-standard cryptography
+- **Single Instance Enforcement:** Only one FadCrypt instance can run at a time to prevent bypass attempts
+- **Password-Secured Monitoring Control:** Requires master password to stop or alter protection settings
+- **Optional System Tools Disabled:** Prevent access to Task Manager, Registry Editor, Command Prompt, etc. (configurable)
+- **File Immutability & Elevation:** Windows Service or Linux daemon for seamless elevated operations
+
+### Daemon Architecture (Linux)
 
 - **Root Daemon:** `fadcrypt-elevated.service` runs as systemd service with full root privileges
 - **Unix Socket Communication:** Secure IPC between GUI and daemon
 - **Capabilities:** File protection (chattr), permissions (chmod), backup restoration, kernel monitoring (fanotify)
 - **Installation:** Automatically configured with .deb package
 
-**Implemented Features:**
+</details>
 
-- ✅ Password-protected app locking & monitoring
-- ✅ Real-time file/folder protection from deletion
-- ✅ Auto-recovery if files are deleted
-- ✅ Recovery codes for password reset
-- ✅ Auto-startup after system reboot (silent with --auto-monitor)
-- ✅ Single-instance enforcement
-- ✅ Detailed statistics & activity monitoring
-- ✅ Customizable dialog styles & preferences
-- ✅ Encrypted password & config storage
-- ✅ Critical files protected from tampering
-- ✅ Password-secured monitoring control
-✅ Windows: Service-based privilege elevation (SYSTEM privileges via FadCryptElevated service)
-- ✅ Linux: Root daemon service with Unix socket communication (systemd)
-- ✅ Cross-platform (Windows + Linux)
+⚠️ **Tamper-Proof Encryption:** When a file or folder is encrypted, it becomes tamper-proof and cannot be copied, moved, deleted, or modified until decrypted. The encrypted file is write-protected and read-restricted to ensure unauthorized access is prevented.
 
 ## `>_` Command-Line Interface (CLI)
 
@@ -513,6 +501,11 @@ fadcrypt --help
 fadcrypt --lock ./file.txt --verbose
 ```
 
+<details>
+<summary><strong>⚙️ CLI Technical Details (Click to expand)</strong></summary>
+
+<br>
+
 ### CLI Features
 
 **Cross-Platform Compatibility:**
@@ -537,6 +530,8 @@ fadcrypt --lock ./file.txt --verbose
 - Prevents locking of system paths
 - Detects already-locked items and prevents double-locking
 - Automatic recovery on interrupted operations
+
+</details>
 
 ### Tamper-Proof Protection Control
 
@@ -668,12 +663,6 @@ This will:
 - Install daemon service automatically
 
 </details>
-
-## `>_` Quick Start
-
-Ready to use FadCrypt? Download pre-built binaries from [Releases](https://github.com/anonfaded/FadCrypt/releases)
-
-Or build from source using the instructions above.
 
 ## `>_` License & Commercial Use
 
