@@ -151,7 +151,7 @@ a = Analysis(
         'jupyter',           # Jupyter (not used)
         'test',              # Test modules
         'unittest',          # Unit testing
-        'pydoc',             # Documentation
+        # Note: 'pydoc' intentionally NOT excluded because some libraries import it at runtime
         # 'xml.etree',       # REMOVED - needed by some modules
         # 'email',           # REMOVED - needed by pkg_resources
         # 'http',            # REMOVED - needed by urllib3/requests

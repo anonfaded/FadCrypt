@@ -416,7 +416,7 @@ class FileLockManagerLinux(FileLockManager):
         Toggle tamper-proof protections on Linux via chmod/chattr.
         
         Args:
-            path: Path to the file or folder
+            path: Path to the file or folder (can be relative or absolute)
             enable: True to enable protections, False to disable
         
         Returns:
@@ -424,6 +424,9 @@ class FileLockManagerLinux(FileLockManager):
         """
         if not os.path.exists(path):
             return False
+        
+        # Convert to absolute path for daemon operations (daemon runs as root with different cwd)
+        abs_path = os.path.abspath(path)
         
         client = self._get_daemon_client()
         if not client:
@@ -433,11 +436,11 @@ class FileLockManagerLinux(FileLockManager):
         try:
             if enable:
                 # Apply same protections as _lock_item: chmod 000 via daemon, then chattr +i
-                success, msg = client.chmod([path], 0o000)
+                success, msg = client.chmod([abs_path], 0o000)
                 if success:
                     vlog(f"  [Toggle] Applied 000 permissions via daemon: {os.path.basename(path)}")
                     # Set immutable flag via daemon
-                    success_chattr, msg_chattr = client.chattr([path], set_immutable=True)
+                    success_chattr, msg_chattr = client.chattr([abs_path], set_immutable=True)
                     if success_chattr:
                         return True
                     else:
@@ -449,7 +452,7 @@ class FileLockManagerLinux(FileLockManager):
             else:
                 # Disable tamper-proof protections via daemon
                 # IMPORTANT: Remove immutable flag FIRST before changing permissions
-                success_chattr, msg_chattr = client.chattr([path], set_immutable=False)
+                success_chattr, msg_chattr = client.chattr([abs_path], set_immutable=False)
                 if not success_chattr:
                     vlog(f"  [Toggle] daemon chattr -i failed: {msg_chattr}")
                     return False
@@ -457,10 +460,10 @@ class FileLockManagerLinux(FileLockManager):
                 vlog(f"  [Toggle] Removed immutable attribute")
                 
                 # Now restore original permissions
-                if os.path.isdir(path):
-                    success, msg = client.chmod([path], 0o755)
+                if os.path.isdir(abs_path):
+                    success, msg = client.chmod([abs_path], 0o755)
                 else:
-                    success, msg = client.chmod([path], 0o644)
+                    success, msg = client.chmod([abs_path], 0o644)
                 
                 if success:
                     vlog(f"  [Toggle] Restored permissions via daemon: {os.path.basename(path)}")
