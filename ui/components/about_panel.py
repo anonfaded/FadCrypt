@@ -244,6 +244,32 @@ class AboutPanel(QWidget):
         
         buttons_layout.addLayout(row3)
         
+        # Row 4: Libraries & Credits
+        libraries_button = QPushButton("📚 Libraries & Credits")
+        libraries_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9933ff, stop:1 #6600cc);
+                color: white;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 12px 25px;
+                border-radius: 8px;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #aa44ff, stop:1 #7700dd);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #6600cc, stop:1 #440099);
+            }
+        """)
+        libraries_button.clicked.connect(self.show_libraries_dialog)
+        libraries_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        buttons_layout.addWidget(libraries_button)
+        
         layout.addWidget(buttons_frame)
         
         # === FadSec Lab Suite Info ===
@@ -387,6 +413,11 @@ class AboutPanel(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(scroll_area)
+    
+    def show_libraries_dialog(self):
+        """Show official Qt about dialog"""
+        from PyQt6.QtWidgets import QApplication
+        QApplication.aboutQt()
         
     def check_for_updates(self):
         """Check for latest version on GitHub"""
