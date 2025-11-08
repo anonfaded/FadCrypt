@@ -79,7 +79,7 @@ Encrypt and lock sensitive files and folders using military-grade **AES-256-GCM 
 <div align="center">
 
 <img src="img/demo/gui/hometab.png" style="width: 600px; height: auto;" >
-<br><em>Home Tab</em>
+<br><em>Home Tab - Dashboard with buttons</em>
 
 <img src="img/demo/gui/applicationstab.png" style="width: 600px; height: auto;" >
 <br><em>Applications Tab - Lock and manage installed applications/software</em>
