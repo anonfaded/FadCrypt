@@ -459,20 +459,20 @@ FadCrypt uses a client-daemon architecture for maximum security:
 
 **Implemented Features:**
 
-✅ Password-protected app locking & monitoring
-✅ Real-time file/folder protection from deletion
-✅ Auto-recovery if files are deleted
-✅ Recovery codes for password reset
-✅ Auto-startup after system reboot (silent with --auto-monitor)
-✅ Single-instance enforcement
-✅ Detailed statistics & activity monitoring
-✅ Customizable dialog styles & preferences
-✅ Encrypted password & config storage
-✅ Critical files protected from tampering
-✅ Password-secured monitoring control
-✅ Windows: Task Scheduler-based privilege elevation (UAC caching)
-✅ Linux: Root daemon service with Unix socket communication (systemd)
-✅ Cross-platform (Windows + Linux)
+- ✅ Password-protected app locking & monitoring
+- ✅ Real-time file/folder protection from deletion
+- ✅ Auto-recovery if files are deleted
+- ✅ Recovery codes for password reset
+- ✅ Auto-startup after system reboot (silent with --auto-monitor)
+- ✅ Single-instance enforcement
+- ✅ Detailed statistics & activity monitoring
+- ✅ Customizable dialog styles & preferences
+- ✅ Encrypted password & config storage
+- ✅ Critical files protected from tampering
+- ✅ Password-secured monitoring control
+- ✅ Windows: Task Scheduler-based privilege elevation (UAC caching)
+- ✅ Linux: Root daemon service with Unix socket communication (systemd)
+- ✅ Cross-platform (Windows + Linux)
 
 ## `>_` Command-Line Interface (CLI)
 
