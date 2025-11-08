@@ -384,7 +384,7 @@ Download the latest version from the [releases page](https://github.com/anonfade
 2. **Install:** Run `FadCryptSetup_vX.X.X.exe` and follow the wizard
 3. **Run:** 
    - Search "FadCrypt" in Start menu and launch, or
-   - Run `fadcrypt` from Command Prompt/PowerShell
+   - Run `fadcrypt` from terminal
 4. **Context Menu:** Right-click files/folders to lock/unlock directly
 
 ### Linux
