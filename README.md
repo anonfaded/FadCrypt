@@ -435,11 +435,11 @@ Download the latest version from the [releases page](https://github.com/anonfade
   - **Linux:** Terminal emulators (gnome-terminal, konsole, xterm), system monitors (htop, top, gnome-system-monitor)
 - **Encrypted Storage:** All passwords and configuration data encrypted using industry-standard cryptography.
 - **File Immutability & Elevation:**
-  - **Windows:** Task Scheduler-based privilege elevation with persistent session authorization (equivalent to PolicyKit)
+  - **Windows:** Windows Service (FadCryptElevated) with SYSTEM privileges for seamless elevated operations
   - **Linux:** Root daemon service with Unix socket communication for seamless elevated operations
 - **Single Instance Enforcement:** Only one FadCrypt instance can run at a time to prevent bypass attempts.
 - **Professional Authorization (Both Platforms):**
-  - **Windows:** Single UAC prompt cached per session via Task Scheduler
+  - **Windows:** Automatic service elevation (FadCryptElevated service with SYSTEM privileges)
   - **Linux:** Automatic root daemon service (no authentication required)
 
 **Extras:**
@@ -470,7 +470,7 @@ FadCrypt uses a client-daemon architecture for maximum security:
 - ✅ Encrypted password & config storage
 - ✅ Critical files protected from tampering
 - ✅ Password-secured monitoring control
-- ✅ Windows: Task Scheduler-based privilege elevation (UAC caching)
+✅ Windows: Service-based privilege elevation (SYSTEM privileges via FadCryptElevated service)
 - ✅ Linux: Root daemon service with Unix socket communication (systemd)
 - ✅ Cross-platform (Windows + Linux)
 

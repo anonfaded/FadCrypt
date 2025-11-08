@@ -72,7 +72,7 @@ Read these files to understand structure:
 - **Platform Detection:** Runtime detection via `platform.system()` determines behavior
 - **Abstraction Layer:** `CLIHandlerBase` and `FileLockManager` provide platform-agnostic interfaces
 - **Daemon on Linux:** Root daemon service via systemd (installed with `.deb` package)
-- **Service on Windows:** Optional Task Scheduler-based elevation service
+- **Service on Windows:** Windows Service (FadCryptElevated) with SYSTEM privileges for elevation
 - **Config Locations:** Automatically platform-specific (Windows uses %APPDATA%, Linux uses ~/.config)
 - **Versioning:** Manual via `__version__` and `__version_code__` in `FadCrypt.py`
 
