@@ -380,8 +380,8 @@ Download the latest version from the [releases page](https://github.com/anonfade
 
 ### Windows
 
-1. **Download:** Get the installer from [Releases](https://github.com/anonfaded/FadCrypt/releases)
-2. **Install:** Run `FadCryptSetup_vX.X.X.exe` and follow the wizard
+1. **Download:** Get [`FadCryptSetup_v2.0.0.exe`](https://github.com/anonfaded/FadCrypt/releases/download/v2.0.0/FadCryptSetup_v2.0.0.exe) from [Releases](https://github.com/anonfaded/FadCrypt/releases)
+2. **Install:** Run the installer and follow the wizard
 3. **Run:** 
    - Search "FadCrypt" in Start menu and launch, or
    - Run `fadcrypt` from terminal
@@ -389,9 +389,9 @@ Download the latest version from the [releases page](https://github.com/anonfade
 
 ### Linux
 
-1. **Download & Install:** Get `.deb` from [Releases](https://github.com/anonfaded/FadCrypt/releases), then:
+1. **Download & Install:** Get [`FadCrypt_v2.0.0_amd64.deb`](https://github.com/anonfaded/FadCrypt/releases/download/v2.0.0/FadCrypt_v2.0.0_amd64.deb) from [Releases](https://github.com/anonfaded/FadCrypt/releases), then:
    ```bash
-   sudo apt install ./fadcrypt_X.Y.Z_amd64.deb
+   sudo apt install ./FadCrypt_v2.0.0_amd64.deb
    ```
    - The daemon service installs and enables automatically
    
