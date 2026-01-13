@@ -401,6 +401,25 @@ Download the latest version from the [releases page](https://github.com/anonfade
 
 3. **First Setup:** Set master password and generate recovery codes
 
+### macOS
+
+1. **Install Dependencies:** Ensure Homebrew is installed, then install SDL2 for pygame:
+   ```bash
+   brew install sdl2
+   ```
+
+2. **Install Python Packages:**
+   ```bash
+   pip3 install --break-system-packages -r requirements.txt
+   ```
+
+3. **Build:** Follow the build instructions for macOS (coming soon)
+
+4. **Run:** 
+   - Run `python3 FadCrypt.py` from terminal
+
+5. **First Setup:** Set master password and generate recovery codes
+
 <details>
 <summary><strong>ℹ️ Linux-Specific Details</strong></summary>
 
