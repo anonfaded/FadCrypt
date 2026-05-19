@@ -591,6 +591,7 @@ FadCrypt uses AES-256-GCM encryption with efficient streaming I/O and optimized 
 - [VPN Club on Telegram](https://t.me/s/wbnet?q=fadcrypt)
 - [popMods on Telegram](https://t.me/s/popmods?q=fadcrypt)
 - [blog.csdn.net](https://blog.csdn.net/qq_29607687/article/details/141366524)
+- [linuxeasy.org](https://www.linuxeasy.org/fadcrypt-la-crittografia-semplice-per-tutti-su-linux/)
 <!-- - [rhkb.cn](http://www.rhkb.cn/news/405585.html) -->
 
 ## `>_` Join Community
@@ -672,7 +673,7 @@ This will:
 If you want to use FadCrypt without GPLv3 requirements, 
 contact us for commercial licensing terms.
 
-📧 Email: fadedhood@proton.me
+📧 Email: contact@fadseclab.com
 
 <details>
 <summary><strong>🧪 Development Testing</strong></summary>
