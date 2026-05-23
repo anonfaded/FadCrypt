@@ -224,7 +224,7 @@ if '--register-context' in sys.argv:
             with open(log_file, 'a') as f:
                 f.write("[REGISTER-CONTEXT] Restarting Explorer...\n")
             try:
-                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                subprocess.run(['cmd', '/c', 'start', '', 'explorer.exe'], 
                              stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.Popen('explorer.exe')
                 print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
@@ -314,7 +314,7 @@ if '--unregister-context' in sys.argv:
             with open(log_file, 'a') as f:
                 f.write("[UNREGISTER-CONTEXT] Restarting Explorer...\n")
             try:
-                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                subprocess.run(['cmd', '/c', 'start', '', 'explorer.exe'], 
                              stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.Popen('explorer.exe')
                 print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
@@ -368,7 +368,7 @@ if '--unregister-context' in sys.argv:
             with open(log_file, 'a') as f:
                 f.write("[REGISTER-CONTEXT] Restarting Explorer...\n")
             try:
-                subprocess.run(['taskkill', '/f', '/im', 'explorer.exe'], 
+                subprocess.run(['cmd', '/c', 'start', '', 'explorer.exe'], 
                              stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.Popen('explorer.exe')
                 print("[CONTEXT MENU] Explorer restarted successfully", flush=True)
@@ -901,7 +901,7 @@ if '--cleanup' in sys.argv:
                     print("[CLEANUP] Restarting File Explorer to clear context menu cache...", flush=True)
                     try:
                         # Kill explorer and restart it properly
-                        subprocess.run(['taskkill.exe', '/f', '/im', 'explorer.exe'], 
+                        subprocess.run(['cmd', '/c', 'start', '', 'explorer.exe'], 
                                      capture_output=True, timeout=5)
                         # Give it a moment to fully terminate
                         import time
